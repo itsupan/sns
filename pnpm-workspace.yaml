@@ -3,3 +3,4 @@ allowBuilds:
   workerd: true
 overrides:
   sharp: 0.35.4
+  kysely: 0.29.5
