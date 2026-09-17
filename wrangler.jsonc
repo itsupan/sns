@@ -35,8 +35,9 @@
 		"production": {
 			"name": "sns",
 			"vars": {
-				"BETTER_AUTH_URL": "REPLACE_WITH_PRODUCTION_URL"
+				"BETTER_AUTH_URL": "https://sns.ecoapsara.com"
 			},
+			"routes": [{ "pattern": "sns.ecoapsara.com", "custom_domain": true }],
 			"secrets": {
 				"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
 			},
@@ -44,14 +45,14 @@
 				{
 					"binding": "DB",
 					"database_name": "sns-prod",
-					"database_id": "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID",
+					"database_id": "57a1a8fc-6d6e-4974-b5d1-2279cbe2c263",
 					"migrations_dir": "migrations"
 				}
 			],
 			"kv_namespaces": [
 				{
 					"binding": "KV",
-					"id": "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID"
+					"id": "fa46fc4c9e684fbbb1f38509a177509b"
 				}
 			]
 		}
