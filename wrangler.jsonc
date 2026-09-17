@@ -10,13 +10,9 @@
 	},
 	"observability": { "enabled": true },
 
-	// Local development (`pnpm dev` / `pnpm preview`). Local D1 and KV live in
-	// .wrangler/state, so these IDs are placeholders and never used.
 	"vars": {
 		"BETTER_AUTH_URL": "http://localhost:5173"
 	},
-	// Values come from .dev.vars locally (copy .dev.vars.example) and from
-	// `wrangler secret put <NAME> --env production` when deployed.
 	"secrets": {
 		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
 	},
@@ -35,8 +31,6 @@
 		}
 	],
 
-	// vars, secrets, d1_databases and kv_namespaces are not inherited, so each
-	// environment repeats them.
 	"env": {
 		"production": {
 			"name": "sns",

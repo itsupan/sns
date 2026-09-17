@@ -4,13 +4,8 @@ import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { createAuth } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
 
-/**
- * Attaches a per-request Drizzle client and Better Auth instance to `event.locals`,
- * resolves the signed-in user, and lets Better Auth answer its own `/api/auth/*` routes.
- */
 export const handle: Handle = async ({ event, resolve }) => {
 	const db = getDb(event.platform);
-	// getDb has already verified that platform.env is available.
 	const auth = createAuth(event.platform!.env, db);
 
 	event.locals.db = db;

@@ -29,7 +29,6 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
-          # SonarCloud needs full history for blame and new-code detection.
           fetch-depth: 0
 
       - name: Set up pnpm
@@ -42,8 +41,6 @@ jobs:
           cache: pnpm
 
       - name: Install Safe Chain
-        # Blocks known-malicious packages during `pnpm install`. Bump the version and
-        # checksum together from https://github.com/AikidoSec/safe-chain/releases
         run: |
           curl -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/${SAFE_CHAIN_VERSION}/install-safe-chain.sh" -o /tmp/install-safe-chain.sh
           echo "${SAFE_CHAIN_SHA256}  /tmp/install-safe-chain.sh" | sha256sum -c -
@@ -72,7 +69,6 @@ jobs:
         run: pnpm run test:coverage
 
       - name: SonarCloud scan
-        # Skipped when the secret is unavailable, e.g. on pull requests from forks.
         if: ${{ env.SONAR_TOKEN != '' }}
         uses: SonarSource/sonarqube-scan-action@v8
 
@@ -123,8 +119,6 @@ jobs:
           cache: pnpm
 
       - name: Install Safe Chain
-        # Blocks known-malicious packages during `pnpm install`. Bump the version and
-        # checksum together from https://github.com/AikidoSec/safe-chain/releases
         run: |
           curl -fsSL "https://github.com/AikidoSec/safe-chain/releases/download/${SAFE_CHAIN_VERSION}/install-safe-chain.sh" -o /tmp/install-safe-chain.sh
           echo "${SAFE_CHAIN_SHA256}  /tmp/install-safe-chain.sh" | sha256sum -c -

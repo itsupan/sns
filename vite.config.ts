@@ -7,7 +7,6 @@ export default defineConfig({
 	plugins: [
 		sveltekit({
 			compilerOptions: {
-				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) =>
 					filename.split(/[/\\]/).includes('node_modules') ? undefined : true
 			},
@@ -19,7 +18,6 @@ export default defineConfig({
 		passWithNoTests: true,
 		coverage: {
 			provider: 'v8',
-			// lcov is what SonarCloud reads (sonar-project.properties).
 			reporter: ['text', 'lcov'],
 			include: ['src/**/*.{ts,svelte}'],
 			exclude: ['src/**/*.{test,spec,e2e}.ts', 'src/**/*.d.ts', 'src/lib/server/db/auth-schema.ts']

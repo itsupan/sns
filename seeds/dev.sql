@@ -1,2 +1,0 @@
--- Local/development seed data. Keep it idempotent so it is safe to re-run.
--- Apply with: pnpm db:seed:local

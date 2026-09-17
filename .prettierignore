@@ -1,11 +1,9 @@
-# Package Managers
 package-lock.json
 pnpm-lock.yaml
 yarn.lock
 bun.lock
 bun.lockb
 
-# Build output & local state
 .svelte-kit/
 .wrangler/
 build/
@@ -14,10 +12,8 @@ test-results/
 coverage/
 .scannerwork/
 
-# Generated files
 worker-configuration.d.ts
 migrations/
 src/lib/server/db/auth-schema.ts
 
-# Miscellaneous
 /static/

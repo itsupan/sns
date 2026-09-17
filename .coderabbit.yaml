@@ -1,5 +1,4 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-# CodeRabbit AI code review. Install the CodeRabbit GitHub App on this repo to enable it.
 language: en-US
 reviews:
   profile: chill

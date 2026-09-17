@@ -3,12 +3,6 @@ import * as schema from './schema';
 
 export type Database = ReturnType<typeof getDb>;
 
-/**
- * Wraps the D1 binding in a typed Drizzle client.
- *
- * `platform` is populated by adapter-cloudflare: from `.wrangler/state` during
- * `pnpm dev` / `pnpm preview`, and from the real D1 database once deployed.
- */
 export function getDb(
 	platform: App.Platform | undefined
 ): ReturnType<typeof drizzle<typeof schema>> {
