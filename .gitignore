@@ -14,6 +14,35 @@ worker-configuration.d.ts
 # OS
 .DS_Store
 Thumbs.db
+Desktop.ini
+*~
+
+# Editors (keep the shared VS Code extension recommendations)
+.idea
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.swo
+
+# Logs
+*.log
+logs
+
+# Tool caches
+.eslintcache
+*.tsbuildinfo
+
+# Local SQLite files (local D1 lives in .wrangler/state)
+*.sqlite
+*.sqlite3
+*.db
+*.db-journal
+
+# Private keys and certificates
+*.pem
+*.key
+*.p12
+*.crt
 
 # Env
 .env
@@ -38,4 +67,6 @@ coverage
 # SonarCloud scanner cache
 .scannerwork
 
+# Claude Code (personal settings; shared project settings stay tracked)
 CLAUDE.md
+.claude/settings.local.json
