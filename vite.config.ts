@@ -17,6 +17,13 @@ export default defineConfig({
 	test: {
 		expect: { requireAssertions: true },
 		passWithNoTests: true,
+		coverage: {
+			provider: 'v8',
+			// lcov is what SonarCloud reads (sonar-project.properties).
+			reporter: ['text', 'lcov'],
+			include: ['src/**/*.{ts,svelte}'],
+			exclude: ['src/**/*.{test,spec,e2e}.ts', 'src/**/*.d.ts', 'src/lib/server/db/auth-schema.ts']
+		},
 		projects: [
 			{
 				extends: './vite.config.ts',

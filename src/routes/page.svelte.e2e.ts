@@ -10,5 +10,5 @@ test('health endpoint reports a reachable database', async ({ request }) => {
 	const response = await request.get('/api/health');
 
 	expect(response.status()).toBe(200);
-	expect(await response.json()).toMatchObject({ status: 'ok', database: 'ok' });
+	expect(await response.json()).toMatchObject({ status: 'ok', database: 'ok', kv: 'ok' });
 });

@@ -1,0 +1,5 @@
+# Aikido Safe Chain: blocks known-malicious packages during `pnpm install`,
+# locally (after installing safe-chain, see README) and in CI.
+safe-chain:
+  # Refuse package versions published less than 48 hours ago.
+  minimumPackageAgeHours: 48

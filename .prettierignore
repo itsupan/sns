@@ -11,10 +11,13 @@ bun.lockb
 build/
 playwright-report/
 test-results/
+coverage/
+.scannerwork/
 
 # Generated files
 worker-configuration.d.ts
 migrations/
+src/lib/server/db/auth-schema.ts
 
 # Miscellaneous
 /static/

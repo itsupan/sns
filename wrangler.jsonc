@@ -10,8 +10,16 @@
 	},
 	"observability": { "enabled": true },
 
-	// Local development (`pnpm dev` / `pnpm preview`). Local D1 lives in .wrangler/state,
-	// so this database_id is a placeholder and never used.
+	// Local development (`pnpm dev` / `pnpm preview`). Local D1 and KV live in
+	// .wrangler/state, so these IDs are placeholders and never used.
+	"vars": {
+		"BETTER_AUTH_URL": "http://localhost:5173"
+	},
+	// Values come from .dev.vars locally (copy .dev.vars.example) and from
+	// `wrangler secret put <NAME> --env production` when deployed.
+	"secrets": {
+		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",
@@ -20,16 +28,36 @@
 			"migrations_dir": "migrations"
 		}
 	],
+	"kv_namespaces": [
+		{
+			"binding": "KV",
+			"id": "00000000000000000000000000000000"
+		}
+	],
 
+	// vars, secrets, d1_databases and kv_namespaces are not inherited, so each
+	// environment repeats them.
 	"env": {
 		"production": {
 			"name": "sns",
+			"vars": {
+				"BETTER_AUTH_URL": "REPLACE_WITH_PRODUCTION_URL"
+			},
+			"secrets": {
+				"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+			},
 			"d1_databases": [
 				{
 					"binding": "DB",
 					"database_name": "sns-prod",
 					"database_id": "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID",
 					"migrations_dir": "migrations"
+				}
+			],
+			"kv_namespaces": [
+				{
+					"binding": "KV",
+					"id": "REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID"
 				}
 			]
 		}

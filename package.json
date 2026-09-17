@@ -10,7 +10,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
+		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173 --var BETTER_AUTH_URL:http://localhost:4173",
 		"prepare": "wrangler types && svelte-kit sync || echo ''",
 		"check": "wrangler types && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -19,8 +19,11 @@
 		"lint": "eslint .",
 		"test": "pnpm run test:unit --run && pnpm run test:e2e",
 		"test:unit": "vitest",
+		"test:coverage": "vitest --run --coverage",
 		"test:e2e": "playwright install chromium && playwright test",
 		"gen": "wrangler types",
+		"audit:deps": "pnpm audit --audit-level high",
+		"auth:schema": "pnpm dlx auth@1.7.5 generate --config better-auth.config.ts --adapter drizzle --dialect sqlite --output src/lib/server/db/auth-schema.ts --yes",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate:local": "wrangler d1 migrations apply DB --local",
 		"db:seed:local": "wrangler d1 execute DB --local --file=./seeds/dev.sql",
@@ -30,6 +33,8 @@
 		"deploy:production": "wrangler deploy --env production"
 	},
 	"dependencies": {
+		"@better-auth/drizzle-adapter": "^1.7.5",
+		"better-auth": "^1.7.5",
 		"drizzle-orm": "^0.45.2"
 	},
 	"devDependencies": {
@@ -40,6 +45,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@types/node": "^22",
 		"@vitest/browser-playwright": "^4.1.8",
+		"@vitest/coverage-v8": "4.1.11",
 		"drizzle-kit": "^0.31.10",
 		"eslint": "^10.4.1",
 		"eslint-config-prettier": "^10.1.8",

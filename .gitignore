@@ -22,6 +22,7 @@ Thumbs.db
 !.env.test
 .dev.vars
 .dev.vars.*
+!.dev.vars.example
 
 # Vite
 vite.config.js.timestamp-*
@@ -30,5 +31,11 @@ vite.config.ts.timestamp-*
 # Playwright
 test-results
 playwright-report
+
+# Coverage (Vitest → SonarCloud)
+coverage
+
+# SonarCloud scanner cache
+.scannerwork
 
 CLAUDE.md

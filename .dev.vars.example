@@ -1,0 +1,7 @@
+# Local secrets for `pnpm dev` / `pnpm preview`. Copy to .dev.vars (gitignored).
+# Generate the secret with: pnpm dlx auth@latest secret
+BETTER_AUTH_SECRET=replace-with-a-random-string-of-at-least-32-characters
+# Google Cloud Console → APIs & Services → Credentials → OAuth client ID (Web application)
+# Authorized redirect URI: http://localhost:5173/api/auth/callback/google
+GOOGLE_CLIENT_ID=replace-me.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=replace-me
