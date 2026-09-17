@@ -17,7 +17,7 @@ The D1 → Drizzle → `locals.db` chain is wired and covered by the `/api/healt
 | End-to-end      | Playwright                                                  |
 | Database        | Cloudflare D1 (SQLite) via Drizzle ORM                      |
 | Hosting         | Cloudflare Workers (`@sveltejs/adapter-cloudflare`)         |
-| CI/CD           | GitHub Actions → staging & production                       |
+| CI/CD           | GitHub Actions → production                                 |
 | Package manager | pnpm                                                        |
 
 ## Getting started
@@ -57,7 +57,7 @@ src/
     page.svelte.e2e.ts   End-to-end test (Playwright)
     api/health/+server.ts  Smoke endpoint: reports D1 reachability
 static/                Files served as-is
-wrangler.jsonc         Worker + D1 config for local / staging / production
+wrangler.jsonc         Worker + D1 config for local / production
 drizzle.config.ts      Drizzle Kit — generates SQL only, never talks to D1
 .github/workflows/cicd.yml
 ```
@@ -83,7 +83,6 @@ regenerates the binding types too, so they can never drift from `wrangler.jsonc`
 | `pnpm test`                  | Everything                                                            |
 | `pnpm db:generate`           | Generate a migration from `schema.ts` (`--name <label>` optional)     |
 | `pnpm db:setup:local`        | Apply migrations to local D1                                          |
-| `pnpm db:migrate:staging`    | Apply migrations to the staging D1                                    |
 | `pnpm db:migrate:production` | Apply migrations to the production D1                                 |
 | `pnpm gen`                   | Regenerate `worker-configuration.d.ts` after editing bindings         |
 
@@ -92,7 +91,7 @@ regenerates the binding types too, so they can never drift from `wrangler.jsonc`
 1. Edit `src/lib/server/db/schema.ts`.
 2. `pnpm db:generate --name <what_changed>` — writes `migrations/NNNN_<name>.sql`.
 3. Review the generated SQL, then `pnpm db:setup:local`.
-4. Commit the schema **and** the migration. CI applies it to staging/production on deploy.
+4. Commit the schema **and** the migration. CI applies it to production on deploy.
 
 Drizzle only generates SQL here; Wrangler owns applying it, so migration state is tracked
 in D1's `d1_migrations` table rather than by Drizzle.
@@ -101,12 +100,11 @@ in D1's `d1_migrations` table rather than by Drizzle.
 
 Deployment is not configured until you do these three things.
 
-**1. Create the two D1 databases** and paste the returned IDs into `wrangler.jsonc`,
-replacing `REPLACE_WITH_STAGING_D1_DATABASE_ID` and `REPLACE_WITH_PRODUCTION_D1_DATABASE_ID`:
+**1. Create the production D1 database** and paste the returned ID into `wrangler.jsonc`,
+replacing `REPLACE_WITH_PRODUCTION_D1_DATABASE_ID`:
 
 ```sh
 pnpm exec wrangler login
-pnpm exec wrangler d1 create sns-staging
 pnpm exec wrangler d1 create sns-prod
 ```
 
@@ -120,8 +118,8 @@ lives in `.wrangler/state` and never uses it.
 | `CLOUDFLARE_API_TOKEN`  | Cloudflare dashboard → My Profile → API Tokens → _Edit Cloudflare Workers_ template, with D1 edit permission |
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID                                                          |
 
-If you create GitHub Environments named `staging` and `production`, the secrets can live
-there instead and you can gate production behind a required reviewer.
+If you create a GitHub Environment named `production`, the secrets can live there instead
+and you can gate deploys behind a required reviewer.
 
 **3. Push.** See below.
 
@@ -131,11 +129,9 @@ there instead and you can gate production behind a required reviewer.
 
 - **Every push and PR** to `development` or `main` runs: format check → lint → typecheck →
   unit/component tests → build → end-to-end tests.
-- **Push to `development`** → after CI passes, applies migrations to the staging D1 and
-  deploys the `sns-staging` Worker.
 - **Push to `main`** → after CI passes, applies migrations to the production D1 and deploys
   the `sns` Worker.
 
 Migrations run _before_ the Worker is deployed, so the new code never meets an old schema.
 
-Deploy manually with `pnpm deploy:staging` / `pnpm deploy:production` if you need to.
+Deploy manually with `pnpm deploy:production` if you need to.

@@ -25,10 +25,8 @@
 		"db:migrate:local": "wrangler d1 migrations apply DB --local",
 		"db:seed:local": "wrangler d1 execute DB --local --file=./seeds/dev.sql",
 		"db:setup:local": "pnpm run db:migrate:local",
-		"db:migrate:staging": "wrangler d1 migrations apply DB --env staging --remote",
 		"db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
 		"db:studio": "drizzle-kit studio",
-		"deploy:staging": "wrangler deploy --env staging",
 		"deploy:production": "wrangler deploy --env production"
 	},
 	"dependencies": {

@@ -22,17 +22,6 @@
 	],
 
 	"env": {
-		"staging": {
-			"name": "sns-staging",
-			"d1_databases": [
-				{
-					"binding": "DB",
-					"database_name": "sns-staging",
-					"database_id": "REPLACE_WITH_STAGING_D1_DATABASE_ID",
-					"migrations_dir": "migrations"
-				}
-			]
-		},
 		"production": {
 			"name": "sns",
 			"d1_databases": [
