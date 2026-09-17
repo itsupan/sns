@@ -1,0 +1,48 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "sns",
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"compatibility_date": "2026-08-27",
+	"compatibility_flags": ["nodejs_compat"],
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"observability": { "enabled": true },
+
+	// Local development (`pnpm dev` / `pnpm preview`). Local D1 lives in .wrangler/state,
+	// so this database_id is a placeholder and never used.
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "sns-local",
+			"database_id": "00000000-0000-0000-0000-000000000000",
+			"migrations_dir": "migrations"
+		}
+	],
+
+	"env": {
+		"staging": {
+			"name": "sns-staging",
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "sns-staging",
+					"database_id": "REPLACE_WITH_STAGING_D1_DATABASE_ID",
+					"migrations_dir": "migrations"
+				}
+			]
+		},
+		"production": {
+			"name": "sns",
+			"d1_databases": [
+				{
+					"binding": "DB",
+					"database_name": "sns-prod",
+					"database_id": "REPLACE_WITH_PRODUCTION_D1_DATABASE_ID",
+					"migrations_dir": "migrations"
+				}
+			]
+		}
+	}
+}
