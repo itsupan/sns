@@ -1,5 +1,12 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
+	import SheetAction from '$lib/components/shared/SheetAction.svelte';
+	import ThemeToggle from '$lib/components/shared/ThemeToggle.svelte';
+	import { authClient } from '$lib/auth-client';
+	import { toast } from '$lib/utils/toast.svelte';
 
 	interface ProfileData {
 		name: string;
@@ -49,7 +56,9 @@
 	const profile = $derived({ ...defaultProfile, ...customProfile });
 
 	let isFollowing = $state(defaultProfile.isFollowing);
-	let copiedLink = $state(false);
+	let settingsOpen = $state(false);
+
+	const session = authClient.useSession();
 
 	function toggleFollow() {
 		isFollowing = !isFollowing;
@@ -57,13 +66,27 @@
 	}
 
 	async function handleShare() {
-		if (typeof navigator !== 'undefined' && navigator.clipboard) {
-			await navigator.clipboard.writeText(window.location.href);
-			copiedLink = true;
-			setTimeout(() => {
-				copiedLink = false;
-			}, 2000);
+		const url = window.location.href;
+		if (navigator.share) {
+			try {
+				await navigator.share({ title: `${profile.name} on Kizuna`, url });
+			} catch {
+				// User dismissed the native share sheet.
+			}
+			return;
 		}
+		try {
+			await navigator.clipboard.writeText(url);
+			toast.show('Profile link copied');
+		} catch {
+			toast.show('Could not copy link');
+		}
+	}
+
+	async function signOut() {
+		settingsOpen = false;
+		await authClient.signOut();
+		await goto(resolve('/login'));
 	}
 </script>
 
@@ -232,7 +255,7 @@
 				<!-- Follow / Following Button -->
 				<button
 					type="button"
-					class="flex-1 sm:flex-initial h-10 px-4 sm:px-5 rounded-full flex items-center justify-center gap-1.5 font-semibold text-xs transition-all duration-150 cursor-pointer border {isFollowing
+					class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full flex items-center justify-center gap-1.5 font-semibold text-xs transition-all duration-150 cursor-pointer border {isFollowing
 						? 'bg-black text-white dark:bg-white dark:text-black border-transparent sm:border-slate-200 sm:dark:border-dark-border sm:bg-slate-100 sm:dark:bg-dark-elevated sm:text-slate-900 sm:dark:text-white sm:hover:bg-slate-200'
 						: 'bg-blue-600 text-white sm:bg-slate-950 sm:dark:bg-white sm:text-white sm:dark:text-slate-950 border-transparent hover:opacity-90'}"
 					onclick={toggleFollow}
@@ -249,7 +272,7 @@
 				<!-- Message Button -->
 				<button
 					type="button"
-					class="flex-1 sm:flex-initial h-10 px-4 sm:px-5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text sm:bg-slate-950 sm:text-white sm:dark:bg-white sm:dark:text-slate-950 hover:bg-slate-200 dark:hover:bg-dark-hover sm:hover:bg-slate-800 sm:dark:hover:bg-slate-100 flex items-center justify-center gap-1.5 font-semibold text-xs transition-colors duration-150 cursor-pointer border-0 shadow-xs"
+					class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text sm:bg-slate-950 sm:text-white sm:dark:bg-white sm:dark:text-slate-950 hover:bg-slate-200 dark:hover:bg-dark-hover sm:hover:bg-slate-800 sm:dark:hover:bg-slate-100 flex items-center justify-center gap-1.5 font-semibold text-xs transition-colors duration-150 cursor-pointer border-0 shadow-xs"
 				>
 					<Icon name="envelope" class="hidden sm:inline-block text-sm" />
 					<span class="sm:hidden">Message</span>
@@ -259,27 +282,48 @@
 				<!-- Share Button -->
 				<button
 					type="button"
-					class="size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-dark-hover flex items-center justify-center transition-colors duration-150 cursor-pointer border-0 shrink-0"
+					class="size-11 sm:size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-dark-hover flex items-center justify-center transition-colors duration-150 cursor-pointer border-0 shrink-0"
 					onclick={handleShare}
 					aria-label="Share profile"
 					title="Share profile"
 				>
 					<Icon name="share" class="text-sm" />
 				</button>
+
+				<!-- Settings (mobile: theme + account live here instead of the app bar) -->
+				<button
+					type="button"
+					class="sm:hidden size-11 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted active:scale-95 active:bg-slate-200 dark:active:bg-dark-hover flex items-center justify-center transition cursor-pointer border-0 shrink-0"
+					onclick={() => (settingsOpen = true)}
+					aria-label="Settings"
+					aria-haspopup="dialog"
+				>
+					<Icon name="settings" class="text-base" />
+				</button>
 			</div>
 		</div>
 	</div>
-
-	<!-- Copy Link Toast Notification -->
-	{#if copiedLink}
-		<div
-			class="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-medium px-4 py-2 rounded-full shadow-lg transition-opacity duration-200"
-			role="status"
-		>
-			Profile link copied to clipboard
-		</div>
-	{/if}
 </div>
+
+<BottomSheet bind:open={settingsOpen} title="Settings" showTitle>
+	<div class="flex items-center justify-between gap-4 min-h-12 px-4">
+		<span class="text-[15px] font-medium text-slate-900 dark:text-dark-text">Appearance</span>
+		<ThemeToggle variant="segmented" />
+	</div>
+	<SheetAction icon="share" label="Share profile" onclick={handleShare} />
+	{#if $session.data?.user}
+		<SheetAction icon="sign-out-alt" label="Log out" danger onclick={signOut} />
+	{:else}
+		<SheetAction
+			icon="sign-in-alt"
+			label="Log in"
+			onclick={() => {
+				settingsOpen = false;
+				goto(resolve('/login'));
+			}}
+		/>
+	{/if}
+</BottomSheet>
 
 <style>
 	.profile-grid {

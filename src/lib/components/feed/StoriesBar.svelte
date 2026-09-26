@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import { toast } from '$lib/utils/toast.svelte';
 
 	interface Story {
 		id: string;
@@ -77,48 +78,58 @@
 </script>
 
 <div
-	class="stories-container w-full bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl p-4 mb-4 shadow-xs dark:shadow-none overflow-x-auto no-scrollbar {className}"
+	class="stories-container w-full bg-white dark:bg-dark-card border-b sm:border border-slate-100 dark:border-dark-border rounded-none sm:rounded-2xl py-3 sm:p-4 mb-2 sm:mb-4 shadow-none sm:shadow-xs dark:shadow-none overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-px-4 {className}"
 >
-	<div class="flex items-center gap-4 sm:gap-5 min-w-max">
+	<ul class="flex items-start gap-3 sm:gap-5 min-w-max px-4 sm:px-0 list-none m-0">
 		<!-- Add your story button -->
-		<button
-			type="button"
-			class="group flex flex-col items-center gap-2 cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none"
-			onclick={onAddStory}
-			aria-label="Add your story"
-		>
-			<div
-				class="size-14 rounded-full border-1.5 border-dashed border-slate-300 dark:border-dark-border group-hover:border-slate-900 dark:group-hover:border-white flex items-center justify-center text-slate-500 dark:text-dark-muted group-hover:text-slate-900 dark:group-hover:text-white transition-all duration-150 bg-slate-50 dark:bg-dark-elevated"
-			>
-				<Icon name="plus" class="text-base" />
-			</div>
-			<span class="text-xs font-medium text-slate-700 dark:text-dark-muted leading-tight">
-				Your story
-			</span>
-		</button>
-
-		<!-- Creators' stories -->
-		{#each stories as story (story.id)}
+		<li class="snap-start">
 			<button
 				type="button"
-				class="group flex flex-col items-center gap-2 cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none"
-				onclick={() => onSelectStory?.(story)}
-				aria-label={`View story from ${story.username}`}
+				class="group w-18 flex flex-col items-center gap-1.5 cursor-pointer bg-transparent border-0 p-0 text-inherit rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 dark:focus-visible:outline-kizuna-blue active:scale-95 transition-transform"
+				onclick={onAddStory ?? (() => toast.show('Stories are coming soon'))}
+				aria-label="Add your story"
 			>
-				<div class="relative transition-transform duration-150 group-hover:scale-105">
-					<Avatar
-						src={story.avatar}
-						name={story.username}
-						size="xl"
-						ring={story.activeRing || 'default'}
-					/>
+				<div
+					class="size-16 rounded-full border-1.5 border-dashed border-slate-300 dark:border-dark-border group-hover:border-slate-900 dark:group-hover:border-white flex items-center justify-center text-slate-500 dark:text-dark-muted group-hover:text-slate-900 dark:group-hover:text-white transition-all duration-150 bg-slate-50 dark:bg-dark-elevated"
+				>
+					<Icon name="plus" class="text-lg" />
 				</div>
 				<span
-					class="text-xs font-medium text-slate-700 dark:text-dark-text leading-tight group-hover:text-slate-950 dark:group-hover:text-white transition-colors"
+					class="w-full truncate text-center text-xs font-medium text-slate-700 dark:text-dark-muted leading-tight"
 				>
-					{story.username}
+					Your story
 				</span>
 			</button>
+		</li>
+
+		<!-- Creators' stories: gradient ring = unseen, grey ring = seen -->
+		{#each stories as story (story.id)}
+			<li class="snap-start">
+				<button
+					type="button"
+					class="group w-18 flex flex-col items-center gap-1.5 cursor-pointer bg-transparent border-0 p-0 text-inherit rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 dark:focus-visible:outline-kizuna-blue active:scale-95 transition-transform"
+					onclick={() =>
+						onSelectStory ? onSelectStory(story) : toast.show('Stories are coming soon')}
+					aria-label={`View story from ${story.username}${story.hasUnread ? ', new' : ''}`}
+				>
+					<div
+						class="size-16 rounded-full p-[2.5px] {story.hasUnread
+							? 'bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600'
+							: 'bg-slate-200 dark:bg-dark-hover'}"
+					>
+						<div class="size-full rounded-full p-[2px] bg-white dark:bg-dark-card">
+							<Avatar src={story.avatar} name={story.username} size="lg" class="!size-full" />
+						</div>
+					</div>
+					<span
+						class="w-full truncate text-center text-xs leading-tight {story.hasUnread
+							? 'font-semibold text-slate-900 dark:text-dark-text'
+							: 'font-medium text-slate-500 dark:text-dark-muted'}"
+					>
+						{story.username}
+					</span>
+				</button>
+			</li>
 		{/each}
-	</div>
+	</ul>
 </div>

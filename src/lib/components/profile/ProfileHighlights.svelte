@@ -52,14 +52,14 @@
 </script>
 
 <div
-	class="w-full py-4 sm:py-6 overflow-x-auto no-scrollbar select-none {className}"
+	class="w-full py-4 sm:py-6 overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-px-4 select-none {className}"
 	aria-label="Story Highlights"
 >
 	<div class="flex items-center gap-4 sm:gap-6 min-w-max px-4 sm:px-0">
 		{#each highlights as item (item.id)}
 			<button
 				type="button"
-				class="group flex flex-col items-center gap-2 cursor-pointer bg-transparent border-0 p-0 text-inherit focus:outline-none"
+				class="group snap-start flex flex-col items-center gap-2 cursor-pointer bg-transparent border-0 p-0 text-inherit rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-950 dark:focus-visible:outline-kizuna-blue active:scale-95 transition-transform"
 				onclick={() => onSelectHighlight?.(item)}
 				aria-label={`View highlight ${item.title}`}
 			>

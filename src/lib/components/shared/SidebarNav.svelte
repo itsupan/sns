@@ -1,29 +1,29 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Icon from './Icon.svelte';
+	import { navItems, activeNavId, OPEN_COMPOSER_EVENT, type NavItem } from './nav-items';
+	import { toast } from '$lib/utils/toast.svelte';
 
 	interface Props {
-		activeItem?: string;
 		class?: string;
 	}
 
-	let { activeItem = 'home', class: className = '' }: Props = $props();
+	let { class: className = '' }: Props = $props();
 
-	const navItems = [
-		{ id: 'home', label: 'Home', icon: 'home', href: resolve('/') },
-		{ id: 'explore', label: 'Explore', icon: 'compass-alt', href: resolve('/#explore') },
-		{ id: 'create', label: 'Create', icon: 'plus', href: resolve('/#create') },
-		{ id: 'activity', label: 'Activity', icon: 'clock', href: resolve('/#activity') },
-		{ id: 'saved', label: 'Saved / Collections', icon: 'bookmark', href: resolve('/#saved') },
-		{ id: 'profile', label: 'Profile', icon: 'user', href: resolve('/profile') }
-	];
+	let currentActive = $derived(activeNavId(page.url.pathname));
 
-	let currentActive = $derived.by(() => {
-		if (page.url.pathname === '/profile') return 'profile';
-		if (page.url.pathname === '/' && !page.url.hash) return 'home';
-		return page.url.hash.replace('#', '') || activeItem;
-	});
+	async function handleItem(event: MouseEvent, item: NavItem) {
+		if (item.id === 'create') {
+			event.preventDefault();
+			if (page.url.pathname !== '/') await goto(resolve('/'));
+			window.dispatchEvent(new CustomEvent(OPEN_COMPOSER_EVENT));
+		} else if (!item.ready) {
+			event.preventDefault();
+			toast.show(`${item.label} is coming soon`);
+		}
+	}
 </script>
 
 <aside
@@ -34,15 +34,16 @@
 	<nav class="flex flex-col gap-1.5">
 		{#each navItems as item (item.id)}
 			{@const isActive = currentActive === item.id}
-			<!-- eslint-disable-next-line svelte/no-navigation-without-resolve -->
+			<!-- eslint-disable svelte/no-navigation-without-resolve -- hrefs come from resolve() in nav-items.ts -->
 			<a
 				href={item.href}
+				onclick={(e) => handleItem(e, item)}
 				class="flex items-center gap-3.5 px-4 py-3 rounded-2xl text-[14px] font-medium transition-all duration-150 no-underline {isActive
 					? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 font-semibold shadow-xs'
 					: 'text-slate-700 dark:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated'}"
 				aria-current={isActive ? 'page' : undefined}
 			>
-				<Icon name={item.icon} class="text-[17px] shrink-0" />
+				<Icon name={item.icon} type={isActive ? 'sr' : 'rr'} class="text-[17px] shrink-0" />
 				<span>{item.label}</span>
 			</a>
 		{/each}
@@ -63,7 +64,7 @@
 
 		<!-- Preferences Link -->
 		<a
-			href={resolve('/#preferences')}
+			href={resolve('/profile')}
 			class="flex items-center justify-between px-4 py-2.5 rounded-xl text-[13px] font-medium text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated transition-colors duration-150 no-underline"
 		>
 			<div class="flex items-center gap-3">

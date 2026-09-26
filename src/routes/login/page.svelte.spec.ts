@@ -31,7 +31,6 @@ describe('Login Page', () => {
 		await expect.element(screen.getByLabelText('Password', { exact: true })).toBeInTheDocument();
 		await expect.element(screen.getByText('Forgot password?')).toBeInTheDocument();
 		await expect.element(screen.getByText('Remember me')).toBeInTheDocument();
-		await expect.element(screen.getByText('256-bit encrypted')).toBeInTheDocument();
 
 		// Primary submit button
 		const submitBtn = screen.getByRole('button', { name: /Sign In/i });

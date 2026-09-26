@@ -55,11 +55,107 @@
 	color-scheme: dark;
 }
 
+html {
+	-webkit-text-size-adjust: 100%;
+	text-size-adjust: 100%;
+	-webkit-tap-highlight-color: transparent;
+}
+
 body {
+	overscroll-behavior-y: none;
+	-webkit-font-smoothing: antialiased;
 	background-color: var(--bg-app);
 	color: var(--text-primary);
 	font-family: var(--font-sans);
 	transition:
 		background-color 0.2s ease,
 		color 0.2s ease;
+}
+
+a,
+button,
+[role='button'],
+label,
+input,
+textarea {
+	touch-action: manipulation;
+}
+
+/* iOS Safari zooms into inputs with font-size < 16px. */
+@media (max-width: 639px) {
+	input,
+	textarea,
+	select {
+		font-size: 16px !important;
+	}
+}
+
+@utility no-scrollbar {
+	scrollbar-width: none;
+	&::-webkit-scrollbar {
+		display: none;
+	}
+}
+
+@utility pt-safe {
+	padding-top: env(safe-area-inset-top);
+}
+
+@utility pb-safe {
+	padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Space reserved for the mobile bottom tab bar (56px) plus the home indicator. */
+@utility pb-nav {
+	padding-bottom: calc(3.5rem + env(safe-area-inset-bottom));
+}
+
+@keyframes heart-pop {
+	0% {
+		transform: scale(1);
+	}
+	40% {
+		transform: scale(1.35);
+	}
+	100% {
+		transform: scale(1);
+	}
+}
+
+@keyframes heart-burst {
+	0% {
+		opacity: 0;
+		transform: scale(0.4);
+	}
+	25% {
+		opacity: 1;
+		transform: scale(1.15);
+	}
+	60% {
+		opacity: 1;
+		transform: scale(1);
+	}
+	100% {
+		opacity: 0;
+		transform: scale(1.1);
+	}
+}
+
+.animate-heart-pop {
+	animation: heart-pop 0.35s ease-out;
+}
+
+.animate-heart-burst {
+	animation: heart-burst 0.8s ease-out forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.01ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.01ms !important;
+		scroll-behavior: auto !important;
+	}
 }

@@ -15,7 +15,7 @@
 <div class="kizuna-header flex flex-col items-center text-center mb-7 {className}">
 	<div class="brand-identity flex items-center justify-center gap-3">
 		<img
-			src={asset('/brand/kizuna_logo.png')}
+			src={asset('/brand/icon-192.png')}
 			alt="Kizuna logo"
 			class="brand-logo size-12 rounded-full object-cover shrink-0 shadow-xs border border-black/10 dark:border-dark-border"
 		/>
