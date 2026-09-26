@@ -53,7 +53,7 @@
 </script>
 
 <div
-	class="w-full select-none border-t sm:border-t-0 sm:border-b border-slate-200 dark:border-dark-border {className}"
+	class="w-full select-none sticky top-0 z-30 sm:static bg-white dark:bg-dark-card sm:bg-transparent sm:dark:bg-transparent border-b sm:border-b border-t sm:border-t-0 sm:border-b border-slate-200 dark:border-dark-border {className}"
 >
 	<div class="flex items-center justify-between sm:py-4">
 		<!-- Tabs Bar (Mobile: 3 Icon Tabs / Desktop: Filter Pills) -->
@@ -66,14 +66,14 @@
 						? 'hidden sm:flex'
 						: 'flex'} items-center justify-center h-12 sm:h-auto sm:px-4 sm:py-2 sm:rounded-full bg-transparent text-sm sm:text-xs font-semibold {isActive
 						? 'text-slate-950 dark:text-white sm:bg-slate-950 sm:text-white sm:dark:bg-white sm:dark:text-slate-950 sm:shadow-xs'
-						: 'text-slate-400 dark:text-dark-muted hover:text-slate-700 dark:hover:text-dark-text sm:hover:bg-slate-100 sm:dark:hover:bg-dark-elevated'}"
+						: 'text-slate-500 dark:text-dark-muted hover:text-slate-700 dark:hover:text-dark-text sm:hover:bg-slate-100 sm:dark:hover:bg-dark-elevated'}"
 					onclick={() => selectTab(tab.id)}
 					role="tab"
 					aria-selected={isActive}
 					aria-label={tab.label}
 				>
 					<!-- Mobile Icon -->
-					<Icon name={tab.icon} class="text-lg sm:hidden" />
+					<Icon name={tab.icon} type={isActive ? 'sr' : 'rr'} class="text-xl sm:hidden" />
 
 					<!-- Desktop Label -->
 					<span class="hidden sm:inline">{tab.label}</span>

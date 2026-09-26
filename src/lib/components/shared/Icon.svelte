@@ -2,8 +2,8 @@
 	interface Props {
 		/** Name of the uicon (e.g. "user", "lock", "eye", "sun", or full "fi-rr-lock") */
 		name: string;
-		/** Weight/style: 'rr' for regular rounded (default), 'rs' for regular straight */
-		type?: 'rr' | 'rs';
+		/** Weight/style: 'rr' regular rounded (default), 'rs' regular straight, 'sr' solid rounded */
+		type?: 'rr' | 'rs' | 'sr';
 		/** Size preset or pixel number */
 		size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
 		/** Additional CSS classes */

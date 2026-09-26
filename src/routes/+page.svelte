@@ -4,6 +4,8 @@
 	import CreatePostBox from '$lib/components/feed/CreatePostBox.svelte';
 	import PostCard from '$lib/components/feed/PostCard.svelte';
 	import RightSidebar from '$lib/components/feed/RightSidebar.svelte';
+	import { authClient } from '$lib/auth-client';
+	import { toast } from '$lib/utils/toast.svelte';
 	import type { PostData } from '$lib/components/feed/PostCard.svelte';
 
 	let posts = $state<PostData[]>([
@@ -59,28 +61,28 @@
 		}
 	]);
 
+	const session = authClient.useSession();
+
 	function handlePublish(content: string, type: 'photo' | 'story' | 'article') {
+		const user = $session.data?.user;
 		const newPost: PostData = {
 			id: `post-${Date.now()}`,
 			author: {
-				name: 'Julian Vance',
-				handle: '@jvance',
-				avatar:
-					'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-				location: 'Tokyo, Japan',
+				name: user?.name ?? 'You',
+				handle: user?.email ? `@${user.email.split('@')[0]}` : '',
+				avatar: user?.image ?? '',
 				timeAgo: 'Just now'
 			},
-			title: type === 'article' ? 'Architectural Field Notes' : '',
+			title: type === 'article' ? content.split('\n')[0].slice(0, 80) : '',
 			description: content,
-			image:
-				'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=80',
-			cameraMeta: '28mm · ISO 100',
-			tags: ['#FieldNotes', '#DesignArchive'],
+			image: '',
+			tags: [],
 			likes: 0,
 			commentsCount: 0,
 			repostsCount: 0
 		};
 		posts = [newPost, ...posts];
+		toast.show('Posted');
 	}
 </script>
 
@@ -90,21 +92,21 @@
 </svelte:head>
 
 <!-- Hidden H1 for accessibility and test suites -->
-<h1 class="sr-only">sns</h1>
+<h1 class="sr-only">Kizuna home feed</h1>
 
 <div
-	class="max-w-7xl mx-auto px-2 sm:px-6 w-full flex justify-center md:justify-between gap-0 md:gap-6 xl:gap-8"
+	class="max-w-7xl mx-auto px-0 sm:px-6 w-full flex justify-center md:justify-between gap-0 md:gap-6 xl:gap-8"
 >
 	<!-- Left Navigation Column (Desktop only) -->
 	<SidebarNav class="hidden md:flex" />
 
 	<!-- Center Main Feed Column (Full width on mobile, centered on desktop) -->
-	<main class="flex-1 max-w-2xl min-w-0 py-4 sm:py-6 mx-auto w-full">
+	<main class="flex-1 max-w-2xl min-w-0 pt-0 pb-4 sm:py-6 mx-auto w-full">
 		<StoriesBar />
 		<CreatePostBox onPublish={handlePublish} />
 		<div class="feed-posts flex flex-col">
 			{#each posts as post (post.id)}
-				<PostCard {post} />
+				<PostCard {post} priority={post.id === posts[0]?.id} />
 			{/each}
 		</div>
 	</main>

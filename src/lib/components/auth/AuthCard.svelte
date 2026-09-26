@@ -72,7 +72,7 @@
 			return;
 		}
 
-		if (password.length < 8) {
+		if (mode === 'signup' && password.length < 8) {
 			errorMessage = 'Password must be at least 8 characters long.';
 			return;
 		}
@@ -93,7 +93,8 @@
 					loading = false;
 				} else {
 					successMessage = 'Signed in successfully! Redirecting...';
-					goto(resolve('/'));
+					// eslint-disable-next-line svelte/no-navigation-without-resolve
+					goto(redirectTo);
 				}
 			} else {
 				const result = await authClient.signUp.email({
@@ -108,7 +109,8 @@
 					loading = false;
 				} else {
 					successMessage = 'Account created successfully! Redirecting...';
-					goto(resolve('/'));
+					// eslint-disable-next-line svelte/no-navigation-without-resolve
+					goto(redirectTo);
 				}
 			}
 		} catch (err: unknown) {
@@ -250,7 +252,8 @@
 					placeholder="Elena Vance"
 					required
 					autocomplete="name"
-					class="form-input w-full h-11 px-3.5 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
+					enterkeyhint="next"
+					class="form-input w-full h-12 sm:h-11 px-3.5 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
 				/>
 			</div>
 		{/if}
@@ -269,7 +272,10 @@
 				placeholder="elena.vance@studio.com"
 				required
 				autocomplete="email"
-				class="form-input w-full h-11 px-3.5 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
+				inputmode="email"
+				autocapitalize="off"
+				enterkeyhint="next"
+				class="form-input w-full h-12 sm:h-11 px-3.5 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
 			/>
 		</div>
 
@@ -298,14 +304,14 @@
 					placeholder="••••••••"
 					required
 					autocomplete={mode === 'login' ? 'current-password' : 'new-password'}
-					class="form-input password-input w-full h-11 px-3.5 pr-11 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
+					enterkeyhint="go"
+					class="form-input password-input w-full h-12 sm:h-11 px-3.5 pr-11 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
 				/>
 				<button
 					type="button"
-					class="toggle-password-btn absolute right-2.5 p-1 text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150 flex items-center justify-center rounded-md cursor-pointer border-none bg-transparent"
+					class="toggle-password-btn absolute right-0.5 size-11 text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150 flex items-center justify-center rounded-md cursor-pointer border-none bg-transparent"
 					onclick={() => (showPassword = !showPassword)}
 					aria-label={showPassword ? 'Hide password' : 'Show password'}
-					tabindex="-1"
 				>
 					{#if showPassword}
 						<!-- Eye Off SVG -->
@@ -318,7 +324,7 @@
 			</div>
 		</div>
 
-		<!-- Options Row (Remember Me / 256-bit encrypted) -->
+		<!-- Options Row (Remember me / Terms) -->
 		<div
 			class="options-row flex items-center justify-between -mt-0.5 mb-1 text-[13px] gap-2 flex-wrap sm:flex-nowrap"
 		>
@@ -346,17 +352,6 @@
 					>
 				</label>
 			{/if}
-
-			<div
-				class="encryption-badge flex items-center gap-1.5 text-xs text-slate-600 dark:text-dark-muted font-normal"
-				title="Connections are secured with TLS 256-bit encryption"
-			>
-				<Icon
-					name="lock"
-					class="lock-icon text-blue-600 dark:text-kizuna-blue text-[13px] shrink-0"
-				/>
-				<span>256-bit encrypted</span>
-			</div>
 		</div>
 
 		<!-- Primary Button Component (Black) -->
@@ -394,23 +389,25 @@
 		{/if}
 	</div>
 
-	<!-- Footer Disclaimer -->
-	<p
-		class="footer-disclaimer mt-4.5 text-xs leading-relaxed text-slate-500 dark:text-dark-subtle text-center max-w-[20rem] mx-auto"
-	>
-		By continuing, you agree to Kizuna's
-		<a
-			href="#terms"
-			rel="external"
-			class="legal-link text-slate-500 dark:text-dark-muted underline hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150"
-			>Terms of Service</a
+	<!-- Footer Disclaimer (signup already has an explicit Terms checkbox) -->
+	{#if mode === 'login'}
+		<p
+			class="footer-disclaimer mt-4.5 text-xs leading-relaxed text-slate-500 dark:text-dark-subtle text-center max-w-[20rem] mx-auto"
 		>
-		and
-		<a
-			href="#privacy"
-			rel="external"
-			class="legal-link text-slate-500 dark:text-dark-muted underline hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150"
-			>Privacy Policy</a
-		>.
-	</p>
+			By continuing, you agree to Kizuna's
+			<a
+				href="#terms"
+				rel="external"
+				class="legal-link text-slate-500 dark:text-dark-muted underline hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150"
+				>Terms of Service</a
+			>
+			and
+			<a
+				href="#privacy"
+				rel="external"
+				class="legal-link text-slate-500 dark:text-dark-muted underline hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150"
+				>Privacy Policy</a
+			>.
+		</p>
+	{/if}
 </div>

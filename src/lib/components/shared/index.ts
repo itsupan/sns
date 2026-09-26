@@ -7,3 +7,6 @@ export { default as Avatar } from './Avatar.svelte';
 export { default as Header } from './Header.svelte';
 export { default as SidebarNav } from './SidebarNav.svelte';
 export { default as MobileNav } from './MobileNav.svelte';
+export { default as BottomSheet } from './BottomSheet.svelte';
+export { default as SheetAction } from './SheetAction.svelte';
+export { default as Toast } from './Toast.svelte';

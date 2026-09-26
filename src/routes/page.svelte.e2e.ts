@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 test('home page renders with layout header and brand link', async ({ page }) => {
 	await page.goto('/');
 
-	await expect(page.getByRole('heading', { level: 1 })).toHaveText('sns');
+	await expect(page.getByRole('heading', { level: 1 })).toHaveText('Kizuna home feed');
 	await expect(page.getByRole('link', { name: /Kizuna/i }).first()).toBeVisible();
 	await expect(page.getByText('Quiet Brutalism: Concrete Light & Shadows')).toBeVisible();
 	await expect(page.getByText('Curators to Follow')).toBeVisible();
@@ -96,7 +96,13 @@ test('feed page on mobile hides sidebars and shows full-width main feed content'
 	// Main post content, stories, and create box must be visible
 	await expect(page.getByText('Quiet Brutalism: Concrete Light & Shadows')).toBeVisible();
 	await expect(page.getByText('Your story')).toBeVisible();
+	await expect(page.getByRole('button', { name: /Share an observation/ })).toBeVisible();
+
+	// Composer opens as a bottom sheet
+	await page.getByRole('button', { name: 'Create post' }).click();
+	await expect(page.getByRole('dialog', { name: 'Create post' })).toBeVisible();
 	await expect(page.getByRole('button', { name: 'Publish' })).toBeVisible();
+	await page.keyboard.press('Escape');
 
 	// Mobile bottom navigation must be visible
 	await expect(page.getByRole('navigation', { name: 'Mobile Navigation' })).toBeVisible();

@@ -6,7 +6,9 @@ describe('home page', () => {
 	it('shows the app name and feed layout components', async () => {
 		const screen = render(Page);
 
-		await expect.element(screen.getByRole('heading', { level: 1 })).toHaveTextContent('sns');
+		await expect
+			.element(screen.getByRole('heading', { level: 1 }))
+			.toHaveTextContent('Kizuna home feed');
 		await expect
 			.element(screen.getByText('Quiet Brutalism: Concrete Light & Shadows'))
 			.toBeInTheDocument();
