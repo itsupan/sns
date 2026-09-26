@@ -1,3 +1,8 @@
 BETTER_AUTH_SECRET=replace-with-a-random-string-of-at-least-32-characters
 GOOGLE_CLIENT_ID=replace-me.apps.googleusercontent.com
 GOOGLE_CLIENT_SECRET=replace-me
+R2_ACCOUNT_ID=replace-me
+R2_ACCESS_KEY_ID=replace-me
+R2_SECRET_ACCESS_KEY=replace-me
+R2_BUCKET_NAME=sns-media
+R2_PUBLIC_URL=https://replace-me.r2.dev

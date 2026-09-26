@@ -4,6 +4,14 @@ import type { Auth, Session, User } from '$lib/server/auth';
 import type { Database } from '$lib/server/db';
 
 declare global {
+	interface Env {
+		R2_ACCOUNT_ID?: string;
+		R2_ACCESS_KEY_ID?: string;
+		R2_SECRET_ACCESS_KEY?: string;
+		R2_BUCKET_NAME?: string;
+		R2_PUBLIC_URL?: string;
+	}
+
 	namespace App {
 		interface Platform {
 			env: Env;

@@ -53,12 +53,34 @@
 
 	let { profile: customProfile, class: className = '', onFollowChange }: Props = $props();
 
-	const profile = $derived({ ...defaultProfile, ...customProfile });
-
 	let isFollowing = $state(defaultProfile.isFollowing);
 	let settingsOpen = $state(false);
 
 	const session = authClient.useSession();
+
+	const profile = $derived.by(() => {
+		const currentUser = $session.data?.user as Record<string, unknown> | undefined;
+		return {
+			...defaultProfile,
+			...(currentUser
+				? {
+						name: (currentUser.name as string) || defaultProfile.name,
+						handle:
+							(currentUser.handle as string) ||
+							(currentUser.email
+								? (currentUser.email as string).split('@')[0]
+								: defaultProfile.handle),
+						avatar: (currentUser.image as string) || defaultProfile.avatar,
+						title: (currentUser.title as string) || defaultProfile.title,
+						bio: (currentUser.bio as string) || defaultProfile.bio,
+						website: (currentUser.website as string) || defaultProfile.website,
+						location: (currentUser.location as string) || defaultProfile.location,
+						cameraGear: (currentUser.cameraGear as string) || defaultProfile.cameraGear
+					}
+				: {}),
+			...customProfile
+		};
+	});
 
 	function toggleFollow() {
 		isFollowing = !isFollowing;
@@ -109,6 +131,7 @@
 					type="button"
 					class="sm:hidden absolute -bottom-1 -right-1 size-7 rounded-full bg-black text-white dark:bg-dark-elevated dark:text-white flex items-center justify-center shadow-md cursor-pointer border-2 border-white dark:border-dark-card"
 					aria-label="Change avatar photo"
+					onclick={() => goto(resolve('/profile/edit'))}
 				>
 					<Icon name="camera" class="text-xs" />
 				</button>
@@ -290,6 +313,15 @@
 					<Icon name="share" class="text-sm" />
 				</button>
 
+				<!-- Edit Profile Button (Desktop) -->
+				<a
+					href={resolve('/profile/edit')}
+					class="hidden sm:inline-flex h-10 px-4 rounded-full bg-slate-100 dark:bg-dark-elevated hover:bg-slate-200 dark:hover:bg-dark-hover text-slate-900 dark:text-dark-text border border-slate-200 dark:border-dark-border items-center justify-center gap-1.5 font-semibold text-xs transition-colors duration-150 no-underline shrink-0"
+				>
+					<Icon name="pencil" class="text-xs" />
+					<span>Edit Profile</span>
+				</a>
+
 				<!-- Settings (mobile: theme + account live here instead of the app bar) -->
 				<button
 					type="button"
@@ -310,6 +342,14 @@
 		<span class="text-[15px] font-medium text-slate-900 dark:text-dark-text">Appearance</span>
 		<ThemeToggle variant="segmented" />
 	</div>
+	<SheetAction
+		icon="pencil"
+		label="Edit Profile"
+		onclick={() => {
+			settingsOpen = false;
+			goto(resolve('/profile/edit'));
+		}}
+	/>
 	<SheetAction icon="share" label="Share profile" onclick={handleShare} />
 	{#if $session.data?.user}
 		<SheetAction icon="sign-out-alt" label="Log out" danger onclick={signOut} />

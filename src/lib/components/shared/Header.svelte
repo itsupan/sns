@@ -121,7 +121,7 @@
 				title="Direct messages"
 				onclick={() => toast.show('Messages are coming soon')}
 			>
-				<Icon name="paper-plane" class="text-xl sm:text-base" />
+				<Icon name="beacon" class="text-xl sm:text-base" />
 			</button>
 
 			<button

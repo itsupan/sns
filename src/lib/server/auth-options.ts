@@ -15,6 +15,16 @@ export function authOptions(env: Env) {
 		},
 		session: {
 			cookieCache: { enabled: true, maxAge: 5 * 60 }
+		},
+		user: {
+			additionalFields: {
+				handle: { type: 'string', required: false },
+				bio: { type: 'string', required: false },
+				title: { type: 'string', required: false },
+				website: { type: 'string', required: false },
+				location: { type: 'string', required: false },
+				cameraGear: { type: 'string', required: false }
+			}
 		}
 	} satisfies BetterAuthOptions;
 }
