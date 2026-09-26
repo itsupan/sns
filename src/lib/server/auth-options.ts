@@ -4,6 +4,9 @@ export function authOptions(env: Env) {
 	return {
 		baseURL: env.BETTER_AUTH_URL,
 		secret: env.BETTER_AUTH_SECRET,
+		emailAndPassword: {
+			enabled: true
+		},
 		socialProviders: {
 			google: {
 				clientId: env.GOOGLE_CLIENT_ID,

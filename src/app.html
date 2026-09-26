@@ -4,6 +4,19 @@
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="text-scale" content="scale" />
+		<script>
+			try {
+				const storedTheme = localStorage.getItem('kizuna-theme') || 'system';
+				const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+				if (storedTheme === 'dark' || (storedTheme === 'system' && prefersDark)) {
+					document.documentElement.classList.add('dark');
+					document.documentElement.setAttribute('data-theme', 'dark');
+				} else {
+					document.documentElement.classList.remove('dark');
+					document.documentElement.setAttribute('data-theme', 'light');
+				}
+			} catch (_) {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">
