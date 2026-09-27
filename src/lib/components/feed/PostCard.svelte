@@ -8,6 +8,7 @@
 	import { authClient } from '$lib/auth-client';
 	import SharePostModal from './SharePostModal.svelte';
 	import PostCommentsModal from './PostCommentsModal.svelte';
+	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
 
 	export interface PostAuthor {
 		id?: string;
@@ -129,6 +130,31 @@
 	let activeSlide = $state(0);
 	let touchStartX = $state(0);
 	let touchEndX = $state(0);
+	let videoErrors = $state<Record<number, boolean>>({});
+	let dynamicMediaUrls = $state<Record<number, string>>({});
+
+	async function handleVideoError(index: number, originalUrl: string) {
+		const fresh = await refreshExpiredMediaUrl(originalUrl);
+		if (fresh && fresh !== originalUrl) {
+			dynamicMediaUrls[index] = fresh;
+			videoErrors[index] = false;
+		} else {
+			videoErrors[index] = true;
+		}
+	}
+
+	async function handleImageError(index: number, originalUrl: string) {
+		const fresh = await refreshExpiredMediaUrl(originalUrl);
+		if (fresh && fresh !== originalUrl) {
+			dynamicMediaUrls[index] = fresh;
+		}
+	}
+
+	function getVideoType(url: string): string {
+		if (/\.webm(\?.*)?$/i.test(url)) return 'video/webm';
+		if (/\.mov(\?.*)?$/i.test(url)) return 'video/quicktime';
+		return 'video/mp4';
+	}
 
 	const allMedia = $derived.by<MediaItem[]>(() => {
 		if (post.mediaItems && post.mediaItems.length > 0) {
@@ -340,8 +366,9 @@
 	<!-- Media: full-bleed on phones & vertical tablets, rounded on larger screens. Multi-image carousel with counter & dots. Double-tap to like. -->
 	{#if allMedia.length > 0}
 		{@const currentMedia = allMedia[activeSlide] ?? allMedia[0]}
+		{@const activeMediaUrl = dynamicMediaUrls[activeSlide] || currentMedia.url}
 		{@const isVideo =
-			currentMedia.type === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(currentMedia.url)}
+			currentMedia.type === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(activeMediaUrl)}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
@@ -351,18 +378,73 @@
 			ontouchend={handleTouchEnd}
 		>
 			{#if isVideo}
-				<video
-					src={currentMedia.url}
-					controls
-					playsinline
-					preload="metadata"
-					class="w-full h-full object-cover"
-				>
-					<track kind="captions" />
-				</video>
+				{#if videoErrors[activeSlide]}
+					<!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+					<div
+						class="w-full h-full flex flex-col items-center justify-center bg-slate-900 text-white p-6 text-center gap-3 select-auto"
+						onclick={(e) => e.stopPropagation()}
+						ontouchstart={(e) => e.stopPropagation()}
+						ontouchend={(e) => e.stopPropagation()}
+						role="region"
+						aria-label="Video playback fallback"
+					>
+						<div
+							class="size-12 rounded-full bg-white/10 flex items-center justify-center text-xl text-white"
+						>
+							<Icon name="play-alt" />
+						</div>
+						<div class="flex flex-col gap-1 max-w-xs">
+							<p class="text-sm font-semibold">Video format not supported inline</p>
+							<p class="text-xs text-slate-400">
+								Your browser could not stream this video directly in the feed.
+							</p>
+						</div>
+						<div class="flex items-center gap-2">
+							<!-- eslint-disable svelte/no-navigation-without-resolve -- external direct media link -->
+							<a
+								href={activeMediaUrl}
+								target="_blank"
+								rel="noopener noreferrer"
+								class="px-4 py-2 rounded-xl bg-white text-slate-950 text-xs font-semibold hover:bg-slate-100 transition no-underline shadow-xs"
+							>
+								Open video in new tab
+							</a>
+							<!-- eslint-enable svelte/no-navigation-without-resolve -->
+							<button
+								type="button"
+								onclick={async () => {
+									videoErrors[activeSlide] = false;
+									await handleVideoError(activeSlide, currentMedia.url);
+								}}
+								class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer border-0"
+							>
+								Retry
+							</button>
+						</div>
+					</div>
+				{:else}
+					<video
+						src={activeMediaUrl}
+						controls
+						playsinline
+						preload="metadata"
+						crossorigin="anonymous"
+						class="w-full h-full object-cover"
+						onclick={(e) => e.stopPropagation()}
+						ontouchstart={(e) => e.stopPropagation()}
+						ontouchend={(e) => e.stopPropagation()}
+						onerror={() => {
+							handleVideoError(activeSlide, currentMedia.url);
+						}}
+					>
+						<source src={activeMediaUrl} type={getVideoType(activeMediaUrl)} />
+						<track kind="captions" />
+						Your browser does not support the video tag.
+					</video>
+				{/if}
 			{:else}
 				<img
-					src={currentMedia.url}
+					src={activeMediaUrl}
 					alt={post.title || `Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
 					sizes="(min-width: 672px) 672px, 100vw"
 					class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
@@ -370,6 +452,9 @@
 					fetchpriority={priority && activeSlide === 0 ? 'high' : 'auto'}
 					decoding="async"
 					draggable="false"
+					onerror={() => {
+						handleImageError(activeSlide, currentMedia.url);
+					}}
 				/>
 			{/if}
 

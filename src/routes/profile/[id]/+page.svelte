@@ -41,9 +41,34 @@
 	const metaDescription = $derived(
 		currentProfile.bio || `${currentProfile.name}'s photography and curation profile on Kizuna.`
 	);
-	const ogImage = $derived(
-		userPosts.find((p) => Boolean(p.image))?.image || currentProfile.avatar || ''
+	function toAbsoluteUrl(pathOrUrl: string | undefined | null, origin: string): string {
+		if (!pathOrUrl) return '';
+		if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+			return pathOrUrl;
+		}
+		const clean = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+		return `${origin}${clean}`;
+	}
+
+	function isVideoUrl(url: string): boolean {
+		return /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+	}
+
+	function getImageType(url: string): string {
+		if (/\.png(\?.*)?$/i.test(url)) return 'image/png';
+		if (/\.webp(\?.*)?$/i.test(url)) return 'image/webp';
+		if (/\.gif(\?.*)?$/i.test(url)) return 'image/gif';
+		return 'image/jpeg';
+	}
+
+	const rawOgImage = $derived(
+		userPosts.find((p) => Boolean(p.image) && !isVideoUrl(p.image))?.image ||
+			(currentProfile.avatar && !isVideoUrl(currentProfile.avatar) ? currentProfile.avatar : '') ||
+			'/brand/icon-512.png'
 	);
+
+	const ogImage = $derived(toAbsoluteUrl(rawOgImage, data.origin || ''));
+	const ogImageType = $derived(getImageType(ogImage));
 </script>
 
 <svelte:head>
@@ -60,6 +85,9 @@
 	{#if ogImage}
 		<meta property="og:image" content={ogImage} />
 		<meta property="og:image:secure_url" content={ogImage} />
+		<meta property="og:image:type" content={ogImageType} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
 		<meta property="og:image:alt" content={pageTitle} />
 		<meta name="twitter:image" content={ogImage} />
 		<meta name="twitter:image:alt" content={pageTitle} />

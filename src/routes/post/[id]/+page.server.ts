@@ -4,6 +4,7 @@ import type { PageServerLoad } from './$types';
 import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import { refreshPostMediaUrls } from '$lib/server/services/storage';
 
 const FALLBACK_POSTS: PostData[] = [
 	{
@@ -88,7 +89,7 @@ const FALLBACK_POSTS: PostData[] = [
 	}
 ];
 
-export const load: PageServerLoad = async ({ params, locals, url }) => {
+export const load: PageServerLoad = async ({ params, locals, url, platform }) => {
 	const postId = params.id;
 	if (!postId) {
 		throw error(404, 'Post not found');
@@ -225,8 +226,16 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 		throw error(404, 'Post not found');
 	}
 
+	const origin =
+		url.origin && !url.origin.includes('localhost') && !url.origin.includes('127.0.0.1')
+			? url.origin
+			: platform?.env?.BETTER_AUTH_URL || url.origin;
+
+	const refreshedPost = await refreshPostMediaUrls(postData, platform?.env);
+
 	return {
-		post: postData,
-		postUrl: `${url.origin}/post/${postData.id}`
+		post: refreshedPost,
+		postUrl: `${origin}/post/${refreshedPost.id}`,
+		origin
 	};
 };

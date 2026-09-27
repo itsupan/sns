@@ -22,26 +22,78 @@
 			: `Curated visual observation by ${post.author.name} on Kizuna.`
 	);
 
-	let shareImage = $derived(
-		post.mediaItems?.[0]?.url || post.mediaUrl || post.image || post.author.avatar || ''
+	function toAbsoluteUrl(pathOrUrl: string | undefined | null, origin: string): string {
+		if (!pathOrUrl) return '';
+		if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+			return pathOrUrl;
+		}
+		const clean = pathOrUrl.startsWith('/') ? pathOrUrl : `/${pathOrUrl}`;
+		return `${origin}${clean}`;
+	}
+
+	function isVideoUrl(url: string, type?: string): boolean {
+		return type === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(url);
+	}
+
+	function getImageType(url: string): string {
+		if (/\.png(\?.*)?$/i.test(url)) return 'image/png';
+		if (/\.webp(\?.*)?$/i.test(url)) return 'image/webp';
+		if (/\.gif(\?.*)?$/i.test(url)) return 'image/gif';
+		return 'image/jpeg';
+	}
+
+	const origin = $derived(data.origin || '');
+
+	// Separate image and video media
+	const imageMedia = $derived(
+		post.mediaItems?.find((m) => !isVideoUrl(m.url, m.type))?.url ||
+			(!isVideoUrl(post.mediaUrl || '', post.mediaType) ? post.mediaUrl : null) ||
+			(!isVideoUrl(post.image || '') ? post.image : null)
 	);
+
+	const videoMedia = $derived(
+		post.mediaItems?.find((m) => isVideoUrl(m.url, m.type))?.url ||
+			(isVideoUrl(post.mediaUrl || '', post.mediaType) ? post.mediaUrl : null) ||
+			(isVideoUrl(post.image || '') ? post.image : null)
+	);
+
+	// OG Image must be a real image format, never an mp4 video
+	const rawShareImage = $derived(imageMedia || post.author.avatar || '/brand/icon-512.png');
+
+	const shareImage = $derived(toAbsoluteUrl(rawShareImage, origin));
+	const shareVideo = $derived(videoMedia ? toAbsoluteUrl(videoMedia, origin) : null);
+	const shareImageType = $derived(getImageType(shareImage));
 </script>
 
 <svelte:head>
 	<title>{pageTitle}</title>
 	<meta name="description" content={metaDescription} />
 
-	<!-- Open Graph / Facebook / Telegram / WhatsApp / LinkedIn -->
+	<!-- Open Graph / Facebook / WhatsApp / Telegram / LinkedIn -->
 	<meta property="og:site_name" content="Kizuna" />
 	<meta property="og:type" content="article" />
 	<meta property="og:title" content={pageTitle} />
 	<meta property="og:description" content={metaDescription} />
 	<meta property="og:url" content={data.postUrl} />
 	<link rel="canonical" href={data.postUrl} />
+
+	<!-- Open Graph Image (Fully-qualified URL, explicit width/height/type for instant preview) -->
 	{#if shareImage}
 		<meta property="og:image" content={shareImage} />
 		<meta property="og:image:secure_url" content={shareImage} />
-		<meta property="og:image:alt" content={post.title || post.description || pageTitle} />
+		<meta property="og:image:type" content={shareImageType} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={post.title || metaDescription} />
+	{/if}
+
+	<!-- Open Graph Video (When post contains video media) -->
+	{#if shareVideo}
+		<meta property="og:video" content={shareVideo} />
+		<meta property="og:video:secure_url" content={shareVideo} />
+		<meta property="og:video:type" content="video/mp4" />
+		<meta property="og:video:width" content="1280" />
+		<meta property="og:video:height" content="720" />
 	{/if}
 
 	<!-- Twitter / X Cards -->
@@ -50,7 +102,7 @@
 	<meta name="twitter:description" content={metaDescription} />
 	{#if shareImage}
 		<meta name="twitter:image" content={shareImage} />
-		<meta name="twitter:image:alt" content={post.title || post.description || pageTitle} />
+		<meta name="twitter:image:alt" content={post.title || metaDescription} />
 	{/if}
 	{#if post.author.handle}
 		<meta name="twitter:creator" content={post.author.handle} />

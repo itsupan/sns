@@ -415,7 +415,13 @@
 					>
 						<!-- Plate Thumbnail -->
 						{#if plate.type === 'video'}
-							<video src={plate.previewUrl} class="w-full h-full object-cover" muted></video>
+							<video
+								src={plate.previewUrl}
+								class="w-full h-full object-cover"
+								muted
+								playsinline
+								preload="metadata"
+							></video>
 						{:else}
 							<img src={plate.previewUrl} alt="Plate preview" class="w-full h-full object-cover" />
 						{/if}
@@ -683,8 +689,13 @@
 										src={activePlate.previewUrl}
 										controls
 										playsinline
+										preload="metadata"
 										class="w-full h-full object-contain"
 									>
+										<source
+											src={activePlate.previewUrl}
+											type={activePlate.file?.type || 'video/mp4'}
+										/>
 										<track kind="captions" />
 									</video>
 								{:else}
@@ -728,7 +739,13 @@
 										: 'border-transparent opacity-75 hover:opacity-100'}"
 								>
 									{#if plate.type === 'video'}
-										<video src={plate.previewUrl} class="w-full h-full object-cover" muted></video>
+										<video
+											src={plate.previewUrl}
+											class="w-full h-full object-cover"
+											muted
+											playsinline
+											preload="metadata"
+										></video>
 									{:else}
 										<img
 											src={plate.previewUrl}
@@ -1023,8 +1040,13 @@
 									src={activePlate.previewUrl}
 									controls
 									playsinline
+									preload="metadata"
 									class="w-full h-full object-contain"
 								>
+									<source
+										src={activePlate.previewUrl}
+										type={activePlate.file?.type || 'video/mp4'}
+									/>
 									<track kind="captions" />
 								</video>
 							{:else}
@@ -1090,7 +1112,13 @@
 										: 'border-transparent opacity-75 hover:opacity-100'}"
 								>
 									{#if plate.type === 'video'}
-										<video src={plate.previewUrl} class="w-full h-full object-cover" muted></video>
+										<video
+											src={plate.previewUrl}
+											class="w-full h-full object-cover"
+											muted
+											playsinline
+											preload="metadata"
+										></video>
 									{:else}
 										<img
 											src={plate.previewUrl}

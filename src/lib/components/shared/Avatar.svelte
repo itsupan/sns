@@ -17,6 +17,8 @@
 		[key: string]: unknown;
 	}
 
+	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
+
 	let {
 		src = null,
 		alt = 'User avatar',
@@ -29,6 +31,23 @@
 	}: Props = $props();
 
 	let imageError = $state(false);
+	let activeSrc = $state<string | null>(null);
+
+	$effect(() => {
+		activeSrc = src;
+		imageError = false;
+	});
+
+	async function handleAvatarError() {
+		if (activeSrc) {
+			const fresh = await refreshExpiredMediaUrl(activeSrc);
+			if (fresh && fresh !== activeSrc) {
+				activeSrc = fresh;
+				return;
+			}
+		}
+		imageError = true;
+	}
 
 	const sizeClasses: Record<string, { container: string; text: string; badge: string }> = {
 		xs: { container: 'size-6', text: 'text-[10px]', badge: 'size-1.5' },
@@ -85,11 +104,11 @@
 	<div
 		class="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-text font-semibold {ringClass} transition-all duration-150"
 	>
-		{#if src && !imageError}
+		{#if activeSrc && !imageError}
 			<img
-				{src}
+				src={activeSrc}
 				{alt}
-				onerror={() => (imageError = true)}
+				onerror={handleAvatarError}
 				class="w-full h-full object-cover rounded-full"
 			/>
 		{:else if initials}
