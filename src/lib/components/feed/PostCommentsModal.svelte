@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { readApiError } from '$lib/utils/api-error';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { authClient } from '$lib/auth-client';
@@ -228,8 +229,8 @@
 			});
 
 			if (!res.ok) {
-				const data = (await res.json()) as { error?: string };
-				throw new Error(data.error || 'Failed to post comment');
+				const data = await res.json().catch(() => null);
+				throw new Error(readApiError(data, 'Failed to post comment').message);
 			}
 
 			const data = (await res.json()) as { comment: CommentItem; commentsCount: number };

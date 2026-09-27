@@ -1,12 +1,64 @@
 import { json } from '@sveltejs/kit';
 import { eq, and, ne } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
+import * as v from 'valibot';
 import { user } from '$lib/server/db/schema';
+import { ApiError, apiError, parseBody, requireUser, withApi } from '$lib/server/api';
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+/** Optional nullable text field: `null` or `''` clears it, otherwise trimmed and length-checked. */
+const clearableText = (
+	label: string,
+	max: number,
+	maxMessage = `${label} cannot exceed ${max} characters`
+) =>
+	v.optional(
+		v.pipe(
+			v.nullable(v.string(`${label} must be a string or null`)),
+			v.check((value) => value === null || value.length <= max, maxMessage),
+			v.transform((value) => value?.trim() || null)
+		)
+	);
+
+const UpdateProfile = v.object(
+	{
+		name: v.optional(
+			v.pipe(
+				v.string('Name must be a string'),
+				v.trim(),
+				v.minLength(1, 'Name cannot be empty'),
+				v.maxLength(100, 'Name cannot exceed 100 characters')
+			)
+		),
+		handle: v.optional(
+			v.pipe(
+				v.nullable(v.string('Handle must be a string or null')),
+				v.transform((value) => value?.trim().replace(/^@/, '').toLowerCase() || null),
+				v.check(
+					(value) => value === null || /^[a-z0-9_.-]{1,30}$/.test(value),
+					'Handle must be 1-30 characters and can only contain letters, numbers, dots, and underscores'
+				)
+			)
+		),
+		image: clearableText('Image', 2048, 'Image URL is too long'),
+		bio: clearableText('Bio', 500),
+		title: clearableText('Title', 100),
+		website: v.optional(
+			v.pipe(
+				v.nullable(v.string('Website must be a string or null')),
+				v.transform((value) => value?.trim().replace(/^https?:\/\//i, '') || null),
+				v.check((value) => value === null || value.length <= 255, 'Website URL is too long')
+			)
+		),
+		location: clearableText('Location', 100),
+		cameraGear: clearableText('Camera gear', 200)
+	},
+	'Request body must be an object'
+);
+
+export const GET: RequestHandler = withApi(async ({ params, locals }) => {
 	const userId = params.id;
 	if (!userId) {
-		return json({ error: 'User ID is required' }, { status: 400 });
+		return apiError(400, 'bad_request', 'User ID is required');
 	}
 
 	const rows = await locals.db
@@ -29,202 +81,48 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		.limit(1);
 
 	if (!rows || rows.length === 0) {
-		return json({ error: 'User not found' }, { status: 404 });
+		return apiError(404, 'not_found', 'User not found');
 	}
 
 	return json({ user: rows[0] });
-};
+});
 
-export const PATCH: RequestHandler = async ({ params, request, locals }) => {
+export const PATCH: RequestHandler = withApi(async ({ params, request, locals }) => {
 	const targetUserId = params.id;
 	if (!targetUserId) {
-		return json({ error: 'User ID is required' }, { status: 400 });
+		return apiError(400, 'bad_request', 'User ID is required');
 	}
 
 	// 1. Authentication check
-	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
+	const currentUser = requireUser(locals);
 
 	// 2. Authorization check: User can only update their own profile
-	if (locals.user.id !== targetUserId) {
-		return json({ error: 'Forbidden: You cannot modify another user profile' }, { status: 403 });
+	if (currentUser.id !== targetUserId) {
+		return apiError(403, 'forbidden', 'Forbidden: You cannot modify another user profile');
 	}
 
-	// 3. Parse JSON body
-	let body: Record<string, unknown>;
-	try {
-		body = await request.json();
-	} catch {
-		return json({ error: 'Invalid JSON payload' }, { status: 400 });
-	}
-
-	if (!body || typeof body !== 'object' || Array.isArray(body)) {
-		return json({ error: 'Request body must be an object' }, { status: 400 });
-	}
-
-	const updates: {
-		name?: string;
-		handle?: string | null;
-		image?: string | null;
-		bio?: string | null;
-		title?: string | null;
-		website?: string | null;
-		location?: string | null;
-		cameraGear?: string | null;
-	} = {};
-
-	// Validate 'name'
-	if ('name' in body) {
-		if (typeof body.name !== 'string') {
-			return json({ error: 'Name must be a string', field: 'name' }, { status: 400 });
-		}
-		const trimmedName = body.name.trim();
-		if (trimmedName.length < 1) {
-			return json({ error: 'Name cannot be empty', field: 'name' }, { status: 400 });
-		}
-		if (trimmedName.length > 100) {
-			return json({ error: 'Name cannot exceed 100 characters', field: 'name' }, { status: 400 });
-		}
-		updates.name = trimmedName;
-	}
-
-	// Validate 'handle'
-	if ('handle' in body) {
-		if (body.handle === null || body.handle === '') {
-			updates.handle = null;
-		} else if (typeof body.handle === 'string') {
-			const sanitizedHandle = body.handle.trim().replace(/^@/, '').toLowerCase();
-			if (!/^[a-z0-9_.-]{1,30}$/.test(sanitizedHandle)) {
-				return json(
-					{
-						error:
-							'Handle must be 1-30 characters and can only contain letters, numbers, dots, and underscores',
-						field: 'handle'
-					},
-					{ status: 400 }
-				);
-			}
-
-			// Check handle uniqueness
-			const existing = await locals.db
-				.select({ id: user.id })
-				.from(user)
-				.where(and(eq(user.handle, sanitizedHandle), ne(user.id, targetUserId)))
-				.limit(1);
-
-			if (existing.length > 0) {
-				return json({ error: 'This handle is already taken', field: 'handle' }, { status: 409 });
-			}
-
-			updates.handle = sanitizedHandle;
-		} else {
-			return json({ error: 'Handle must be a string or null', field: 'handle' }, { status: 400 });
-		}
-	}
-
-	// Validate 'image'
-	if ('image' in body) {
-		if (body.image === null || body.image === '') {
-			updates.image = null;
-		} else if (typeof body.image === 'string') {
-			if (body.image.length > 2048) {
-				return json({ error: 'Image URL is too long', field: 'image' }, { status: 400 });
-			}
-			updates.image = body.image.trim();
-		} else {
-			return json({ error: 'Image must be a URL string or null', field: 'image' }, { status: 400 });
-		}
-	}
-
-	// Validate 'bio'
-	if ('bio' in body) {
-		if (body.bio === null || body.bio === '') {
-			updates.bio = null;
-		} else if (typeof body.bio === 'string') {
-			if (body.bio.length > 500) {
-				return json({ error: 'Bio cannot exceed 500 characters', field: 'bio' }, { status: 400 });
-			}
-			updates.bio = body.bio.trim();
-		} else {
-			return json({ error: 'Bio must be a string or null', field: 'bio' }, { status: 400 });
-		}
-	}
-
-	// Validate 'title'
-	if ('title' in body) {
-		if (body.title === null || body.title === '') {
-			updates.title = null;
-		} else if (typeof body.title === 'string') {
-			if (body.title.length > 100) {
-				return json(
-					{ error: 'Title cannot exceed 100 characters', field: 'title' },
-					{ status: 400 }
-				);
-			}
-			updates.title = body.title.trim();
-		} else {
-			return json({ error: 'Title must be a string or null', field: 'title' }, { status: 400 });
-		}
-	}
-
-	// Validate 'website'
-	if ('website' in body) {
-		if (body.website === null || body.website === '') {
-			updates.website = null;
-		} else if (typeof body.website === 'string') {
-			const cleanWebsite = body.website.trim().replace(/^https?:\/\//i, '');
-			if (cleanWebsite.length > 255) {
-				return json({ error: 'Website URL is too long', field: 'website' }, { status: 400 });
-			}
-			updates.website = cleanWebsite;
-		} else {
-			return json({ error: 'Website must be a string or null', field: 'website' }, { status: 400 });
-		}
-	}
-
-	// Validate 'location'
-	if ('location' in body) {
-		if (body.location === null || body.location === '') {
-			updates.location = null;
-		} else if (typeof body.location === 'string') {
-			if (body.location.length > 100) {
-				return json(
-					{ error: 'Location cannot exceed 100 characters', field: 'location' },
-					{ status: 400 }
-				);
-			}
-			updates.location = body.location.trim();
-		} else {
-			return json(
-				{ error: 'Location must be a string or null', field: 'location' },
-				{ status: 400 }
-			);
-		}
-	}
-
-	// Validate 'cameraGear'
-	if ('cameraGear' in body) {
-		if (body.cameraGear === null || body.cameraGear === '') {
-			updates.cameraGear = null;
-		} else if (typeof body.cameraGear === 'string') {
-			if (body.cameraGear.length > 200) {
-				return json(
-					{ error: 'Camera gear cannot exceed 200 characters', field: 'cameraGear' },
-					{ status: 400 }
-				);
-			}
-			updates.cameraGear = body.cameraGear.trim();
-		} else {
-			return json(
-				{ error: 'Camera gear must be a string or null', field: 'cameraGear' },
-				{ status: 400 }
-			);
-		}
-	}
+	// 3. Validate body; drop fields that were not sent
+	const parsed = await parseBody(request, UpdateProfile);
+	const updates = Object.fromEntries(
+		Object.entries(parsed).filter(([, value]) => value !== undefined)
+	) as Partial<typeof parsed>;
 
 	if (Object.keys(updates).length === 0) {
-		return json({ error: 'No valid fields provided to update' }, { status: 400 });
+		return apiError(400, 'validation_failed', 'No valid fields provided to update');
+	}
+
+	if (updates.handle) {
+		const existing = await locals.db
+			.select({ id: user.id })
+			.from(user)
+			.where(and(eq(user.handle, updates.handle), ne(user.id, targetUserId)))
+			.limit(1);
+
+		if (existing.length > 0) {
+			throw new ApiError(409, 'handle_taken', 'This handle is already taken', {
+				handle: 'This handle is already taken'
+			});
+		}
 	}
 
 	// 4. Update the user row in database
@@ -260,4 +158,4 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 		success: true,
 		user: updatedRows[0]
 	});
-};
+});

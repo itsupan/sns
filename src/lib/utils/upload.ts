@@ -1,3 +1,4 @@
+import { readApiError } from './api-error';
 export interface UploadOptions {
 	onProgress?: (percent: number) => void;
 	maxSizeMb?: number;
@@ -127,10 +128,7 @@ export async function getPresignedUploadUrl(file: {
 	if (!response.ok) {
 		let errorMessage = `Failed to get presigned upload URL (${response.status})`;
 		try {
-			const data = (await response.json()) as { error?: string };
-			if (data && typeof data.error === 'string') {
-				errorMessage = data.error;
-			}
+			errorMessage = readApiError(await response.json(), errorMessage).message;
 		} catch {
 			// ignore json parsing errors
 		}

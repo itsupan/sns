@@ -2,11 +2,12 @@ import { json } from '@sveltejs/kit';
 import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post } from '$lib/server/db/schema';
+import { apiError, withApi } from '$lib/server/api';
 
-export const POST: RequestHandler = async ({ params, locals }) => {
+export const POST: RequestHandler = withApi(async ({ params, locals }) => {
 	const postId = params.id;
 	if (!postId) {
-		return json({ error: 'Post ID is required' }, { status: 400 });
+		return apiError(400, 'bad_request', 'Post ID is required');
 	}
 
 	const postRows = await locals.db
@@ -16,7 +17,7 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		.limit(1);
 
 	if (postRows.length === 0) {
-		return json({ error: 'Post not found' }, { status: 404 });
+		return apiError(404, 'not_found', 'Post not found');
 	}
 
 	const nextSharesCount = postRows[0].sharesCount + 1;
@@ -26,4 +27,4 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 		.where(eq(post.id, postId));
 
 	return json({ sharesCount: nextSharesCount });
-};
+});

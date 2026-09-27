@@ -2,12 +2,23 @@ import { json } from '@sveltejs/kit';
 import { eq, asc } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post, postComment, user } from '$lib/server/db/schema';
+import * as v from 'valibot';
 import { formatTimeAgo } from '$lib/utils/format';
+import { apiError, parseBody, requireUser, withApi } from '$lib/server/api';
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+const CreateComment = v.object({
+	content: v.pipe(
+		v.string('Comment content is required'),
+		v.trim(),
+		v.minLength(1, 'Comment content is required'),
+		v.maxLength(1000, 'Comment cannot exceed 1000 characters')
+	)
+});
+
+export const GET: RequestHandler = withApi(async ({ params, locals }) => {
 	const postId = params.id;
 	if (!postId) {
-		return json({ error: 'Post ID is required' }, { status: 400 });
+		return apiError(400, 'bad_request', 'Post ID is required');
 	}
 
 	const commentRows = await locals.db
@@ -43,33 +54,17 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	}));
 
 	return json({ comments });
-};
+});
 
-export const POST: RequestHandler = async ({ params, request, locals }) => {
-	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
+export const POST: RequestHandler = withApi(async ({ params, request, locals }) => {
+	const currentUser = requireUser(locals);
 
 	const postId = params.id;
 	if (!postId) {
-		return json({ error: 'Post ID is required' }, { status: 400 });
+		return apiError(400, 'bad_request', 'Post ID is required');
 	}
 
-	let body: Record<string, unknown>;
-	try {
-		body = await request.json();
-	} catch {
-		return json({ error: 'Invalid JSON payload' }, { status: 400 });
-	}
-
-	const content = typeof body.content === 'string' ? body.content.trim() : '';
-	if (!content) {
-		return json({ error: 'Comment content is required' }, { status: 400 });
-	}
-
-	if (content.length > 1000) {
-		return json({ error: 'Comment cannot exceed 1000 characters' }, { status: 400 });
-	}
+	const { content } = await parseBody(request, CreateComment);
 
 	const postRows = await locals.db
 		.select({ id: post.id, commentsCount: post.commentsCount })
@@ -78,7 +73,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		.limit(1);
 
 	if (postRows.length === 0) {
-		return json({ error: 'Post not found' }, { status: 404 });
+		return apiError(404, 'not_found', 'Post not found');
 	}
 
 	const targetPost = postRows[0];
@@ -87,7 +82,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	await locals.db.insert(postComment).values({
 		id: commentId,
 		postId,
-		userId: locals.user.id,
+		userId: currentUser.id,
 		content
 	});
 
@@ -103,14 +98,14 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		createdAt: new Date(),
 		timeAgo: 'Just now',
 		author: {
-			id: locals.user.id,
-			name: locals.user.name,
-			handle: locals.user.handle
-				? `@${locals.user.handle.replace(/^@/, '')}`
-				: `@${locals.user.name.toLowerCase().replace(/\s+/g, '')}`,
-			avatar: locals.user.image || ''
+			id: currentUser.id,
+			name: currentUser.name,
+			handle: currentUser.handle
+				? `@${currentUser.handle.replace(/^@/, '')}`
+				: `@${currentUser.name.toLowerCase().replace(/\s+/g, '')}`,
+			avatar: currentUser.image || ''
 		}
 	};
 
 	return json({ comment: createdComment, commentsCount: nextCommentsCount }, { status: 201 });
-};
+});

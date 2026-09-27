@@ -1,44 +1,38 @@
 import { json } from '@sveltejs/kit';
+import * as v from 'valibot';
 import type { RequestHandler } from './$types';
 import { generatePresignedUploadUrl } from '$lib/server/services/storage';
+import { ApiError, parseBody, requireUser, withApi } from '$lib/server/api';
 
-export const POST: RequestHandler = async ({ request, locals, platform }) => {
-	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
+const PresignRequest = v.object({
+	filename: v.pipe(v.string('Filename is required'), v.minLength(1, 'Filename is required')),
+	contentType: v.pipe(
+		v.string('Content-Type is required'),
+		v.minLength(1, 'Content-Type is required')
+	),
+	size: v.optional(
+		v.pipe(
+			v.number('Size must be a positive number'),
+			v.minValue(0, 'Size must be a positive number')
+		)
+	)
+});
 
-	let body: { filename?: unknown; contentType?: unknown; size?: unknown };
-	try {
-		body = await request.json();
-	} catch {
-		return json({ error: 'Invalid JSON payload' }, { status: 400 });
-	}
-
-	const { filename, contentType, size } = body;
-
-	if (!filename || typeof filename !== 'string') {
-		return json({ error: 'Filename is required' }, { status: 400 });
-	}
-
-	if (!contentType || typeof contentType !== 'string') {
-		return json({ error: 'Content-Type is required' }, { status: 400 });
-	}
-
-	if (size !== undefined && (typeof size !== 'number' || size < 0)) {
-		return json({ error: 'Size must be a positive number' }, { status: 400 });
-	}
+export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
+	const currentUser = requireUser(locals);
+	const { filename, contentType, size } = await parseBody(request, PresignRequest);
 
 	try {
 		const result = await generatePresignedUploadUrl(platform?.env, {
 			filename,
 			contentType,
 			size,
-			userId: locals.user.id
+			userId: currentUser.id
 		});
 
 		return json(result);
 	} catch (error) {
 		const message = error instanceof Error ? error.message : 'Failed to generate upload URL';
-		return json({ error: message }, { status: 400 });
+		throw new ApiError(400, 'upload_rejected', message);
 	}
-};
+});

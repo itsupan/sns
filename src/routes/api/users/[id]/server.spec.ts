@@ -1,3 +1,4 @@
+import type { ApiErrorBody } from '$lib/server/api';
 import { describe, expect, it, vi } from 'vitest';
 import { GET, PATCH } from './+server';
 import type { RequestEvent } from './$types';
@@ -51,7 +52,7 @@ describe('GET /api/users/:id', () => {
 		const res = await GET(event);
 		expect(res.status).toBe(404);
 		const body = await res.json();
-		expect(body).toEqual({ error: 'User not found' });
+		expect(body).toEqual({ error: { code: 'not_found', message: 'User not found' } });
 	});
 
 	it('returns user profile when user exists', async () => {
@@ -99,8 +100,8 @@ describe('PATCH /api/users/:id', () => {
 
 		const res = await PATCH(event);
 		expect(res.status).toBe(401);
-		const body = (await res.json()) as { error?: string };
-		expect(body).toEqual({ error: 'Unauthorized' });
+		const body = (await res.json()) as ApiErrorBody;
+		expect(body.error.code).toBe('unauthorized');
 	});
 
 	it('returns 403 when user attempts to update someone else profile', async () => {
@@ -116,8 +117,8 @@ describe('PATCH /api/users/:id', () => {
 
 		const res = await PATCH(event);
 		expect(res.status).toBe(403);
-		const body = (await res.json()) as { error?: string };
-		expect(body.error).toContain('Forbidden');
+		const body = (await res.json()) as ApiErrorBody;
+		expect(body.error.code).toBe('forbidden');
 	});
 
 	it('returns 400 when name is empty', async () => {
@@ -133,8 +134,8 @@ describe('PATCH /api/users/:id', () => {
 
 		const res = await PATCH(event);
 		expect(res.status).toBe(400);
-		const body = (await res.json()) as { error?: string };
-		expect(body.error).toBe('Name cannot be empty');
+		const body = (await res.json()) as ApiErrorBody;
+		expect(body.error.fields).toEqual({ name: 'Name cannot be empty' });
 	});
 
 	it('returns 400 when handle contains invalid characters', async () => {
@@ -150,8 +151,8 @@ describe('PATCH /api/users/:id', () => {
 
 		const res = await PATCH(event);
 		expect(res.status).toBe(400);
-		const body = (await res.json()) as { error?: string };
-		expect(body.error).toContain('Handle must be 1-30 characters');
+		const body = (await res.json()) as ApiErrorBody;
+		expect(body.error.fields?.handle).toContain('Handle must be 1-30 characters');
 	});
 
 	it('returns 409 when handle is already taken by another user', async () => {
@@ -177,8 +178,9 @@ describe('PATCH /api/users/:id', () => {
 
 		const res = await PATCH(event);
 		expect(res.status).toBe(409);
-		const body = (await res.json()) as { error?: string };
-		expect(body.error).toBe('This handle is already taken');
+		const body = (await res.json()) as ApiErrorBody;
+		expect(body.error.code).toBe('handle_taken');
+		expect(body.error.fields?.handle).toBe('This handle is already taken');
 	});
 
 	it('successfully updates user profile data', async () => {
