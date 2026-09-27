@@ -6,7 +6,7 @@ import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
-import { ApiError, parseBody, requireUser, withApi } from '$lib/server/api';
+import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
 const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
@@ -141,6 +141,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 
 export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
 	const currentUser = requireUser(locals);
+	await enforceRateLimit(platform, 'createPost', currentUser.id);
 	const body = await parseBody(request, CreatePostBody);
 
 	const content = typeof body.content === 'string' ? body.content.trim() : '';

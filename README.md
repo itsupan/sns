@@ -134,6 +134,20 @@ export const POST = withApi(async ({ request, locals }) => {
 });
 ```
 
+### Rate limits
+
+Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fixed window stored in the `KV` binding. Limits live in `RATE_LIMITS` (`src/lib/server/api/rate-limit.ts`):
+
+| Name            | Endpoint                       | Limit    |
+| --------------- | ------------------------------ | -------- |
+| `createPost`    | `POST /api/posts`              | 10 / min |
+| `comment`       | `POST /api/posts/:id/comments` | 20 / min |
+| `like`          | `POST /api/posts/:id/like`     | 60 / min |
+| `follow`        | follow / unfollow (#46)        | 30 / min |
+| `uploadPresign` | `POST /api/upload/presigned`   | 20 / min |
+
+Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }`. KV has no atomic increment and is eventually consistent, so a burst can let a few extra requests through: treat this as abuse protection, not an exact quota. Without a `KV` binding (unit tests) requests are allowed.
+
 ## Generated files
 
 `worker-configuration.d.ts` (the `Env` type for your bindings) and `.svelte-kit/` are
