@@ -5,6 +5,7 @@ import { post, postComment, user } from '$lib/server/db/schema';
 import * as v from 'valibot';
 import { formatTimeAgo } from '$lib/utils/format';
 import { apiError, parseBody, requireUser, withApi } from '$lib/server/api';
+import { commentsCountOf } from '$lib/server/db/counters';
 
 const CreateComment = v.object({
 	content: v.pipe(
@@ -67,7 +68,7 @@ export const POST: RequestHandler = withApi(async ({ params, request, locals }) 
 	const { content } = await parseBody(request, CreateComment);
 
 	const postRows = await locals.db
-		.select({ id: post.id, commentsCount: post.commentsCount })
+		.select({ id: post.id })
 		.from(post)
 		.where(eq(post.id, postId))
 		.limit(1);
@@ -76,21 +77,22 @@ export const POST: RequestHandler = withApi(async ({ params, request, locals }) 
 		return apiError(404, 'not_found', 'Post not found');
 	}
 
-	const targetPost = postRows[0];
 	const commentId = crypto.randomUUID();
 
-	await locals.db.insert(postComment).values({
-		id: commentId,
-		postId,
-		userId: currentUser.id,
-		content
-	});
-
-	const nextCommentsCount = targetPost.commentsCount + 1;
-	await locals.db
-		.update(post)
-		.set({ commentsCount: nextCommentsCount, updatedAt: new Date() })
-		.where(eq(post.id, postId));
+	const [, updated] = await locals.db.batch([
+		locals.db.insert(postComment).values({
+			id: commentId,
+			postId,
+			userId: currentUser.id,
+			content
+		}),
+		locals.db
+			.update(post)
+			.set({ commentsCount: commentsCountOf(postId), updatedAt: new Date() })
+			.where(eq(post.id, postId))
+			.returning({ commentsCount: post.commentsCount })
+	]);
+	const nextCommentsCount = updated[0]?.commentsCount ?? 0;
 
 	const createdComment = {
 		id: commentId,

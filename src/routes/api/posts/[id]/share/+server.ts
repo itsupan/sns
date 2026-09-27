@@ -1,5 +1,5 @@
 import { json } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post } from '$lib/server/db/schema';
 import { apiError, withApi } from '$lib/server/api';
@@ -10,21 +10,15 @@ export const POST: RequestHandler = withApi(async ({ params, locals }) => {
 		return apiError(400, 'bad_request', 'Post ID is required');
 	}
 
-	const postRows = await locals.db
-		.select({ id: post.id, sharesCount: post.sharesCount })
-		.from(post)
+	const updated = await locals.db
+		.update(post)
+		.set({ sharesCount: sql`${post.sharesCount} + 1`, updatedAt: new Date() })
 		.where(eq(post.id, postId))
-		.limit(1);
+		.returning({ sharesCount: post.sharesCount });
 
-	if (postRows.length === 0) {
+	if (updated.length === 0) {
 		return apiError(404, 'not_found', 'Post not found');
 	}
 
-	const nextSharesCount = postRows[0].sharesCount + 1;
-	await locals.db
-		.update(post)
-		.set({ sharesCount: nextSharesCount, updatedAt: new Date() })
-		.where(eq(post.id, postId));
-
-	return json({ sharesCount: nextSharesCount });
+	return json({ sharesCount: updated[0].sharesCount });
 });
