@@ -1,10 +1,13 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
+	import { toast } from '$lib/utils/toast.svelte';
 	import Button from '$lib/components/shared/Button.svelte';
 	import KizunaLogo from '$lib/components/shared/KizunaLogo.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+
 	interface Props {
 		mode?: 'login' | 'signup';
 		redirectTo?: string;
@@ -12,27 +15,41 @@
 
 	let { mode = $bindable('login'), redirectTo = '/' }: Props = $props();
 
+	let effectiveRedirect = $derived(page.url?.searchParams?.get('redirectTo') || redirectTo);
+
 	let name = $state('');
-	let email = $state('');
+	let email = $state(page.url?.searchParams?.get('email') || '');
 	let password = $state('');
+	let confirmPassword = $state('');
 	let rememberMe = $state(true);
 	let agreeToTerms = $state(false);
 
 	let showPassword = $state(false);
+	let showConfirmPassword = $state(false);
 	let loading = $state(false);
 	let googleLoading = $state(false);
 	let errorMessage = $state<string | null>(null);
 	let successMessage = $state<string | null>(null);
 
+	$effect(() => {
+		const paramEmail = page.url?.searchParams?.get('email');
+		if (paramEmail && !email) {
+			email = paramEmail;
+		}
+	});
+
 	function switchMode(newMode: 'login' | 'signup') {
 		mode = newMode;
 		errorMessage = null;
 		successMessage = null;
+		confirmPassword = '';
 
 		if (typeof window !== 'undefined') {
 			const targetPath = newMode === 'signup' ? resolve('/signup') : resolve('/login');
 			if (window.location.pathname !== targetPath) {
-				goto(targetPath, { replaceState: true, noScroll: true, keepFocus: true });
+				const query = email.trim() ? `?email=${encodeURIComponent(email.trim())}` : '';
+				// eslint-disable-next-line svelte/no-navigation-without-resolve
+				goto(`${targetPath}${query}`, { replaceState: true, noScroll: true, keepFocus: true });
 			}
 		}
 	}
@@ -43,11 +60,12 @@
 		try {
 			await authClient.signIn.social({
 				provider: 'google',
-				callbackURL: redirectTo
+				callbackURL: effectiveRedirect
 			});
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : 'Google authentication failed';
 			errorMessage = msg;
+			toast.error(msg);
 			googleLoading = false;
 		}
 	}
@@ -57,24 +75,45 @@
 		errorMessage = null;
 		successMessage = null;
 
-		if (!email || !password) {
+		const trimmedEmail = email.trim();
+		const trimmedName = name.trim();
+
+		if (!trimmedEmail || !password) {
 			errorMessage = 'Please fill in all required fields.';
+			toast.error(errorMessage);
 			return;
 		}
 
-		if (mode === 'signup' && !name.trim()) {
-			errorMessage = 'Please enter your name.';
-			return;
-		}
+		if (mode === 'signup') {
+			if (!trimmedName) {
+				errorMessage = 'Please enter your name.';
+				toast.error(errorMessage);
+				return;
+			}
 
-		if (mode === 'signup' && !agreeToTerms) {
-			errorMessage = 'Please agree to the Terms of Service to continue.';
-			return;
-		}
+			if (password.length < 8) {
+				errorMessage = 'Password must be at least 8 characters long.';
+				toast.error(errorMessage);
+				return;
+			}
 
-		if (mode === 'signup' && password.length < 8) {
-			errorMessage = 'Password must be at least 8 characters long.';
-			return;
+			if (!confirmPassword) {
+				errorMessage = 'Please confirm your password.';
+				toast.error(errorMessage);
+				return;
+			}
+
+			if (password !== confirmPassword) {
+				errorMessage = 'Passwords do not match.';
+				toast.error(errorMessage);
+				return;
+			}
+
+			if (!agreeToTerms) {
+				errorMessage = 'Please agree to the Terms of Service to continue.';
+				toast.error(errorMessage);
+				return;
+			}
 		}
 
 		loading = true;
@@ -82,40 +121,62 @@
 		try {
 			if (mode === 'login') {
 				const result = await authClient.signIn.email({
-					email,
+					email: trimmedEmail,
 					password,
 					rememberMe,
-					callbackURL: redirectTo
+					callbackURL: effectiveRedirect
 				});
 
 				if (result.error) {
 					errorMessage = result.error.message || 'Invalid email or password. Please try again.';
+					toast.error(errorMessage);
 					loading = false;
 				} else {
 					successMessage = 'Signed in successfully! Redirecting...';
-					// eslint-disable-next-line svelte/no-navigation-without-resolve
-					goto(redirectTo);
+					toast.success('Signed in successfully! Welcome back.');
+					setTimeout(() => {
+						// eslint-disable-next-line svelte/no-navigation-without-resolve
+						goto(effectiveRedirect);
+					}, 350);
 				}
 			} else {
 				const result = await authClient.signUp.email({
-					email,
+					email: trimmedEmail,
 					password,
-					name: name.trim(),
-					callbackURL: redirectTo
+					name: trimmedName
 				});
 
 				if (result.error) {
 					errorMessage = result.error.message || 'Could not create account. Please try again.';
+					toast.error(errorMessage);
 					loading = false;
 				} else {
-					successMessage = 'Account created successfully! Redirecting...';
-					// eslint-disable-next-line svelte/no-navigation-without-resolve
-					goto(redirectTo);
+					// Sign out immediately so user must sign in with their email and password first
+					try {
+						await authClient.signOut();
+					} catch {
+						// Ignore if not authenticated yet
+					}
+
+					successMessage =
+						'Account created successfully! Please sign in with your email and password.';
+					toast.success('Account created successfully! Please sign in.');
+
+					// Redirect user to login with their email and redirectTo prefilled
+					const redirectParam = page.url?.searchParams?.get('redirectTo');
+					const loginUrl = redirectParam
+						? `${resolve('/login')}?email=${encodeURIComponent(trimmedEmail)}&redirectTo=${encodeURIComponent(redirectParam)}`
+						: `${resolve('/login')}?email=${encodeURIComponent(trimmedEmail)}`;
+					setTimeout(() => {
+						// eslint-disable-next-line svelte/no-navigation-without-resolve
+						goto(loginUrl);
+					}, 600);
 				}
 			}
 		} catch (err: unknown) {
 			const msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
 			errorMessage = msg;
+			toast.error(msg);
 			loading = false;
 		}
 	}
@@ -323,6 +384,41 @@
 				</button>
 			</div>
 		</div>
+
+		{#if mode === 'signup'}
+			<div class="form-group flex flex-col gap-1.5">
+				<label
+					for="confirm-password"
+					class="form-label text-[13px] font-medium text-slate-900 dark:text-dark-text"
+					>Confirm password</label
+				>
+				<div class="password-input-wrapper relative flex items-center">
+					<input
+						id="confirm-password"
+						name="confirmPassword"
+						type={showConfirmPassword ? 'text' : 'password'}
+						bind:value={confirmPassword}
+						placeholder="••••••••"
+						required
+						autocomplete="new-password"
+						enterkeyhint="go"
+						class="form-input password-input w-full h-12 sm:h-11 px-3.5 pr-11 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
+					/>
+					<button
+						type="button"
+						class="toggle-password-btn absolute right-0.5 size-11 text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150 flex items-center justify-center rounded-md cursor-pointer border-none bg-transparent"
+						onclick={() => (showConfirmPassword = !showConfirmPassword)}
+						aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+					>
+						{#if showConfirmPassword}
+							<Icon name="eye-crossed" size={19} />
+						{:else}
+							<Icon name="eye" size={19} />
+						{/if}
+					</button>
+				</div>
+			</div>
+		{/if}
 
 		<!-- Options Row (Remember me / Terms) -->
 		<div

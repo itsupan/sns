@@ -17,7 +17,7 @@ describe('storage service', () => {
 			generatePresignedUploadUrl(undefined, {
 				filename: 'huge.png',
 				contentType: 'image/png',
-				size: 20 * 1024 * 1024,
+				size: 60 * 1024 * 1024,
 				userId: 'user-1'
 			})
 		).rejects.toThrow('File size exceeds');

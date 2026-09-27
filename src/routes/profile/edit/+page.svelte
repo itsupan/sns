@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
+	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import ProfileSettingsForm from '$lib/components/profile/ProfileSettingsForm.svelte';
@@ -9,8 +9,12 @@
 
 	const user = $derived(data?.user);
 
-	function handleSuccess() {
-		goto(resolve('/profile'));
+	async function handleSuccess() {
+		// Invalidate SvelteKit server data so /profile immediately loads fresh DB values
+		await invalidateAll();
+		setTimeout(async () => {
+			await goto(resolve('/profile'), { invalidateAll: true });
+		}, 600);
 	}
 
 	function handleCancel() {

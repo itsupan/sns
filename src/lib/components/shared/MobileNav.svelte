@@ -38,7 +38,7 @@
 </script>
 
 <nav
-	class="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-dark-card/95 backdrop-blur-md border-t border-slate-200 dark:border-dark-border pb-safe {className}"
+	class="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-dark-card/95 backdrop-blur-md border-t border-slate-200 dark:border-dark-border pb-safe {className}"
 	aria-label="Mobile Navigation"
 >
 	<ul class="h-14 flex items-stretch list-none m-0 p-0">

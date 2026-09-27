@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount } from './format';
+import { formatCount, formatTimeAgo } from './format';
 
 describe('formatCount', () => {
 	it('keeps small numbers as-is', () => {
@@ -14,5 +14,16 @@ describe('formatCount', () => {
 		expect(formatCount(1999)).toBe('1.9K');
 		expect(formatCount(125_400)).toBe('125K');
 		expect(formatCount(2_300_000)).toBe('2.3M');
+	});
+});
+
+describe('formatTimeAgo', () => {
+	it('formats recent timestamps correctly', () => {
+		const now = Date.now();
+		expect(formatTimeAgo(now - 10 * 1000)).toBe('Just now');
+		expect(formatTimeAgo(now - 5 * 60 * 1000)).toBe('5m ago');
+		expect(formatTimeAgo(now - 3 * 3600 * 1000)).toBe('3h ago');
+		expect(formatTimeAgo(now - 2 * 86400 * 1000)).toBe('2d ago');
+		expect(formatTimeAgo('invalid date')).toBe('');
 	});
 });

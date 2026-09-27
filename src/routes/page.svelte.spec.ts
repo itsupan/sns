@@ -15,4 +15,36 @@ describe('home page', () => {
 		await expect.element(screen.getByText('Your story')).toBeInTheDocument();
 		await expect.element(screen.getByText('Curators to Follow')).toBeInTheDocument();
 	});
+
+	it('shows "You\'re all caught up" indicator when no more posts exist', async () => {
+		const screen = render(Page, {
+			props: {
+				data: {
+					posts: [
+						{
+							id: 'post-test-1',
+							author: {
+								name: 'Elena Rostova',
+								handle: '@elena.rostova',
+								avatar: 'https://example.com/avatar.jpg'
+							},
+							title: 'Single Post',
+							description: 'Test post description',
+							image: 'https://example.com/test.jpg',
+							tags: ['#test'],
+							likes: 5,
+							commentsCount: 1,
+							repostsCount: 0
+						}
+					],
+					hasMore: false
+				}
+			}
+		});
+
+		await expect.element(screen.getByText("You're all caught up")).toBeInTheDocument();
+		await expect
+			.element(screen.getByText("You've seen all recent posts from your feed."))
+			.toBeInTheDocument();
+	});
 });

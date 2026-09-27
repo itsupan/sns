@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import type { TabId, ViewMode } from './ProfileTabs.svelte';
 
@@ -37,10 +38,18 @@
 
 	interface Props {
 		items?: GridItem[];
+		essays?: EssayItem[];
+		collections?: PinnedCollection[];
 		activeTab?: TabId;
 		viewMode?: ViewMode;
 		class?: string;
 		onSelectItem?: (item: GridItem) => void;
+		user?: {
+			name?: string;
+			handle?: string;
+			image?: string | null;
+		};
+		isOwnProfile?: boolean;
 	}
 
 	const defaultItems: GridItem[] = [
@@ -226,10 +235,14 @@
 
 	let {
 		items = defaultItems,
+		essays = sampleEssays,
+		collections = sampleCollections,
 		activeTab = 'grid',
 		viewMode = 'grid',
 		class: className = '',
-		onSelectItem
+		onSelectItem,
+		user,
+		isOwnProfile = true
 	}: Props = $props();
 
 	let activeModalItem = $state<GridItem | null>(null);
@@ -257,8 +270,33 @@
 <div class="w-full {className}">
 	<!-- 1. CURATED GRID TAB -->
 	{#if activeTab === 'grid'}
-		<!-- A. GRID VIEW MODE (3 Columns) -->
-		{#if viewMode === 'grid'}
+		{#if items.length === 0}
+			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+				<div
+					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
+				>
+					<Icon name="camera" class="text-2xl" />
+				</div>
+				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">No posts yet</h3>
+				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm mb-5">
+					{#if isOwnProfile}
+						When you share photos or architectural studies, they will appear here on your profile.
+					{:else}
+						{user?.name || 'This user'} hasn't shared any posts yet.
+					{/if}
+				</p>
+				{#if isOwnProfile}
+					<a
+						href={resolve('/')}
+						class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 font-semibold text-xs transition hover:opacity-90 no-underline shadow-xs"
+					>
+						<Icon name="plus" class="text-xs" />
+						<span>Create your first post</span>
+					</a>
+				{/if}
+			</div>
+			<!-- A. GRID VIEW MODE (3 Columns) -->
+		{:else if viewMode === 'grid'}
 			<div class="grid grid-cols-3 gap-0.5 sm:gap-4 md:gap-6 py-0.5 sm:py-6">
 				{#each items as item (item.id)}
 					<button
@@ -316,20 +354,26 @@
 						<div class="flex items-center justify-between mb-3.5">
 							<div class="flex items-center gap-3">
 								<div
-									class="size-10 rounded-full overflow-hidden bg-slate-100 dark:bg-dark-elevated"
+									class="size-10 rounded-full overflow-hidden bg-slate-100 dark:bg-dark-elevated flex items-center justify-center shrink-0"
 								>
-									<img
-										src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80"
-										alt="Elena Rostova"
-										class="w-full h-full object-cover"
-									/>
+									{#if user?.image}
+										<img
+											src={user.image}
+											alt={user.name || 'User'}
+											class="w-full h-full object-cover"
+										/>
+									{:else}
+										<span class="font-bold text-xs text-slate-600 dark:text-dark-text select-none">
+											{(user?.name || 'U').slice(0, 1).toUpperCase()}
+										</span>
+									{/if}
 								</div>
 								<div class="flex flex-col">
 									<div class="flex items-center gap-1.5 leading-tight">
-										<span class="font-semibold text-sm text-slate-900 dark:text-white"
-											>Elena Rostova</span
-										>
-										<span class="text-xs text-slate-400">@elena.rostova</span>
+										<span class="font-semibold text-sm text-slate-900 dark:text-white">
+											{user?.name || 'User'}
+										</span>
+										<span class="text-xs text-slate-400">@{user?.handle || 'user'}</span>
 									</div>
 									<span class="text-xs text-slate-400 mt-0.5">
 										{[item.location, item.date].filter(Boolean).join(' • ')}
@@ -508,90 +552,120 @@
 
 		<!-- 2. EDITORIAL ESSAYS / SERIES TAB -->
 	{:else if activeTab === 'essays'}
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-3 sm:px-0">
-			{#each sampleEssays as essay (essay.id)}
-				<article
-					class="bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl overflow-hidden shadow-xs dark:shadow-none hover:shadow-md transition-shadow flex flex-col"
+		{#if essays.length === 0}
+			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+				<div
+					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
 				>
-					<div class="w-full aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-dark-elevated">
-						<img
-							src={essay.coverImage}
-							alt={essay.title}
-							class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-							loading="lazy"
-						/>
-					</div>
-					<div class="p-5 sm:p-6 flex-1 flex flex-col justify-between">
-						<div>
-							<div class="flex items-center gap-2 text-xs text-slate-400 mb-2">
-								<span>{essay.date}</span>
-								<span>•</span>
-								<span>{essay.readTime}</span>
-							</div>
-							<h3 class="text-lg font-bold text-slate-950 dark:text-white mb-2 leading-snug">
-								{essay.title}
-							</h3>
-							<p
-								class="text-xs sm:text-sm text-slate-600 dark:text-dark-muted leading-relaxed line-clamp-3 mb-4"
-							>
-								{essay.excerpt}
-							</p>
+					<Icon name="document" class="text-2xl" />
+				</div>
+				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+					No essays published yet
+				</h3>
+				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm">
+					In-depth architectural monographs and critical essays will appear here.
+				</p>
+			</div>
+		{:else}
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-3 sm:px-0">
+				{#each essays as essay (essay.id)}
+					<article
+						class="bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl overflow-hidden shadow-xs dark:shadow-none hover:shadow-md transition-shadow flex flex-col"
+					>
+						<div class="w-full aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-dark-elevated">
+							<img
+								src={essay.coverImage}
+								alt={essay.title}
+								class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+								loading="lazy"
+							/>
 						</div>
-						<div
-							class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-dark-border"
-						>
-							<div class="flex items-center gap-1.5 flex-wrap">
-								{#each essay.tags as tag (tag)}
-									<span
-										class="text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-dark-elevated px-2.5 py-0.5 rounded-full"
-									>
-										{tag}
-									</span>
-								{/each}
+						<div class="p-5 sm:p-6 flex-1 flex flex-col justify-between">
+							<div>
+								<div class="flex items-center gap-2 text-xs text-slate-400 mb-2">
+									<span>{essay.date}</span>
+									<span>•</span>
+									<span>{essay.readTime}</span>
+								</div>
+								<h3 class="text-lg font-bold text-slate-950 dark:text-white mb-2 leading-snug">
+									{essay.title}
+								</h3>
+								<p
+									class="text-xs sm:text-sm text-slate-600 dark:text-dark-muted leading-relaxed line-clamp-3 mb-4"
+								>
+									{essay.excerpt}
+								</p>
 							</div>
-							<button
-								type="button"
-								class="text-xs font-semibold text-blue-600 dark:text-kizuna-blue hover:underline bg-transparent border-0 cursor-pointer"
+							<div
+								class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-dark-border"
 							>
-								Read Essay →
-							</button>
+								<div class="flex items-center gap-1.5 flex-wrap">
+									{#each essay.tags as tag (tag)}
+										<span
+											class="text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-dark-elevated px-2.5 py-0.5 rounded-full"
+										>
+											{tag}
+										</span>
+									{/each}
+								</div>
+								<button
+									type="button"
+									class="text-xs font-semibold text-blue-600 dark:text-kizuna-blue hover:underline bg-transparent border-0 cursor-pointer"
+								>
+									Read Essay →
+								</button>
+							</div>
 						</div>
-					</div>
-				</article>
-			{/each}
-		</div>
+					</article>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- 3. PINNED COLLECTIONS TAB -->
 	{:else if activeTab === 'pinned'}
-		<div class="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-3 sm:px-0">
-			{#each sampleCollections as col (col.id)}
+		{#if collections.length === 0}
+			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
 				<div
-					class="group bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl overflow-hidden p-4 shadow-xs dark:shadow-none hover:border-slate-300 dark:hover:border-dark-hover transition-all cursor-pointer"
+					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
 				>
-					<div
-						class="relative w-full aspect-[16/10] rounded-xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-3.5"
-					>
-						<img
-							src={col.coverImage}
-							alt={col.title}
-							class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-							loading="lazy"
-						/>
-						<div
-							class="absolute bottom-2 right-2 bg-black/75 backdrop-blur-xs text-white text-xs font-semibold px-2.5 py-1 rounded-md"
-						>
-							{col.count} works
-						</div>
-					</div>
-					<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
-						{col.title}
-					</h3>
-					<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-						{col.description}
-					</p>
+					<Icon name="bookmark" class="text-2xl" />
 				</div>
-			{/each}
-		</div>
+				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">No collections yet</h3>
+				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm">
+					Curated photo series and collections will appear here.
+				</p>
+			</div>
+		{:else}
+			<div class="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-3 sm:px-0">
+				{#each collections as col (col.id)}
+					<div
+						class="group bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl overflow-hidden p-4 shadow-xs dark:shadow-none hover:border-slate-300 dark:hover:border-dark-hover transition-all cursor-pointer"
+					>
+						<div
+							class="relative w-full aspect-[16/10] rounded-xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-3.5"
+						>
+							<img
+								src={col.coverImage}
+								alt={col.title}
+								class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+								loading="lazy"
+							/>
+							<div
+								class="absolute bottom-2 right-2 bg-black/75 backdrop-blur-xs text-white text-xs font-semibold px-2.5 py-1 rounded-md"
+							>
+								{col.count} works
+							</div>
+						</div>
+						<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+							{col.title}
+						</h3>
+						<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
+							{col.description}
+						</p>
+					</div>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- 4. CRITIQUES TAB -->
 	{:else if activeTab === 'critiques'}
@@ -607,26 +681,40 @@
 
 		<!-- 5. SAVED TAB -->
 	{:else if activeTab === 'saved'}
-		<div class="grid grid-cols-3 gap-0.5 sm:gap-4 md:gap-6 py-0.5 sm:py-6">
-			{#each items.slice(0, 6) as item (item.id)}
-				<button
-					type="button"
-					class="group relative w-full aspect-square sm:aspect-[4/5] rounded-none sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
-					onclick={() => openItem(item)}
-					aria-label={`View saved photo ${item.title}`}
+		{#if items.length === 0}
+			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
+				<div
+					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
 				>
-					<img
-						src={item.image}
-						alt={item.title}
-						class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-						loading="lazy"
-					/>
-					<div class="absolute top-2 right-2 text-white drop-shadow-md">
-						<Icon name="bookmark" class="text-sm text-blue-500" />
-					</div>
-				</button>
-			{/each}
-		</div>
+					<Icon name="bookmark" class="text-2xl" />
+				</div>
+				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">No saved posts</h3>
+				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm">
+					Save photos and essays to revisit them later in your private archive.
+				</p>
+			</div>
+		{:else}
+			<div class="grid grid-cols-3 gap-0.5 sm:gap-4 md:gap-6 py-0.5 sm:py-6">
+				{#each items.slice(0, 6) as item (item.id)}
+					<button
+						type="button"
+						class="group relative w-full aspect-square sm:aspect-[4/5] rounded-none sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
+						onclick={() => openItem(item)}
+						aria-label={`View saved photo ${item.title}`}
+					>
+						<img
+							src={item.image}
+							alt={item.title}
+							class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+							loading="lazy"
+						/>
+						<div class="absolute top-2 right-2 text-white drop-shadow-md">
+							<Icon name="bookmark" class="text-sm text-blue-500" />
+						</div>
+					</button>
+				{/each}
+			</div>
+		{/if}
 	{/if}
 
 	<!-- LIGHTBOX MODAL -->
@@ -657,7 +745,9 @@
 						<div
 							class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-dark-border"
 						>
-							<span class="font-bold text-sm text-slate-900 dark:text-white"> Elena Rostova </span>
+							<span class="font-bold text-sm text-slate-900 dark:text-white">
+								{user?.name || 'User'}
+							</span>
 							<button
 								type="button"
 								class="size-8 rounded-full flex items-center justify-center text-slate-500 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-hover transition-colors cursor-pointer border-0 bg-transparent"

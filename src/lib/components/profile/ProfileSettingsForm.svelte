@@ -119,6 +119,7 @@
 	let fileInputRef = $state<HTMLInputElement | null>(null);
 
 	let isSubmitting = $state(false);
+	let saveSuccess = $state(false);
 	let formError = $state<string | null>(null);
 	let fieldErrors = $state<Record<string, string>>({});
 
@@ -268,13 +269,22 @@
 				return;
 			}
 
-			toast.show('Profile updated successfully');
+			saveSuccess = true;
+			formError = null;
+
+			// Dispatch profile update event so views update immediately across the app
+			if (typeof window !== 'undefined' && data.user) {
+				window.dispatchEvent(new CustomEvent('kizuna:profile-updated', { detail: data.user }));
+			}
+
+			toast.show('Profile updated successfully', 3500);
 			if (data.user) {
 				onSuccess?.(data.user);
 			}
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Network error updating profile';
 			formError = message;
+			saveSuccess = false;
 			toast.show(message);
 		} finally {
 			isSubmitting = false;
@@ -311,6 +321,20 @@
 			>
 				<Icon name="exclamation" class="text-base shrink-0 mt-0.5" />
 				<div class="flex-1 font-medium">{formError}</div>
+			</div>
+		{/if}
+
+		<!-- Success Alert Banner -->
+		{#if saveSuccess}
+			<div
+				class="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 flex items-start gap-3 text-emerald-800 dark:text-emerald-300 text-sm"
+				role="status"
+			>
+				<Icon
+					name="check"
+					class="text-base text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5"
+				/>
+				<div class="flex-1 font-medium">Profile updated successfully! All changes are saved.</div>
 			</div>
 		{/if}
 

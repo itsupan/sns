@@ -6,3 +6,5 @@ export { default as ProfileGrid } from './ProfileGrid.svelte';
 export type { GridItem } from './ProfileGrid.svelte';
 export { default as ProfileSettingsForm } from './ProfileSettingsForm.svelte';
 export type { UserProfileData } from './ProfileSettingsForm.svelte';
+export { default as ShareProfileModal } from './ShareProfileModal.svelte';
+export { defaultProfile, resolveProfile, type ProfileData } from '$lib/utils/profile.svelte';

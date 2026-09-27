@@ -1,0 +1,105 @@
+<script lang="ts">
+	import ProfileHeader from '$lib/components/profile/ProfileHeader.svelte';
+	import ProfileHighlights from '$lib/components/profile/ProfileHighlights.svelte';
+	import ProfileTabs from '$lib/components/profile/ProfileTabs.svelte';
+	import ProfileGrid from '$lib/components/profile/ProfileGrid.svelte';
+	import type { Highlight } from '$lib/components/profile/ProfileHighlights.svelte';
+	import type {
+		GridItem,
+		EssayItem,
+		PinnedCollection
+	} from '$lib/components/profile/ProfileGrid.svelte';
+	import type { TabId, ViewMode } from '$lib/components/profile/ProfileTabs.svelte';
+	import { resolveProfile } from '$lib/utils/profile.svelte';
+	import type { PageData } from './$types';
+
+	interface Props {
+		data: PageData;
+	}
+
+	let { data }: Props = $props();
+
+	let activeTab = $state<TabId>('grid');
+	let viewMode = $state<ViewMode>('grid');
+
+	const currentProfile = $derived.by(() => {
+		return resolveProfile(data.targetUser, null, {
+			isOwnProfile: data.isOwnProfile
+		});
+	});
+
+	const userHighlights = $derived<Highlight[]>([]);
+	const userPosts = $derived<GridItem[]>(data.posts ?? []);
+	const userEssays = $derived<EssayItem[]>([]);
+	const userCollections = $derived<PinnedCollection[]>([]);
+
+	const pageTitle = $derived(
+		currentProfile.name
+			? `${currentProfile.name} (@${currentProfile.handle}) — Kizuna`
+			: 'Curator Profile — Kizuna'
+	);
+	const metaDescription = $derived(
+		currentProfile.bio || `${currentProfile.name}'s photography and curation profile on Kizuna.`
+	);
+	const ogImage = $derived(
+		userPosts.find((p) => Boolean(p.image))?.image || currentProfile.avatar || ''
+	);
+</script>
+
+<svelte:head>
+	<title>{pageTitle}</title>
+	<meta name="description" content={metaDescription} />
+	<meta property="og:site_name" content="Kizuna" />
+	<meta property="og:type" content="profile" />
+	<meta property="og:title" content={pageTitle} />
+	<meta property="og:description" content={metaDescription} />
+	{#if data.canonicalUrl}
+		<meta property="og:url" content={data.canonicalUrl} />
+		<link rel="canonical" href={data.canonicalUrl} />
+	{/if}
+	{#if ogImage}
+		<meta property="og:image" content={ogImage} />
+		<meta property="og:image:secure_url" content={ogImage} />
+		<meta property="og:image:alt" content={pageTitle} />
+		<meta name="twitter:image" content={ogImage} />
+		<meta name="twitter:image:alt" content={pageTitle} />
+		<meta name="twitter:card" content="summary_large_image" />
+	{:else}
+		<meta name="twitter:card" content="summary" />
+	{/if}
+	<meta name="twitter:title" content={pageTitle} />
+	<meta name="twitter:description" content={metaDescription} />
+</svelte:head>
+
+<main class="w-full flex-1 flex flex-col items-center">
+	<div class="w-full max-w-6xl mx-auto px-0 sm:px-6 lg:px-8 py-0 sm:py-6 flex flex-col">
+		<!-- Profile Header (Supports both own profile and other user view) -->
+		<ProfileHeader
+			user={data.targetUser}
+			profile={{
+				isOwnProfile: data.isOwnProfile
+			}}
+		/>
+
+		<!-- Story Collections / Highlights -->
+		<ProfileHighlights highlights={userHighlights} />
+
+		<!-- Tabs Bar -->
+		<ProfileTabs bind:activeTab bind:viewMode />
+
+		<!-- Curated Grid Gallery / List / Essays -->
+		<ProfileGrid
+			{activeTab}
+			{viewMode}
+			items={userPosts}
+			essays={userEssays}
+			collections={userCollections}
+			user={{
+				name: currentProfile.name,
+				handle: currentProfile.handle,
+				image: currentProfile.avatar
+			}}
+			isOwnProfile={data.isOwnProfile}
+		/>
+	</div>
+</main>
