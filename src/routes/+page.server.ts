@@ -4,6 +4,7 @@ import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
+import { notDeleted } from '$lib/server/db/posts';
 
 const FALLBACK_POSTS: PostData[] = [
 	{
@@ -94,6 +95,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			})
 			.from(post)
 			.innerJoin(user, eq(post.userId, user.id))
+			.where(notDeleted)
 			.orderBy(desc(post.createdAt))
 			.limit(PAGE_SIZE);
 

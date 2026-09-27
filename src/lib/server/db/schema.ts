@@ -29,11 +29,15 @@ export const post = sqliteTable(
 			.notNull(),
 		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-			.notNull()
+			.notNull(),
+		// Soft delete: set instead of removing the row; feed and profile queries filter it out.
+		deletedAt: integer('deleted_at', { mode: 'timestamp_ms' })
 	},
 	(table) => [
-		index('post_userId_idx').on(table.userId),
-		index('post_createdAt_idx').on(table.createdAt)
+		// Feed keyset pagination: ORDER BY created_at DESC, id DESC.
+		index('post_createdAt_id_idx').on(table.createdAt, table.id),
+		// Profile grid: WHERE user_id = ? ORDER BY created_at DESC (also serves user_id lookups).
+		index('post_userId_createdAt_idx').on(table.userId, table.createdAt)
 	]
 );
 

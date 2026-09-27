@@ -35,13 +35,16 @@ describe('GET /api/posts', () => {
 			select: vi.fn(() => ({
 				from: vi.fn(() => ({
 					innerJoin: vi.fn(() => ({
-						orderBy: vi.fn(() => ({
-							limit: vi.fn(() => ({
-								offset: vi.fn(async () => mockPosts)
-							}))
-						})),
+						// Feed query: .where(notDeleted).orderBy().limit().offset();
+						// comment previews: .where().orderBy() awaited directly.
 						where: vi.fn(() => ({
-							orderBy: vi.fn(async () => [])
+							orderBy: vi.fn(() =>
+								Object.assign(Promise.resolve([]), {
+									limit: vi.fn(() => ({
+										offset: vi.fn(async () => mockPosts)
+									}))
+								})
+							)
 						}))
 					})),
 					where: vi.fn(async () => [])
@@ -77,9 +80,11 @@ describe('GET /api/posts', () => {
 			select: vi.fn(() => ({
 				from: vi.fn(() => ({
 					innerJoin: vi.fn(() => ({
-						orderBy: vi.fn(() => ({
-							limit: vi.fn(() => ({
-								offset: vi.fn(async () => [])
+						where: vi.fn(() => ({
+							orderBy: vi.fn(() => ({
+								limit: vi.fn(() => ({
+									offset: vi.fn(async () => [])
+								}))
 							}))
 						}))
 					}))
