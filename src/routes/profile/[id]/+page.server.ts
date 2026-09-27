@@ -1,10 +1,11 @@
 import { error } from '@sveltejs/kit';
-import { eq, or, desc } from 'drizzle-orm';
+import { eq, or, desc, and } from 'drizzle-orm';
 import { user, post } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
 import { refreshMediaUrl } from '$lib/server/services/storage';
+import { notDeleted } from '$lib/server/db/posts';
 
 const FALLBACK_CURATORS: Record<
 	string,
@@ -127,7 +128,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 				const postRows = await locals.db
 					.select()
 					.from(post)
-					.where(eq(post.userId, targetUser.id as string))
+					.where(and(eq(post.userId, targetUser.id as string), notDeleted))
 					.orderBy(desc(post.createdAt));
 
 				targetPosts = postRows.map((p) => {

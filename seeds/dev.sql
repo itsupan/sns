@@ -19,3 +19,8 @@ VALUES
   ('cmt-1', 'post-1', 'usr_kai_dev', 'The texture gradation is immaculate. Concrete takes light like velvet here.'),
   ('cmt-2', 'post-2', 'usr_elena_dev', 'The natural wood ash glaze turned out breathtaking.'),
   ('cmt-3', 'post-3', 'usr_lars_dev', 'The timber grain balances the cold slate impeccably.');
+
+-- Soft-deleted post (#31): must never appear in feed, profile or /post/[id].
+INSERT OR REPLACE INTO `post` (`id`, `user_id`, `title`, `content`, `media_type`, `aspect_ratio`, `post_type`, `deleted_at`)
+VALUES
+  ('post-deleted', 'usr_elena_dev', 'Deleted draft', 'This post was deleted and should stay hidden.', 'none', '1:1', 'photo', cast(unixepoch('subsecond') * 1000 as integer));

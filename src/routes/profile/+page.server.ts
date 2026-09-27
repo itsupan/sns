@@ -1,11 +1,12 @@
 import { redirect } from '@sveltejs/kit';
 import { resolve } from '$app/paths';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, and } from 'drizzle-orm';
 import { user, post } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
 import { refreshMediaUrl } from '$lib/server/services/storage';
+import { notDeleted } from '$lib/server/db/posts';
 
 export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	if (!locals.user) {
@@ -44,7 +45,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 			const postRows = await locals.db
 				.select()
 				.from(post)
-				.where(eq(post.userId, locals.user.id))
+				.where(and(eq(post.userId, locals.user.id), notDeleted))
 				.orderBy(desc(post.createdAt));
 
 			userPosts = postRows.map((p) => {

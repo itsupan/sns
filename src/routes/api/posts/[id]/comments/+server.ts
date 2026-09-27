@@ -1,11 +1,12 @@
 import { json } from '@sveltejs/kit';
-import { eq, asc } from 'drizzle-orm';
+import { eq, asc, and } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post, postComment, user } from '$lib/server/db/schema';
 import * as v from 'valibot';
 import { formatTimeAgo } from '$lib/utils/format';
 import { apiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import { commentsCountOf } from '$lib/server/db/counters';
+import { notDeleted } from '$lib/server/db/posts';
 
 const CreateComment = v.object({
 	content: v.pipe(
@@ -71,7 +72,7 @@ export const POST: RequestHandler = withApi(async ({ params, request, locals, pl
 	const postRows = await locals.db
 		.select({ id: post.id })
 		.from(post)
-		.where(eq(post.id, postId))
+		.where(and(eq(post.id, postId), notDeleted))
 		.limit(1);
 
 	if (postRows.length === 0) {

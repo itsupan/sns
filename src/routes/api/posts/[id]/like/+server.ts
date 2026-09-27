@@ -4,6 +4,7 @@ import type { RequestHandler } from './$types';
 import { post, postLike } from '$lib/server/db/schema';
 import { apiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 import { likesCountOf } from '$lib/server/db/counters';
+import { notDeleted } from '$lib/server/db/posts';
 
 export const POST: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const currentUser = requireUser(locals);
@@ -17,7 +18,7 @@ export const POST: RequestHandler = withApi(async ({ params, locals, platform })
 	const postRows = await locals.db
 		.select({ id: post.id })
 		.from(post)
-		.where(eq(post.id, postId))
+		.where(and(eq(post.id, postId), notDeleted))
 		.limit(1);
 
 	if (postRows.length === 0) {

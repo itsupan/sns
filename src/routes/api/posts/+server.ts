@@ -8,6 +8,7 @@ import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
+import { notDeleted } from '$lib/server/db/posts';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
 const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
@@ -33,6 +34,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 		})
 		.from(post)
 		.innerJoin(user, eq(post.userId, user.id))
+		.where(notDeleted)
 		.orderBy(desc(post.createdAt))
 		.limit(limit)
 		.offset(offset);
