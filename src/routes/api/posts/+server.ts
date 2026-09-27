@@ -6,13 +6,18 @@ import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
+import { getConfig } from '$lib/server/config';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
 const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
 
 export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => {
-	const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
+	const { defaultPageSize, maxPageSize } = getConfig(platform?.env).feed;
+	const limit = Math.min(
+		Math.max(Number(url.searchParams.get('limit')) || defaultPageSize, 1),
+		maxPageSize
+	);
 	const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
 
 	const postRows = await locals.db

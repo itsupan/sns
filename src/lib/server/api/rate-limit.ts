@@ -1,22 +1,15 @@
 import { ApiError } from './errors';
+import {
+	DEFAULT_CONFIG,
+	getConfig,
+	type RateLimitName,
+	type RateLimitRule
+} from '$lib/server/config';
 
-export interface RateLimitRule {
-	/** Max requests per window. */
-	limit: number;
-	/** Window length in seconds. */
-	windowSec: number;
-}
+export type { RateLimitName, RateLimitRule };
 
-/** Per-user limits for write endpoints. Keep README "Rate limits" in sync. */
-export const RATE_LIMITS = {
-	createPost: { limit: 10, windowSec: 60 },
-	comment: { limit: 20, windowSec: 60 },
-	like: { limit: 60, windowSec: 60 },
-	follow: { limit: 30, windowSec: 60 },
-	uploadPresign: { limit: 20, windowSec: 60 }
-} satisfies Record<string, RateLimitRule>;
-
-export type RateLimitName = keyof typeof RATE_LIMITS;
+/** Default per-user limits; override per environment with `RATE_LIMIT_*` vars (see config). */
+export const RATE_LIMITS = DEFAULT_CONFIG.rateLimits;
 
 // KV rejects expirations shorter than 60 seconds.
 const MIN_KV_TTL = 60;
@@ -60,7 +53,11 @@ export async function enforceRateLimit(
 	const kv = platform?.env?.KV;
 	if (!kv) return;
 
-	const retryAfter = await rateLimit(kv, `${name}:${userId}`, RATE_LIMITS[name]);
+	const retryAfter = await rateLimit(
+		kv,
+		`${name}:${userId}`,
+		getConfig(platform?.env).rateLimits[name]
+	);
 	if (retryAfter !== null) {
 		throw new ApiError(
 			429,
