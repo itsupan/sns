@@ -13,6 +13,7 @@ export const post = sqliteTable(
 			.references(() => user.id, { onDelete: 'cascade' }),
 		title: text('title'),
 		content: text('content').notNull(),
+		// Legacy media columns: superseded by post_media, still dual-written until the contract migration.
 		mediaUrl: text('media_url'),
 		mediaType: text('media_type').default('none').notNull(), // 'image' | 'video' | 'none'
 		mediaUrls: text('media_urls'), // JSON string array of media items: [{ url: string, type: 'image' | 'video' }]
@@ -39,6 +40,26 @@ export const post = sqliteTable(
 		// Profile grid: WHERE user_id = ? ORDER BY created_at DESC (also serves user_id lookups).
 		index('post_userId_createdAt_idx').on(table.userId, table.createdAt)
 	]
+);
+
+export const postMedia = sqliteTable(
+	'post_media',
+	{
+		id: text('id').primaryKey(),
+		postId: text('post_id')
+			.notNull()
+			.references(() => post.id, { onDelete: 'cascade' }),
+		url: text('url').notNull(),
+		type: text('type', { enum: ['image', 'video'] }).notNull(),
+		width: integer('width'),
+		height: integer('height'),
+		// 0-based order within the post's carousel.
+		position: integer('position').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [uniqueIndex('post_media_postId_position_unique').on(table.postId, table.position)]
 );
 
 export const postLike = sqliteTable(
@@ -92,8 +113,16 @@ export const postRelations = relations(post, ({ one, many }) => ({
 		fields: [post.userId],
 		references: [user.id]
 	}),
+	media: many(postMedia),
 	likes: many(postLike),
 	comments: many(postComment)
+}));
+
+export const postMediaRelations = relations(postMedia, ({ one }) => ({
+	post: one(post, {
+		fields: [postMedia.postId],
+		references: [post.id]
+	})
 }));
 
 export const postLikeRelations = relations(postLike, ({ one }) => ({

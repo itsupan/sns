@@ -46,7 +46,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 			'video/quicktime'
 		])
 	},
-	feed: { defaultPageSize: 20, maxPageSize: 50 },
+	feed: { defaultPageSize: 10, maxPageSize: 50 },
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC
 };
 

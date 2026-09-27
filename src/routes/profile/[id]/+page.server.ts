@@ -5,7 +5,7 @@ import { formatTimeAgo } from '$lib/utils/format';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
 import { refreshMediaUrl } from '$lib/server/services/storage';
-import { notDeleted } from '$lib/server/db/posts';
+import { loadPostMedia, notDeleted } from '$lib/server/db/posts';
 
 const FALLBACK_CURATORS: Record<
 	string,
@@ -131,23 +131,13 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					.where(and(eq(post.userId, targetUser.id as string), notDeleted))
 					.orderBy(desc(post.createdAt));
 
+				const mediaByPost = await loadPostMedia(
+					locals.db,
+					postRows.map((p) => p.id)
+				);
+
 				targetPosts = postRows.map((p) => {
-					let parsedMedia: Array<{ url: string; type: 'image' | 'video' }> = [];
-					if (p.mediaUrls) {
-						try {
-							parsedMedia = JSON.parse(p.mediaUrls);
-						} catch {
-							parsedMedia = [];
-						}
-					}
-					if (parsedMedia.length === 0 && p.mediaUrl) {
-						parsedMedia = [
-							{
-								url: p.mediaUrl,
-								type: (p.mediaType as 'image' | 'video') || 'image'
-							}
-						];
-					}
+					const parsedMedia = mediaByPost.get(p.id) ?? [];
 
 					let parsedTags: string[] = [];
 					if (p.tags) {
@@ -161,7 +151,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					return {
 						id: p.id,
 						title: p.title || p.content.slice(0, 40),
-						image: parsedMedia[0]?.url || p.mediaUrl || '',
+						image: parsedMedia[0]?.url || '',
 						likes: p.likesCount,
 						comments: p.commentsCount,
 						isCarousel: parsedMedia.length > 1,

@@ -37,7 +37,8 @@ describe('home page', () => {
 							repostsCount: 0
 						}
 					],
-					hasMore: false
+					hasMore: false,
+					pageSize: 10
 				}
 			}
 		});

@@ -1,6 +1,22 @@
 import { describe, expect, it, vi } from 'vitest';
 import { load } from './+page.server';
 
+// Media now comes from post_media via loadPostMedia; stub it with fixture rows.
+vi.mock('$lib/server/db/posts', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/server/db/posts')>();
+	const media: Record<string, Array<{ url: string; type: 'image' | 'video' }>> = {
+		'post-100': [{ url: 'https://example.com/photo.jpg', type: 'image' }],
+		'post-1': [{ url: 'https://example.com/photo.jpg', type: 'image' }]
+	};
+	return {
+		...actual,
+		loadPostMedia: vi.fn(
+			async (_db: unknown, ids: string[]) =>
+				new Map(ids.filter((id) => media[id]).map((id) => [id, media[id]]))
+		)
+	};
+});
+
 type LoadEvent = Parameters<typeof load>[0];
 
 describe('Individual Post +page.server.ts', () => {

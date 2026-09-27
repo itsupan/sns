@@ -157,7 +157,7 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `RATE_LIMIT_*`              | `<limit>/<windowSeconds>`     | see [Rate limits](#rate-limits)   |
 | `UPLOAD_MAX_BYTES`          | integer                       | `52428800` (50 MB)                |
 | `UPLOAD_ALLOWED_MIME_TYPES` | comma-separated MIME types    | common image + mp4/webm/mov types |
-| `FEED_PAGE_SIZE`            | integer (≤ max)               | `20`                              |
+| `FEED_PAGE_SIZE`            | integer (≤ max)               | `10`                              |
 | `FEED_MAX_PAGE_SIZE`        | integer                       | `50`                              |
 | `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                 |
 

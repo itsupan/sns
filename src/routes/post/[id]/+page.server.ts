@@ -5,7 +5,7 @@ import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
-import { notDeleted } from '$lib/server/db/posts';
+import { loadPostMedia, notDeleted } from '$lib/server/db/posts';
 
 const FALLBACK_POSTS: PostData[] = [
 	{
@@ -118,6 +118,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 
 			if (rows.length > 0) {
 				const r = rows[0];
+				const mediaByPost = await loadPostMedia(locals.db, [r.post.id]);
 
 				let parsedTags: string[] = [];
 				if (r.post.tags) {
@@ -128,22 +129,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					}
 				}
 
-				let parsedMedia: Array<{ url: string; type: 'image' | 'video' }> = [];
-				if (r.post.mediaUrls) {
-					try {
-						parsedMedia = JSON.parse(r.post.mediaUrls);
-					} catch {
-						parsedMedia = [];
-					}
-				}
-				if (parsedMedia.length === 0 && r.post.mediaUrl) {
-					parsedMedia = [
-						{
-							url: r.post.mediaUrl,
-							type: (r.post.mediaType as 'image' | 'video') || 'image'
-						}
-					];
-				}
+				const parsedMedia = mediaByPost.get(r.post.id) ?? [];
 
 				let isLiked = false;
 				if (locals.user) {
@@ -195,10 +181,9 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					},
 					title: r.post.title || '',
 					description: r.post.content,
-					image: parsedMedia[0]?.url || r.post.mediaUrl || '',
-					mediaUrl: parsedMedia[0]?.url || r.post.mediaUrl || undefined,
-					mediaType:
-						parsedMedia[0]?.type || (r.post.mediaType as 'image' | 'video' | 'none') || 'none',
+					image: parsedMedia[0]?.url || '',
+					mediaUrl: parsedMedia[0]?.url || undefined,
+					mediaType: parsedMedia[0]?.type || 'none',
 					mediaItems: parsedMedia,
 					aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
 					location: r.post.location || r.user.location || undefined,
