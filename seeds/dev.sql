@@ -14,6 +14,19 @@ VALUES
   ('post-5', 'usr_elena_dev', 'Spiral Concrete: Geometry in Rotation', 'Continuous spiral staircase forming a helical prism through the skylight atrium.', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80', 'image', '[{"url":"https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80","type":"image"}]', '4:5', 'Helsinki, Finland', '35mm · ISO 400', '["#HelicalForm", "#BrutalistStairs", "#DesignArchive"]', 'photo', 720, 35, 14),
   ('post-6', 'usr_kai_dev', 'Charred Yakisugi Cedar: Fire & Longevity', 'Surface preservation through controlled combustion. The blackened timber absorbs dawn light with velvety depth.', 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&auto=format&fit=crop&q=80', 'image', '[{"url":"https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&auto=format&fit=crop&q=80","type":"image"}]', '1:1', 'Nara, Japan', '50mm · ISO 160', '["#Yakisugi", "#KyotoCraft", "#JapaneseWoodwork"]', 'photo', 589, 27, 11);
 
+-- Post media (#32). Seeds run after migrations, so the 0005 backfill never sees them.
+INSERT OR REPLACE INTO `post_media` (`id`, `post_id`, `url`, `type`, `position`)
+VALUES
+  ('media-post-1-0', 'post-1', 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80', 'image', 0),
+  ('media-post-1-1', 'post-1', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80', 'image', 1),
+  ('media-post-1-2', 'post-1', 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&auto=format&fit=crop&q=80', 'image', 2),
+  ('media-post-1-3', 'post-1', 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&auto=format&fit=crop&q=80', 'image', 3),
+  ('media-post-2-0', 'post-2', 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=1200&auto=format&fit=crop&q=80', 'image', 0),
+  ('media-post-3-0', 'post-3', 'https://images.unsplash.com/photo-1541123437800-1bb1317badc2?w=1200&auto=format&fit=crop&q=80', 'image', 0),
+  ('media-post-4-0', 'post-4', 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=80', 'image', 0),
+  ('media-post-5-0', 'post-5', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80', 'image', 0),
+  ('media-post-6-0', 'post-6', 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&auto=format&fit=crop&q=80', 'image', 0);
+
 INSERT OR IGNORE INTO `post_comment` (`id`, `post_id`, `user_id`, `content`)
 VALUES
   ('cmt-1', 'post-1', 'usr_kai_dev', 'The texture gradation is immaculate. Concrete takes light like velvet here.'),

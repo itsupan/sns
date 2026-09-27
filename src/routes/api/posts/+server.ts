@@ -2,13 +2,13 @@ import { json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import { eq, desc, inArray } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
-import { post, postLike, postComment, user } from '$lib/server/db/schema';
+import { post, postLike, postComment, postMedia, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
-import { notDeleted } from '$lib/server/db/posts';
+import { loadPostMedia, notDeleted } from '$lib/server/db/posts';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
 const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
@@ -44,6 +44,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 	}
 
 	const postIds = postRows.map((r) => r.post.id);
+	const mediaByPost = await loadPostMedia(locals.db, postIds);
 
 	// Check which posts the current authenticated user has liked
 	const likedSet = new Set<string>();
@@ -90,22 +91,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 			}
 		}
 
-		let parsedMedia: Array<{ url: string; type: 'image' | 'video' }> = [];
-		if (r.post.mediaUrls) {
-			try {
-				parsedMedia = JSON.parse(r.post.mediaUrls);
-			} catch {
-				parsedMedia = [];
-			}
-		}
-		if (parsedMedia.length === 0 && r.post.mediaUrl) {
-			parsedMedia = [
-				{
-					url: r.post.mediaUrl,
-					type: (r.post.mediaType as 'image' | 'video') || 'image'
-				}
-			];
-		}
+		const parsedMedia = mediaByPost.get(r.post.id) ?? [];
 
 		return {
 			id: r.post.id,
@@ -121,9 +107,9 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 			},
 			title: r.post.title || '',
 			description: r.post.content,
-			image: parsedMedia[0]?.url || r.post.mediaUrl || '',
-			mediaUrl: parsedMedia[0]?.url || r.post.mediaUrl || undefined,
-			mediaType: parsedMedia[0]?.type || (r.post.mediaType as 'image' | 'video' | 'none') || 'none',
+			image: parsedMedia[0]?.url || '',
+			mediaUrl: parsedMedia[0]?.url || undefined,
+			mediaType: parsedMedia[0]?.type || 'none',
 			mediaItems: parsedMedia,
 			aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
 			location: r.post.location || r.user.location || undefined,
@@ -201,7 +187,7 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 
 	const newPostId = crypto.randomUUID();
 
-	await locals.db.insert(post).values({
+	const insertPost = locals.db.insert(post).values({
 		id: newPostId,
 		userId: currentUser.id,
 		title,
@@ -218,6 +204,24 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		commentsCount: 0,
 		sharesCount: 0
 	});
+
+	// Post and its media land together; legacy media columns above are still dual-written.
+	if (mediaItems.length > 0) {
+		await locals.db.batch([
+			insertPost,
+			locals.db.insert(postMedia).values(
+				mediaItems.map((m, position) => ({
+					id: crypto.randomUUID(),
+					postId: newPostId,
+					url: m.url,
+					type: m.type,
+					position
+				}))
+			)
+		]);
+	} else {
+		await insertPost;
+	}
 
 	const createdPost: PostData = {
 		id: newPostId,

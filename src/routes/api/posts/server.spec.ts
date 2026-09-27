@@ -3,6 +3,21 @@ import { describe, expect, it, vi } from 'vitest';
 import { GET, POST } from './+server';
 import type { RequestEvent } from './$types';
 
+// Media now comes from post_media via loadPostMedia; stub it with fixture rows.
+vi.mock('$lib/server/db/posts', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/server/db/posts')>();
+	const media: Record<string, Array<{ url: string; type: 'image' | 'video' }>> = {
+		'post-1': [{ url: 'https://example.com/photo.jpg', type: 'image' }]
+	};
+	return {
+		...actual,
+		loadPostMedia: vi.fn(
+			async (_db: unknown, ids: string[]) =>
+				new Map(ids.filter((id) => media[id]).map((id) => [id, media[id]]))
+		)
+	};
+});
+
 describe('GET /api/posts', () => {
 	it('returns a list of posts from database', async () => {
 		const mockPosts = [
@@ -140,10 +155,12 @@ describe('POST /api/posts', () => {
 		const db = {
 			insert: vi.fn(() => ({
 				values: vi.fn(async (val: Record<string, unknown>) => {
-					insertedRow = val;
+					// First insert is the post row; later ones are post_media rows.
+					insertedRow ??= val;
 					return [{ success: true }];
 				})
-			}))
+			})),
+			batch: vi.fn(async (queries: unknown[]) => Promise.all(queries))
 		};
 
 		const event = {
@@ -190,10 +207,12 @@ describe('POST /api/posts', () => {
 		const db = {
 			insert: vi.fn(() => ({
 				values: vi.fn(async (val: Record<string, unknown>) => {
-					insertedRow = val;
+					// First insert is the post row; later ones are post_media rows.
+					insertedRow ??= val;
 					return [{ success: true }];
 				})
-			}))
+			})),
+			batch: vi.fn(async (queries: unknown[]) => Promise.all(queries))
 		};
 
 		const event = {
