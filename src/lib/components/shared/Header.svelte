@@ -146,11 +146,7 @@
 					href={resolve('/profile')}
 					class="hidden sm:flex items-center gap-2.5 pl-1 pr-1.5 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-dark-hover transition-colors duration-150 no-underline text-inherit"
 				>
-					<Avatar
-						src={currentUser.image || asset('/brand/logo-64.png')}
-						name={currentUser.name}
-						size="sm"
-					/>
+					<Avatar src={currentUser.image} name={currentUser.name} size="sm" />
 					<div class="hidden md:flex flex-col text-left">
 						<span class="text-xs font-semibold text-slate-900 dark:text-dark-text leading-tight">
 							{currentUser.name}

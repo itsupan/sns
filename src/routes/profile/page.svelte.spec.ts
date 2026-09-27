@@ -2,57 +2,143 @@ import { render } from 'vitest-browser-svelte';
 import { describe, expect, it } from 'vitest';
 import ProfilePage from './+page.svelte';
 
-describe('Profile Page', () => {
-	it('renders profile info, master curator badge, and stats', async () => {
-		const screen = render(ProfilePage);
+const testUser = {
+	id: 'user-test-1',
+	name: 'Kenji Sato',
+	email: 'kenji@example.com',
+	handle: 'kenji.sato',
+	image: null,
+	title: 'Street & Monochrome Photographer',
+	bio: 'Shooting 35mm film across Shinjuku and Ginza.',
+	website: 'kenjisato.jp',
+	location: 'Tokyo, Japan',
+	cameraGear: 'Leica M6 · Summicron 35mm',
+	badgeText: 'CURATOR',
+	isVerified: true,
+	postsCount: 5,
+	followersCount: '120',
+	followingCount: 85,
+	impressionsCount: '1.2k'
+};
 
-		// Elena Rostova identity
-		await expect.element(screen.getByText('Elena Rostova').first()).toBeInTheDocument();
-		await expect.element(screen.getByText('MASTER CURATOR')).toBeInTheDocument();
-		await expect.element(screen.getByText('elenarostova.com/archive').first()).toBeInTheDocument();
+const newRegisteredUser = {
+	id: 'user-new-2',
+	name: 'Sarah Connor',
+	email: 'sarah@example.com',
+	handle: null,
+	image: null,
+	title: null,
+	bio: null,
+	website: null,
+	location: null,
+	cameraGear: null,
+	postsCount: 0,
+	followersCount: '0',
+	followingCount: 0,
+	impressionsCount: '0'
+};
+
+describe('Profile Page', () => {
+	it('renders authenticated user profile info, badge, and stats', async () => {
+		const screen = render(ProfilePage, {
+			props: {
+				data: {
+					user: testUser,
+					posts: []
+				}
+			}
+		});
+
+		// User identity
+		await expect.element(screen.getByText('Kenji Sato').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('@kenji.sato').first()).toBeInTheDocument();
+		await expect
+			.element(screen.getByText('Street & Monochrome Photographer').first())
+			.toBeInTheDocument();
+		await expect
+			.element(screen.getByText('Shooting 35mm film across Shinjuku and Ginza.').first())
+			.toBeInTheDocument();
+		await expect.element(screen.getByText('kenjisato.jp').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('Tokyo, Japan').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('Leica M6 · Summicron 35mm').first()).toBeInTheDocument();
 
 		// Stats
-		await expect.element(screen.getByText('Archived Works')).toBeInTheDocument();
-		await expect.element(screen.getByText('Curators Following')).toBeInTheDocument();
-		await expect.element(screen.getByText('Total Impressions')).toBeInTheDocument();
+		await expect.element(screen.getByText('5').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('120').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('85').first()).toBeInTheDocument();
 
-		// Story highlights
-		await expect.element(screen.getByText("Kyoto '23")).toBeInTheDocument();
-		await expect.element(screen.getByText('Gear & EXIF')).toBeInTheDocument();
+		// Own profile action buttons (no duplication: Edit Profile button + Settings gear)
+		await expect.element(screen.getByText('Edit Profile').first()).toBeInTheDocument();
+		await expect.element(screen.getByRole('button', { name: 'Settings' })).toBeInTheDocument();
 
 		// Filter pills
 		await expect.element(screen.getByText('Curated Grid')).toBeInTheDocument();
 		await expect.element(screen.getByText('Editorial Essays / Series')).toBeInTheDocument();
 	});
 
-	it('switches between grid and feed/list view modes', async () => {
-		const screen = render(ProfilePage);
+	it('displays only the user data without dummy data for newly registered users', async () => {
+		const screen = render(ProfilePage, {
+			props: {
+				data: {
+					user: newRegisteredUser,
+					posts: []
+				}
+			}
+		});
 
-		// Switch to feed / list view
-		const feedViewBtn = screen.getByRole('button', { name: 'Feed layout' });
-		await feedViewBtn.click();
+		// Real user name and handle derived from email
+		await expect.element(screen.getByText('Sarah Connor').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('@sarah').first()).toBeInTheDocument();
 
-		// Feed layout renders post cards with metadata and descriptions
+		// Empty state instead of static dummy photos of another user
+		await expect.element(screen.getByText('No posts yet')).toBeInTheDocument();
+		await expect.element(screen.getByText('Create your first post')).toBeInTheDocument();
+
+		// Add bio prompt instead of dummy brutalist bio
+		await expect.element(screen.getByText('Add a bio to your profile...')).toBeInTheDocument();
+
+		// Elena Rostova dummy data must NOT exist
+		expect(document.body.textContent).not.toContain('Elena Rostova');
+		expect(document.body.textContent).not.toContain('Hasselblad 500C/M');
+		expect(document.body.textContent).not.toContain('elenarostova.com');
+	});
+
+	it('sets document title and metadata dynamically for the user', async () => {
+		render(ProfilePage, {
+			props: {
+				data: {
+					user: testUser,
+					posts: []
+				}
+			}
+		});
+
+		expect(document.title).toBe('Kenji Sato (@kenji.sato) — Kizuna');
+		const metaDesc = document.querySelector('meta[name="description"]');
+		expect(metaDesc?.getAttribute('content')).toBe('Shooting 35mm film across Shinjuku and Ginza.');
+	});
+
+	it('opens settings menu containing share, theme, and logout without duplicate edit profile', async () => {
+		const screen = render(ProfilePage, {
+			props: {
+				data: {
+					user: testUser,
+					posts: []
+				}
+			}
+		});
+
+		const settingsBtn = screen.getByRole('button', { name: 'Settings' });
+		await expect.element(settingsBtn).toBeInTheDocument();
+		await settingsBtn.click();
+
+		// Appearance / Theme
+		await expect.element(screen.getByText(/Theme|Appearance/i).first()).toBeInTheDocument();
+		// Share profile is moved into settings dropdown
 		await expect
-			.element(
-				screen.getByText(
-					'Continuous cast concrete helical staircase with natural zenital light pouring through the overhead skylight. Shot on Hasselblad 500C/M.'
-				)
-			)
+			.element(screen.getByText(/Share Profile|Share profile/i).first())
 			.toBeInTheDocument();
-
-		// Switch to compact layout
-		const compactViewBtn = screen.getByRole('button', { name: 'Compact layout' });
-		await compactViewBtn.click();
-
-		await expect.element(screen.getByText('35mm · ISO 200 · f/2.0')).toBeInTheDocument();
-
-		// Switch to Editorial Essays tab
-		const essaysTab = screen.getByRole('tab', { name: 'Editorial Essays / Series' });
-		await essaysTab.click();
-
-		await expect
-			.element(screen.getByText('Quiet Brutalism: Concrete Light & Shadows in Copenhagen'))
-			.toBeInTheDocument();
+		// Log out
+		await expect.element(screen.getByText('Log out').first()).toBeInTheDocument();
 	});
 });

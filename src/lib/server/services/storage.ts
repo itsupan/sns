@@ -19,10 +19,13 @@ const ALLOWED_MIME_TYPES = new Set([
 	'image/png',
 	'image/webp',
 	'image/gif',
-	'image/avif'
+	'image/avif',
+	'video/mp4',
+	'video/webm',
+	'video/quicktime'
 ]);
 
-const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
 
 /**
  * Validates upload parameters and generates a presigned PUT URL for Cloudflare R2.
@@ -59,8 +62,17 @@ export async function generatePresignedUploadUrl(
 	const secretAccessKey = env?.R2_SECRET_ACCESS_KEY;
 	const bucketName = env?.R2_BUCKET_NAME;
 
-	// If R2 credentials are fully configured, generate authentic AWS SigV4 presigned PUT URL
-	if (accountId && accessKeyId && secretAccessKey && bucketName) {
+	const isValidCredential = (val: string | undefined): boolean =>
+		Boolean(val && val.trim() !== '' && !val.includes('replace-me'));
+
+	const hasValidR2Credentials =
+		isValidCredential(accountId) &&
+		isValidCredential(accessKeyId) &&
+		isValidCredential(secretAccessKey) &&
+		isValidCredential(bucketName);
+
+	// If real R2 credentials are fully configured, generate authentic AWS SigV4 presigned PUT URL
+	if (hasValidR2Credentials && accountId && accessKeyId && secretAccessKey && bucketName) {
 		const aws = new AwsClient({
 			accessKeyId,
 			secretAccessKey,

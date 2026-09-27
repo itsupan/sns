@@ -29,7 +29,7 @@
 		<Header />
 	{/if}
 
-	<div class="flex-1 flex flex-col {isAuthPage ? '' : 'pb-nav md:pb-0'}">
+	<div class="flex-1 flex flex-col {isAuthPage ? '' : 'pb-nav lg:pb-0'}">
 		{@render children()}
 	</div>
 

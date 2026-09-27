@@ -61,33 +61,39 @@
 </script>
 
 <aside
-	class="w-72 lg:w-80 shrink-0 hidden lg:flex flex-col gap-5 py-6 select-none {className}"
+	class="w-60 lg:w-60 xl:w-72 2xl:w-80 shrink-0 hidden lg:flex flex-col gap-3.5 xl:gap-5 py-4 xl:py-6 select-none transition-all duration-200 {className}"
 	aria-label="Secondary Sidebar"
 >
 	<!-- Curators to Follow Card -->
 	<div
-		class="curators-card w-full bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl p-5 shadow-xs dark:shadow-none"
+		class="curators-card w-full bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl p-3.5 xl:p-5 shadow-xs dark:shadow-none"
 	>
-		<div class="flex items-center justify-between mb-4">
-			<h3 class="font-bold text-sm text-slate-900 dark:text-dark-text m-0">Curators to Follow</h3>
+		<div class="flex items-center justify-between mb-3 xl:mb-4">
+			<h3 class="font-bold text-xs xl:text-sm text-slate-900 dark:text-dark-text m-0">
+				Curators to Follow
+			</h3>
 			<a
 				href="#explore"
-				class="text-xs font-semibold text-blue-600 dark:text-kizuna-blue hover:underline no-underline"
+				class="text-[11px] xl:text-xs font-semibold text-blue-600 dark:text-kizuna-blue hover:underline no-underline"
 			>
 				Explore all
 			</a>
 		</div>
 
-		<div class="flex flex-col gap-3.5">
+		<div class="flex flex-col gap-3 xl:gap-3.5">
 			{#each curators as curator (curator.id)}
-				<div class="flex items-center justify-between gap-3">
-					<div class="flex items-center gap-2.5 min-w-0">
-						<Avatar src={curator.avatar} name={curator.name} size="md" />
+				<div class="flex items-center justify-between gap-2 xl:gap-3">
+					<div class="flex items-center gap-2 xl:gap-2.5 min-w-0">
+						<Avatar src={curator.avatar} name={curator.name} size="sm" />
 						<div class="flex flex-col min-w-0">
-							<span class="text-xs font-semibold text-slate-900 dark:text-dark-text truncate">
+							<span
+								class="text-xs font-semibold text-slate-900 dark:text-dark-text truncate max-w-[110px] xl:max-w-none"
+							>
 								{curator.name}
 							</span>
-							<span class="text-[11px] text-slate-400 dark:text-dark-muted truncate">
+							<span
+								class="text-[10px] xl:text-[11px] text-slate-400 dark:text-dark-muted truncate max-w-[110px] xl:max-w-none"
+							>
 								{curator.handle}
 							</span>
 						</div>
@@ -95,7 +101,7 @@
 
 					<button
 						type="button"
-						class="text-xs font-semibold px-4 py-1.5 rounded-full border transition-all duration-150 cursor-pointer {curator.following
+						class="text-[11px] xl:text-xs font-semibold px-2.5 xl:px-4 py-1 xl:py-1.5 rounded-full border transition-all duration-150 cursor-pointer shrink-0 {curator.following
 							? 'bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted border-slate-200 dark:border-dark-border'
 							: 'bg-white dark:bg-dark-card text-slate-900 dark:text-dark-text border-slate-200 dark:border-dark-border hover:bg-slate-50 dark:hover:bg-dark-hover shadow-2xs'}"
 						onclick={() => toggleFollow(curator.id)}
@@ -109,18 +115,20 @@
 
 	<!-- Curated Topics Card -->
 	<div
-		class="topics-card w-full bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl p-5 shadow-xs dark:shadow-none"
+		class="topics-card w-full bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl p-3.5 xl:p-5 shadow-xs dark:shadow-none"
 	>
-		<div class="flex items-center justify-between mb-3.5">
-			<h3 class="font-bold text-sm text-slate-900 dark:text-dark-text m-0">Curated Topics</h3>
-			<Icon name="arrow-trend-up" class="text-slate-400 text-sm" />
+		<div class="flex items-center justify-between mb-3 xl:mb-3.5">
+			<h3 class="font-bold text-xs xl:text-sm text-slate-900 dark:text-dark-text m-0">
+				Curated Topics
+			</h3>
+			<Icon name="arrow-trend-up" class="text-slate-400 text-xs xl:text-sm" />
 		</div>
 
-		<div class="flex flex-wrap gap-2">
+		<div class="flex flex-wrap gap-1.5 xl:gap-2">
 			{#each topics as topic (topic)}
 				<a
 					href={`#topic-${topic.replace('#', '')}`}
-					class="text-xs font-medium px-3 py-1.5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted hover:bg-slate-200/80 dark:hover:bg-dark-hover hover:text-slate-900 dark:hover:text-dark-text transition-colors no-underline"
+					class="text-[11px] xl:text-xs font-medium px-2.5 xl:px-3 py-1 xl:py-1.5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted hover:bg-slate-200/80 dark:hover:bg-dark-hover hover:text-slate-900 dark:hover:text-dark-text transition-colors no-underline"
 				>
 					{topic}
 				</a>
@@ -129,7 +137,9 @@
 	</div>
 
 	<!-- Footer Links & Archive Notice -->
-	<footer class="px-2 text-xs text-slate-400 dark:text-dark-subtle flex flex-col gap-2">
+	<footer
+		class="px-2 text-[11px] xl:text-xs text-slate-400 dark:text-dark-subtle flex flex-col gap-1.5 xl:gap-2"
+	>
 		<div class="flex flex-wrap gap-x-3 gap-y-1">
 			<a
 				href="#about"

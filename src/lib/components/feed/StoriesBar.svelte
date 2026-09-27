@@ -78,9 +78,9 @@
 </script>
 
 <div
-	class="stories-container w-full bg-white dark:bg-dark-card border-b sm:border border-slate-100 dark:border-dark-border rounded-none sm:rounded-2xl py-3 sm:p-4 mb-2 sm:mb-4 shadow-none sm:shadow-xs dark:shadow-none overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-px-4 {className}"
+	class="stories-container w-full bg-white dark:bg-dark-card border-b lg:border border-slate-100 dark:border-dark-border rounded-none lg:rounded-2xl py-3 lg:p-4 mb-2 lg:mb-4 shadow-none lg:shadow-xs dark:shadow-none overflow-x-auto no-scrollbar snap-x snap-mandatory scroll-px-4 {className}"
 >
-	<ul class="flex items-start gap-3 sm:gap-5 min-w-max px-4 sm:px-0 list-none m-0">
+	<ul class="flex items-start gap-3 lg:gap-5 min-w-max px-4 lg:px-0 list-none m-0">
 		<!-- Add your story button -->
 		<li class="snap-start">
 			<button

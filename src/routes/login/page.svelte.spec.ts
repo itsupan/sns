@@ -40,4 +40,15 @@ describe('Login Page', () => {
 		// Switch to sign up
 		await expect.element(screen.getByText("Don't have an account?")).toBeInTheDocument();
 	});
+
+	it('validates empty fields on login submission', async () => {
+		const screen = render(LoginPage);
+
+		const submitBtn = screen.getByRole('button', { name: /Sign In/i });
+		await submitBtn.click();
+
+		await expect
+			.element(screen.getByText('Please fill in all required fields.'))
+			.toBeInTheDocument();
+	});
 });

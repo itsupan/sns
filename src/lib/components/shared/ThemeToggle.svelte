@@ -60,7 +60,7 @@
 {:else}
 	<!-- Segmented (Light / System / Dark) -->
 	<div
-		class="inline-flex items-center p-1 bg-slate-100 dark:bg-dark-elevated rounded-lg border border-slate-200 dark:border-dark-border text-xs {className}"
+		class="inline-flex items-center p-0.5 bg-slate-100 dark:bg-dark-elevated rounded-lg border border-slate-200 dark:border-dark-border text-xs {className}"
 		role="radiogroup"
 		aria-label="Theme mode"
 	>
@@ -68,7 +68,7 @@
 			type="button"
 			role="radio"
 			aria-checked={themeManager.theme === 'light'}
-			class="px-2.5 py-1 rounded-md font-medium transition-all duration-150 cursor-pointer {themeManager.theme ===
+			class="px-2 py-0.5 sm:py-1 rounded-md font-medium text-xs transition-all duration-150 cursor-pointer {themeManager.theme ===
 			'light'
 				? 'bg-white dark:bg-dark-card text-slate-900 dark:text-dark-text shadow-xs font-semibold'
 				: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text'}"
@@ -80,7 +80,7 @@
 			type="button"
 			role="radio"
 			aria-checked={themeManager.theme === 'system'}
-			class="px-2.5 py-1 rounded-md font-medium transition-all duration-150 cursor-pointer {themeManager.theme ===
+			class="px-2 py-0.5 sm:py-1 rounded-md font-medium text-xs transition-all duration-150 cursor-pointer {themeManager.theme ===
 			'system'
 				? 'bg-white dark:bg-dark-card text-slate-900 dark:text-dark-text shadow-xs font-semibold'
 				: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text'}"
@@ -92,7 +92,7 @@
 			type="button"
 			role="radio"
 			aria-checked={themeManager.theme === 'dark'}
-			class="px-2.5 py-1 rounded-md font-medium transition-all duration-150 cursor-pointer {themeManager.theme ===
+			class="px-2 py-0.5 sm:py-1 rounded-md font-medium text-xs transition-all duration-150 cursor-pointer {themeManager.theme ===
 			'dark'
 				? 'bg-white dark:bg-dark-card text-slate-900 dark:text-dark-text shadow-xs font-semibold'
 				: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text'}"

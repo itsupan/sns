@@ -5,8 +5,12 @@
 	import SheetAction from '$lib/components/shared/SheetAction.svelte';
 	import { formatCount } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { authClient } from '$lib/auth-client';
+	import SharePostModal from './SharePostModal.svelte';
+	import PostCommentsModal from './PostCommentsModal.svelte';
 
 	export interface PostAuthor {
+		id?: string;
 		name: string;
 		handle: string;
 		avatar: string;
@@ -15,8 +19,14 @@
 	}
 
 	export interface PostComment {
+		id?: string;
 		author: string;
 		content: string;
+	}
+
+	export interface MediaItem {
+		url: string;
+		type: 'image' | 'video';
 	}
 
 	export interface PostData {
@@ -25,6 +35,11 @@
 		title: string;
 		description: string;
 		image: string;
+		mediaUrl?: string;
+		mediaType?: 'image' | 'video' | 'none';
+		mediaItems?: MediaItem[];
+		aspectRatio?: '1:1' | '4:5' | '16:9';
+		location?: string;
 		cameraMeta?: string;
 		tags: string[];
 		likes: number;
@@ -59,7 +74,26 @@
 			'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.',
 		image:
 			'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-		cameraMeta: '35mm · ISO 200',
+		mediaItems: [
+			{
+				url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
+				type: 'image'
+			},
+			{
+				url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80',
+				type: 'image'
+			},
+			{
+				url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&auto=format&fit=crop&q=80',
+				type: 'image'
+			},
+			{
+				url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&auto=format&fit=crop&q=80',
+				type: 'image'
+			}
+		],
+		aspectRatio: '4:5',
+		location: 'Fondazione Prada, Milano',
 		tags: ['#MinimalArchitecture', '#LightAndSpace', '#DesignArchive'],
 		likes: 842,
 		commentsCount: 46,
@@ -78,16 +112,87 @@
 		onSave
 	}: Props = $props();
 
+	const session = authClient.useSession();
+
 	let likedOverride = $state<boolean | null>(null);
 	let savedOverride = $state<boolean | null>(null);
 	let likesDelta = $state(0);
 	let likePop = $state(0);
 	let burst = $state(0);
 	let optionsOpen = $state(false);
+	let commentsOpen = $state(false);
+	let shareOpen = $state(false);
+	let sharesDelta = $state(0);
+	let commentsDelta = $state(0);
+	let latestCommentPreview = $state<PostComment | undefined>(undefined);
+
+	let activeSlide = $state(0);
+	let touchStartX = $state(0);
+	let touchEndX = $state(0);
+
+	const allMedia = $derived.by<MediaItem[]>(() => {
+		if (post.mediaItems && post.mediaItems.length > 0) {
+			return post.mediaItems;
+		}
+		if (post.mediaUrl || post.image) {
+			const src = post.mediaUrl || post.image;
+			const isVid = post.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(src);
+			return [{ url: src, type: isVid ? 'video' : 'image' }];
+		}
+		return [];
+	});
+
+	const aspectClass = $derived.by(() => {
+		if (post.aspectRatio === '1:1') {
+			return 'aspect-square';
+		}
+		if (post.aspectRatio === '16:9') {
+			return 'aspect-video';
+		}
+		return 'aspect-[4/5]';
+	});
+
+	function nextSlide(e?: MouseEvent) {
+		e?.stopPropagation();
+		if (allMedia.length > 1) {
+			activeSlide = (activeSlide + 1) % allMedia.length;
+		}
+	}
+
+	function prevSlide(e?: MouseEvent) {
+		e?.stopPropagation();
+		if (allMedia.length > 1) {
+			activeSlide = (activeSlide - 1 + allMedia.length) % allMedia.length;
+		}
+	}
+
+	function goToSlide(index: number, e?: MouseEvent) {
+		e?.stopPropagation();
+		activeSlide = index;
+	}
+
+	function handleTouchStart(e: TouchEvent) {
+		touchStartX = e.touches[0].clientX;
+	}
+
+	function handleTouchEnd(e: TouchEvent) {
+		touchEndX = e.changedTouches[0].clientX;
+		const diff = touchStartX - touchEndX;
+		if (Math.abs(diff) > 40) {
+			if (diff > 0) {
+				nextSlide();
+			} else {
+				prevSlide();
+			}
+		}
+	}
 
 	let isLiked = $derived(likedOverride !== null ? likedOverride : (post.liked ?? false));
 	let isSaved = $derived(savedOverride !== null ? savedOverride : (post.saved ?? false));
 	let likesCount = $derived(post.likes + likesDelta);
+	let sharesCount = $derived(post.repostsCount + sharesDelta);
+	let displayCommentsCount = $derived(post.commentsCount + commentsDelta);
+	let activeCommentPreview = $derived(latestCommentPreview || post.commentPreview);
 
 	function haptic() {
 		navigator.vibrate?.(10);
@@ -102,8 +207,21 @@
 		onLike?.(next);
 	}
 
-	function toggleLike() {
-		setLiked(!isLiked);
+	async function toggleLike() {
+		const next = !isLiked;
+		setLiked(next);
+
+		if ($session.data?.user) {
+			try {
+				const res = await fetch(`/api/posts/${post.id}/like`, { method: 'POST' });
+				if (!res.ok) {
+					// rollback if server rejects
+					setLiked(!next);
+				}
+			} catch {
+				setLiked(!next);
+			}
+		}
 	}
 
 	function toggleSave() {
@@ -116,19 +234,40 @@
 
 	// Double-tap the photo to like (never un-likes, same as native apps).
 	let lastTap = 0;
-	function handleMediaTap() {
+	async function handleMediaTap() {
 		const now = Date.now();
 		if (now - lastTap < 300) {
 			burst++;
-			setLiked(true);
+			if (!isLiked) {
+				await toggleLike();
+			}
 			lastTap = 0;
 		} else {
 			lastTap = now;
 		}
 	}
 
+	function openShare() {
+		optionsOpen = false;
+		shareOpen = true;
+	}
+
+	async function handleShared() {
+		sharesDelta++;
+		try {
+			await fetch(`/api/posts/${post.id}/share`, { method: 'POST' });
+		} catch {
+			// ignore
+		}
+	}
+
+	function handleCommentAdded(comment: PostComment, newCount: number) {
+		commentsDelta = newCount - post.commentsCount;
+		latestCommentPreview = comment;
+	}
+
 	function postUrl() {
-		return `${window.location.origin}/#${post.id}`;
+		return `${window.location.origin}/post/${post.id}`;
 	}
 
 	async function copyLink() {
@@ -136,21 +275,9 @@
 		try {
 			await navigator.clipboard.writeText(postUrl());
 			toast.show('Link copied');
+			handleShared();
 		} catch {
 			toast.show('Could not copy link');
-		}
-	}
-
-	async function share() {
-		optionsOpen = false;
-		if (navigator.share) {
-			try {
-				await navigator.share({ title: post.title || post.author.name, url: postUrl() });
-			} catch {
-				// User dismissed the native share sheet.
-			}
-		} else {
-			await copyLink();
 		}
 	}
 
@@ -160,12 +287,12 @@
 
 <article
 	id={post.id}
-	class="post-card w-full flex flex-col bg-white dark:bg-dark-card border-y sm:border border-slate-100 dark:border-dark-border rounded-none sm:rounded-3xl pt-3 pb-2 sm:p-7 mb-2 sm:mb-6 shadow-none sm:shadow-xs dark:shadow-none transition-colors duration-200 {className}"
+	class="post-card w-full flex flex-col bg-white dark:bg-dark-card border-y lg:border border-slate-100 dark:border-dark-border rounded-none lg:rounded-3xl pt-3 pb-2 lg:p-7 mb-2 lg:mb-6 shadow-none lg:shadow-xs dark:shadow-none transition-colors duration-200 {className}"
 	aria-labelledby={post.title ? `post-title-${post.id}` : undefined}
 	aria-label={post.title ? undefined : `Post by ${post.author.name}`}
 >
 	<!-- Post Header: Author info & options -->
-	<header class="flex items-center justify-between px-4 sm:px-0">
+	<header class="flex items-center justify-between px-4 lg:px-0">
 		<div class="flex items-center gap-3 min-w-0">
 			<Avatar src={post.author.avatar} name={post.author.name} size="md" />
 			<div class="flex flex-col min-w-0">
@@ -177,9 +304,11 @@
 						{post.author.handle}
 					</span>
 				</div>
-				{#if post.author.location || post.author.timeAgo}
+				{#if post.location || post.author.location || post.author.timeAgo}
 					<span class="text-xs text-slate-500 dark:text-dark-subtle mt-0.5 truncate">
-						{[post.author.location, post.author.timeAgo].filter(Boolean).join(' • ')}
+						{[post.location || post.author.location, post.author.timeAgo]
+							.filter(Boolean)
+							.join(' • ')}
 					</span>
 				{/if}
 			</div>
@@ -200,7 +329,7 @@
 	{#if post.title}
 		<h2
 			id={`post-title-${post.id}`}
-			class="px-4 sm:px-0 text-lg sm:text-xl font-bold text-slate-950 dark:text-white mt-3 sm:mt-4 mb-3 tracking-tight leading-snug"
+			class="px-4 lg:px-0 text-lg lg:text-xl font-bold text-slate-950 dark:text-white mt-3 lg:mt-4 mb-3 tracking-tight leading-snug"
 		>
 			{post.title}
 		</h2>
@@ -208,28 +337,99 @@
 		<div class="h-3"></div>
 	{/if}
 
-	<!-- Media: full-bleed on phones, rounded on larger screens. Double-tap to like. -->
-	{#if post.image}
+	<!-- Media: full-bleed on phones & vertical tablets, rounded on larger screens. Multi-image carousel with counter & dots. Double-tap to like. -->
+	{#if allMedia.length > 0}
+		{@const currentMedia = allMedia[activeSlide] ?? allMedia[0]}
+		{@const isVideo =
+			currentMedia.type === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(currentMedia.url)}
 		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
-			class="media-container relative w-full aspect-[4/5] sm:aspect-[16/10] rounded-none sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-3 sm:mb-4 group select-none"
+			class="media-container relative w-full {aspectClass} rounded-none lg:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-3 lg:mb-4 group select-none"
 			onclick={handleMediaTap}
+			ontouchstart={handleTouchStart}
+			ontouchend={handleTouchEnd}
 		>
-			<img
-				src={post.image}
-				alt={post.title || `Photo by ${post.author.name}`}
-				sizes="(min-width: 672px) 672px, 100vw"
-				class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
-				loading={priority ? 'eager' : 'lazy'}
-				fetchpriority={priority ? 'high' : 'auto'}
-				decoding="async"
-				draggable="false"
-			/>
+			{#if isVideo}
+				<video
+					src={currentMedia.url}
+					controls
+					playsinline
+					preload="metadata"
+					class="w-full h-full object-cover"
+				>
+					<track kind="captions" />
+				</video>
+			{:else}
+				<img
+					src={currentMedia.url}
+					alt={post.title || `Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+					sizes="(min-width: 672px) 672px, 100vw"
+					class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
+					loading={priority && activeSlide === 0 ? 'eager' : 'lazy'}
+					fetchpriority={priority && activeSlide === 0 ? 'high' : 'auto'}
+					decoding="async"
+					draggable="false"
+				/>
+			{/if}
+
+			<!-- Multi-photo Counter Badge (Mockup 2 top-right: e.g. "1/4") -->
+			{#if allMedia.length > 1}
+				<div
+					class="carousel-counter absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-semibold tracking-wider select-none shadow-xs z-10"
+					aria-label={`Slide ${activeSlide + 1} of ${allMedia.length}`}
+				>
+					{activeSlide + 1}/{allMedia.length}
+				</div>
+
+				<!-- Prev / Next Navigation Arrows -->
+				{#if activeSlide > 0}
+					<button
+						type="button"
+						class="absolute left-2.5 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 border-0 cursor-pointer z-10 shadow-sm"
+						onclick={prevSlide}
+						aria-label="Previous slide"
+					>
+						<Icon name="angle-left" class="text-sm" />
+					</button>
+				{/if}
+
+				{#if activeSlide < allMedia.length - 1}
+					<button
+						type="button"
+						class="absolute right-2.5 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 border-0 cursor-pointer z-10 shadow-sm"
+						onclick={nextSlide}
+						aria-label="Next slide"
+					>
+						<Icon name="angle-right" class="text-sm" />
+					</button>
+				{/if}
+
+				<!-- Pagination Dots at Bottom Center (Mockup 2: active dot is pill, others are dots) -->
+				<div
+					class="carousel-dots absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm z-10 select-none"
+					role="tablist"
+					aria-label="Slide indicators"
+				>
+					{#each allMedia as item, idx (item.url + idx)}
+						<button
+							type="button"
+							role="tab"
+							class="transition-all rounded-full p-0 border-0 cursor-pointer {idx === activeSlide
+								? 'w-4 h-1.5 bg-white'
+								: 'size-1.5 bg-white/50 hover:bg-white/75'}"
+							onclick={(e) => goToSlide(idx, e)}
+							aria-label={`Go to slide ${idx + 1}`}
+							aria-selected={idx === activeSlide}
+						></button>
+					{/each}
+				</div>
+			{/if}
+
 			{#key burst}
 				{#if burst > 0}
 					<div
-						class="absolute inset-0 flex items-center justify-center pointer-events-none"
+						class="absolute inset-0 flex items-center justify-center pointer-events-none z-20"
 						aria-hidden="true"
 					>
 						<Icon
@@ -240,21 +440,14 @@
 					</div>
 				{/if}
 			{/key}
-			{#if post.cameraMeta}
-				<div
-					class="camera-badge absolute bottom-3 right-3 bg-black/75 backdrop-blur-xs text-white text-[11px] font-mono px-3 py-1 rounded-md tracking-wider select-none shadow-sm"
-				>
-					{post.cameraMeta}
-				</div>
-			{/if}
 		</div>
 	{/if}
 
-	<!-- Action Bar: sits right under the media on phones, like native feeds -->
+	<!-- Action Bar: sits right under the media on phones and vertical tablets, like native feeds -->
 	<div
-		class="action-bar flex items-center justify-between px-2 sm:px-0 sm:py-2 sm:order-1 sm:border-t border-slate-100 dark:border-dark-border text-slate-700 dark:text-dark-muted text-sm sm:text-xs font-medium"
+		class="action-bar flex items-center justify-between px-2 lg:px-0 lg:py-2 lg:order-1 lg:border-t border-slate-100 dark:border-dark-border text-slate-700 dark:text-dark-muted text-sm lg:text-xs font-medium"
 	>
-		<div class="flex items-center gap-0 sm:gap-3">
+		<div class="flex items-center gap-0 lg:gap-3">
 			<button
 				type="button"
 				class="{actionButton} px-2 {isLiked
@@ -268,7 +461,7 @@
 					<Icon
 						name="heart"
 						type={isLiked ? 'sr' : 'rr'}
-						class="text-xl sm:text-base {likePop ? 'animate-heart-pop' : ''}"
+						class="text-xl lg:text-base {likePop ? 'animate-heart-pop' : ''}"
 					/>
 				{/key}
 				<span>{formatCount(likesCount)}</span>
@@ -278,20 +471,20 @@
 				type="button"
 				class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
 				aria-label="Comments"
-				onclick={() => toast.show('Comments are coming soon')}
+				onclick={() => (commentsOpen = true)}
 			>
-				<Icon name="comment" class="text-xl sm:text-base" />
-				<span>{formatCount(post.commentsCount)}</span>
+				<Icon name="comment" class="text-xl lg:text-base" />
+				<span>{formatCount(displayCommentsCount)}</span>
 			</button>
 
 			<button
 				type="button"
 				class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
 				aria-label="Repost"
-				onclick={() => toast.show('Reposts are coming soon')}
+				onclick={openShare}
 			>
-				<Icon name="arrows-repeat" class="text-xl sm:text-base" />
-				<span>{formatCount(post.repostsCount)}</span>
+				<Icon name="arrows-repeat" class="text-xl lg:text-base" />
+				<span>{formatCount(sharesCount)}</span>
 			</button>
 		</div>
 
@@ -305,25 +498,25 @@
 				aria-label={isSaved ? 'Remove bookmark' : 'Save bookmark'}
 				aria-pressed={isSaved}
 			>
-				<Icon name="bookmark" type={isSaved ? 'sr' : 'rr'} class="text-xl sm:text-base" />
+				<Icon name="bookmark" type={isSaved ? 'sr' : 'rr'} class="text-xl lg:text-base" />
 			</button>
 
 			<button
 				type="button"
 				class="{actionButton} hover:text-slate-900 dark:hover:text-dark-text"
 				aria-label="Share post"
-				onclick={share}
+				onclick={openShare}
 			>
-				<Icon name="paper-plane" class="text-xl sm:text-base" />
+				<Icon name="paper-plane" class="text-xl lg:text-base" />
 			</button>
 		</div>
 	</div>
 
-	<div class="px-4 sm:px-0 flex flex-col">
+	<div class="px-4 lg:px-0 flex flex-col">
 		<!-- Caption / Description -->
 		{#if post.description}
 			<p
-				class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mt-1.5 sm:mt-0 mb-3 line-clamp-3 sm:line-clamp-none"
+				class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mt-1.5 lg:mt-0 mb-3 line-clamp-3 lg:line-clamp-none"
 			>
 				{post.description}
 			</p>
@@ -332,7 +525,7 @@
 		<!-- Tags -->
 		{#if post.tags && post.tags.length > 0}
 			<div
-				class="flex items-center gap-2 mb-3 sm:mb-4.5 overflow-x-auto no-scrollbar sm:flex-wrap -mx-4 px-4 sm:mx-0 sm:px-0"
+				class="flex items-center gap-2 mb-3 lg:mb-4.5 overflow-x-auto no-scrollbar lg:flex-wrap -mx-4 px-4 lg:mx-0 lg:px-0"
 			>
 				{#each post.tags as tag (tag)}
 					<button
@@ -347,24 +540,24 @@
 		{/if}
 	</div>
 
-	<div class="px-4 sm:px-0 sm:order-2">
+	<div class="px-4 lg:px-0 lg:order-2">
 		<!-- Comment Preview -->
-		{#if post.commentPreview}
+		{#if activeCommentPreview}
 			<button
 				type="button"
-				class="comment-preview w-full text-left mb-1 sm:mt-3 sm:mb-0 p-3 rounded-xl bg-slate-50 dark:bg-dark-elevated text-xs leading-normal flex items-center justify-between gap-3 text-slate-700 dark:text-dark-muted border-0 cursor-pointer active:bg-slate-100 dark:active:bg-dark-hover"
-				onclick={() => toast.show('Comments are coming soon')}
+				class="comment-preview w-full text-left mb-1 lg:mt-3 lg:mb-0 p-3 rounded-xl bg-slate-50 dark:bg-dark-elevated text-xs leading-normal flex items-center justify-between gap-3 text-slate-700 dark:text-dark-muted border-0 cursor-pointer active:bg-slate-100 dark:active:bg-dark-hover"
+				onclick={() => (commentsOpen = true)}
 			>
 				<span class="truncate">
 					<strong class="font-semibold text-slate-900 dark:text-dark-text">
-						{post.commentPreview.author}
+						{activeCommentPreview.author}
 					</strong>
-					<span class="ml-2">{post.commentPreview.content}</span>
+					<span class="ml-2">{activeCommentPreview.content}</span>
 				</span>
 				<span
 					class="reply-link text-[11px] font-medium text-slate-500 dark:text-dark-muted shrink-0"
 				>
-					View all {formatCount(post.commentsCount)}
+					View all {formatCount(displayCommentsCount)}
 				</span>
 			</button>
 		{/if}
@@ -380,7 +573,7 @@
 			toggleSave();
 		}}
 	/>
-	<SheetAction icon="paper-plane" label="Share" onclick={share} />
+	<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
 	<SheetAction icon="link" label="Copy link" onclick={copyLink} />
 	<SheetAction
 		icon="flag"
@@ -392,3 +585,6 @@
 		}}
 	/>
 </BottomSheet>
+
+<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
+<PostCommentsModal bind:open={commentsOpen} {post} onCommentAdded={handleCommentAdded} />
