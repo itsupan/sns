@@ -4,8 +4,9 @@ import type { RequestHandler } from './$types';
 import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import { refreshPostMediaUrls } from '$lib/server/services/storage';
 
-export const GET: RequestHandler = async ({ url, locals }) => {
+export const GET: RequestHandler = async ({ url, locals, platform }) => {
 	const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
 	const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
 
@@ -124,12 +125,16 @@ export const GET: RequestHandler = async ({ url, locals }) => {
 		};
 	});
 
+	const refreshedPosts = await Promise.all(
+		posts.map((p) => refreshPostMediaUrls(p, platform?.env))
+	);
+
 	const hasMore = postRows.length === limit;
 	const nextOffset = hasMore ? offset + limit : null;
-	return json({ posts, hasMore, nextOffset });
+	return json({ posts: refreshedPosts, hasMore, nextOffset });
 };
 
-export const POST: RequestHandler = async ({ request, locals }) => {
+export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	if (!locals.user) {
 		return json({ error: 'Unauthorized' }, { status: 401 });
 	}
@@ -235,5 +240,6 @@ export const POST: RequestHandler = async ({ request, locals }) => {
 		liked: false
 	};
 
-	return json({ post: createdPost }, { status: 201 });
+	const refreshedCreatedPost = await refreshPostMediaUrls(createdPost, platform?.env);
+	return json({ post: refreshedCreatedPost }, { status: 201 });
 };

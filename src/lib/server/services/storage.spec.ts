@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { generatePresignedUploadUrl } from './storage';
+import {
+	generatePresignedUploadUrl,
+	extractR2Key,
+	isPresignedUrlExpired,
+	generatePresignedGetUrl,
+	refreshMediaUrl,
+	refreshPostMediaUrls
+} from './storage';
 
 describe('storage service', () => {
 	it('rejects unsupported MIME types', async () => {
@@ -59,5 +66,137 @@ describe('storage service', () => {
 		expect(result.uploadUrl).toContain('X-Amz-Signature=');
 		expect(result.publicUrl).toMatch(/^https:\/\/cdn\.example\.com\/avatars\/user-456\//);
 		expect(result.key).toMatch(/^avatars\/user-456\/\d+-[a-f0-9-]+\.png$/);
+	});
+
+	describe('extractR2Key', () => {
+		it('extracts key from plain relative key string', () => {
+			expect(extractR2Key('posts/user-1/photo.jpg')).toBe('posts/user-1/photo.jpg');
+			expect(extractR2Key('avatars/user-2/avatar.png')).toBe('avatars/user-2/avatar.png');
+		});
+
+		it('extracts key from mock-r2 URL', () => {
+			expect(extractR2Key('/api/upload/mock-r2/posts/user-1/photo.jpg')).toBe(
+				'posts/user-1/photo.jpg'
+			);
+			expect(
+				extractR2Key('https://sns.ecoapsara.com/api/upload/mock-r2/posts/user-1/video.mp4')
+			).toBe('posts/user-1/video.mp4');
+		});
+
+		it('extracts key from media proxy URL', () => {
+			expect(extractR2Key('/api/media/posts/user-1/photo.jpg')).toBe('posts/user-1/photo.jpg');
+			expect(extractR2Key('https://sns.ecoapsara.com/api/media/posts/user-1/photo.jpg')).toBe(
+				'posts/user-1/photo.jpg'
+			);
+		});
+
+		it('extracts key from Cloudflare R2 S3 URLs with query parameters', () => {
+			const s3Url =
+				'https://cf-acc.r2.cloudflarestorage.com/sns-media/posts/user-1/photo.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Expires=3600';
+			expect(extractR2Key(s3Url)).toBe('posts/user-1/photo.jpg');
+		});
+
+		it('returns null for non-R2 external URLs', () => {
+			expect(extractR2Key('https://images.unsplash.com/photo-1513694203232')).toBeNull();
+		});
+	});
+
+	describe('isPresignedUrlExpired', () => {
+		it('returns false for regular non-presigned URLs', () => {
+			expect(isPresignedUrlExpired('https://cdn.example.com/photo.jpg')).toBe(false);
+			expect(isPresignedUrlExpired('/api/media/posts/photo.jpg')).toBe(false);
+			expect(isPresignedUrlExpired('/api/upload/mock-r2/posts/photo.jpg')).toBe(false);
+		});
+
+		it('returns true for past expired AWS presigned URLs', () => {
+			const pastUrl =
+				'https://bucket.acc.r2.cloudflarestorage.com/photo.jpg?X-Amz-Date=20200101T000000Z&X-Amz-Expires=3600';
+			expect(isPresignedUrlExpired(pastUrl)).toBe(true);
+		});
+
+		it('returns false for future valid AWS presigned URLs', () => {
+			const futureUrl =
+				'https://bucket.acc.r2.cloudflarestorage.com/photo.jpg?X-Amz-Date=20990101T000000Z&X-Amz-Expires=86400';
+			expect(isPresignedUrlExpired(futureUrl)).toBe(false);
+		});
+
+		it('returns true for raw unauthenticated R2 cloudflarestorage.com endpoints', () => {
+			const rawS3Url = 'https://bucket.acc.r2.cloudflarestorage.com/posts/photo.jpg';
+			expect(isPresignedUrlExpired(rawS3Url)).toBe(true);
+		});
+	});
+
+	describe('generatePresignedGetUrl', () => {
+		it('returns permanent public CDN URL if R2_PUBLIC_URL is configured', async () => {
+			const env = { R2_PUBLIC_URL: 'https://cdn.example.com' };
+			const result = await generatePresignedGetUrl(env, 'posts/user-1/pic.webp');
+			expect(result).toBe('https://cdn.example.com/posts/user-1/pic.webp');
+		});
+
+		it('generates authentic presigned GET URL when credentials are present', async () => {
+			const env = {
+				R2_ACCOUNT_ID: 'cf-acc',
+				R2_ACCESS_KEY_ID: 'cf-key',
+				R2_SECRET_ACCESS_KEY: 'cf-sec',
+				R2_BUCKET_NAME: 'sns-bucket'
+			};
+			const result = await generatePresignedGetUrl(env, 'posts/user-1/video.mp4');
+			expect(result).toContain(
+				'https://cf-acc.r2.cloudflarestorage.com/sns-bucket/posts/user-1/video.mp4'
+			);
+			expect(result).toContain('X-Amz-Signature=');
+			expect(result).toContain('X-Amz-Expires=');
+		});
+
+		it('falls back to /api/media proxy when credentials are missing', async () => {
+			const result = await generatePresignedGetUrl(undefined, 'posts/user-1/video.mp4');
+			expect(result).toBe('/api/media/posts/user-1/video.mp4');
+		});
+	});
+
+	describe('refreshMediaUrl and refreshPostMediaUrls', () => {
+		it('refreshes a single expired media URL', async () => {
+			const expiredUrl =
+				'https://bucket.acc.r2.cloudflarestorage.com/posts/u1/photo.jpg?X-Amz-Date=20200101T000000Z&X-Amz-Expires=3600';
+			const refreshed = await refreshMediaUrl(expiredUrl, {
+				R2_PUBLIC_URL: 'https://cdn.example.com'
+			});
+			expect(refreshed).toBe('https://cdn.example.com/posts/u1/photo.jpg');
+
+			const unchanged = await refreshMediaUrl('https://images.unsplash.com/photo-123', undefined);
+			expect(unchanged).toBe('https://images.unsplash.com/photo-123');
+		});
+
+		it('refreshes expired presigned URLs in post data', async () => {
+			const expiredUrl =
+				'https://bucket.acc.r2.cloudflarestorage.com/posts/u1/photo.jpg?X-Amz-Date=20200101T000000Z&X-Amz-Expires=3600';
+			const validUrl = 'https://images.unsplash.com/photo-123';
+
+			const mockPost = {
+				id: 'post-1',
+				author: {
+					name: 'Elena',
+					avatar: expiredUrl
+				},
+				title: 'Post',
+				description: 'Desc',
+				image: expiredUrl,
+				mediaUrl: expiredUrl,
+				mediaItems: [
+					{ url: expiredUrl, type: 'image' as const },
+					{ url: validUrl, type: 'image' as const }
+				]
+			};
+
+			const refreshed = await refreshPostMediaUrls(mockPost, {
+				R2_PUBLIC_URL: 'https://cdn.example.com'
+			});
+
+			expect(refreshed.image).toBe('https://cdn.example.com/posts/u1/photo.jpg');
+			expect(refreshed.mediaUrl).toBe('https://cdn.example.com/posts/u1/photo.jpg');
+			expect(refreshed.author.avatar).toBe('https://cdn.example.com/posts/u1/photo.jpg');
+			expect(refreshed.mediaItems[0].url).toBe('https://cdn.example.com/posts/u1/photo.jpg');
+			expect(refreshed.mediaItems[1].url).toBe(validUrl);
+		});
 	});
 });

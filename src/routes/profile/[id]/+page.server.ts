@@ -4,6 +4,7 @@ import { user, post } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
+import { refreshMediaUrl } from '$lib/server/services/storage';
 
 const FALLBACK_CURATORS: Record<
 	string,
@@ -89,7 +90,7 @@ const FALLBACK_CURATORS: Record<
 	}
 };
 
-export const load: PageServerLoad = async ({ params, locals, url }) => {
+export const load: PageServerLoad = async ({ params, locals, url, platform }) => {
 	const rawId = params.id;
 	if (!rawId) {
 		throw error(404, 'User not found');
@@ -196,16 +197,32 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 
 	const isOwnProfile = Boolean(locals.user && locals.user.id === targetUser.id);
 
+	const origin =
+		url.origin && !url.origin.includes('localhost') && !url.origin.includes('127.0.0.1')
+			? url.origin
+			: platform?.env?.BETTER_AUTH_URL || url.origin;
+
 	const handleStr = targetUser.handle as string | null | undefined;
 	const canonicalHandle = handleStr ? `@${handleStr.replace(/^@/, '')}` : (targetUser.id as string);
-	const canonicalUrl = `${url.origin}/profile/${canonicalHandle}`;
+	const canonicalUrl = `${origin}/profile/${canonicalHandle}`;
+
+	const refreshedImage = targetUser.image
+		? await refreshMediaUrl(targetUser.image as string, platform?.env)
+		: null;
+
+	const refreshedPosts = await Promise.all(
+		targetPosts.map(async (p) => ({
+			...p,
+			image: p.image ? await refreshMediaUrl(p.image, platform?.env) : ''
+		}))
+	);
 
 	return {
 		targetUser: {
 			id: targetUser.id,
 			name: targetUser.name,
 			email: targetUser.email,
-			image: targetUser.image ?? null,
+			image: refreshedImage,
 			handle: (targetUser.handle as string | null | undefined) ?? null,
 			title: (targetUser.title as string | null | undefined) ?? null,
 			bio: (targetUser.bio as string | null | undefined) ?? null,
@@ -214,7 +231,8 @@ export const load: PageServerLoad = async ({ params, locals, url }) => {
 			cameraGear: (targetUser.cameraGear as string | null | undefined) ?? null
 		},
 		isOwnProfile,
-		posts: targetPosts,
-		canonicalUrl
+		posts: refreshedPosts,
+		canonicalUrl,
+		origin
 	};
 };

@@ -3,6 +3,7 @@ import type { PageServerLoad } from './$types';
 import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import { refreshPostMediaUrls } from '$lib/server/services/storage';
 
 const FALLBACK_POSTS: PostData[] = [
 	{
@@ -77,7 +78,7 @@ const FALLBACK_POSTS: PostData[] = [
 	}
 ];
 
-export const load: PageServerLoad = async ({ locals }) => {
+export const load: PageServerLoad = async ({ locals, platform }) => {
 	try {
 		const PAGE_SIZE = 10;
 		const postRows = await locals.db
@@ -193,7 +194,11 @@ export const load: PageServerLoad = async ({ locals }) => {
 			};
 		});
 
-		return { posts, hasMore: postRows.length === PAGE_SIZE };
+		const refreshedPosts = await Promise.all(
+			posts.map((p) => refreshPostMediaUrls(p, platform?.env))
+		);
+
+		return { posts: refreshedPosts, hasMore: postRows.length === PAGE_SIZE };
 	} catch (err) {
 		console.error('Failed to load feed posts from database:', err);
 		return { posts: FALLBACK_POSTS, hasMore: false };

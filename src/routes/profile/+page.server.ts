@@ -5,8 +5,9 @@ import { user, post } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
+import { refreshMediaUrl } from '$lib/server/services/storage';
 
-export const load: PageServerLoad = async ({ locals, url }) => {
+export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	if (!locals.user) {
 		throw redirect(
 			302,
@@ -94,12 +95,23 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 
 	const currentUser = (dbUser ?? locals.user) as Record<string, unknown>;
 
+	const refreshedImage = currentUser.image
+		? await refreshMediaUrl(currentUser.image as string, platform?.env)
+		: null;
+
+	const refreshedPosts = await Promise.all(
+		userPosts.map(async (p) => ({
+			...p,
+			image: p.image ? await refreshMediaUrl(p.image, platform?.env) : ''
+		}))
+	);
+
 	return {
 		user: {
 			id: currentUser.id,
 			name: currentUser.name,
 			email: currentUser.email,
-			image: currentUser.image ?? null,
+			image: refreshedImage,
 			handle: (currentUser.handle as string | null | undefined) ?? null,
 			title: (currentUser.title as string | null | undefined) ?? null,
 			bio: (currentUser.bio as string | null | undefined) ?? null,
@@ -107,6 +119,6 @@ export const load: PageServerLoad = async ({ locals, url }) => {
 			location: (currentUser.location as string | null | undefined) ?? null,
 			cameraGear: (currentUser.cameraGear as string | null | undefined) ?? null
 		},
-		posts: userPosts
+		posts: refreshedPosts
 	};
 };
