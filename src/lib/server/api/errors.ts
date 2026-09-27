@@ -13,14 +13,15 @@ export class ApiError extends Error {
 		readonly status: number,
 		readonly code: string,
 		message: string,
-		readonly fields?: FieldErrors
+		readonly fields?: FieldErrors,
+		readonly headers?: HeadersInit
 	) {
 		super(message);
 		this.name = 'ApiError';
 	}
 
 	toResponse(): Response {
-		return apiError(this.status, this.code, this.message, this.fields);
+		return apiError(this.status, this.code, this.message, this.fields, this.headers);
 	}
 }
 
@@ -28,10 +29,11 @@ export function apiError(
 	status: number,
 	code: string,
 	message: string,
-	fields?: FieldErrors
+	fields?: FieldErrors,
+	headers?: HeadersInit
 ): Response {
 	const body: ApiErrorBody = { error: fields ? { code, message, fields } : { code, message } };
-	return json(body, { status });
+	return json(body, { status, headers });
 }
 
 /**

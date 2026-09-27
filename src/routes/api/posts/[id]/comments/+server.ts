@@ -4,7 +4,7 @@ import type { RequestHandler } from './$types';
 import { post, postComment, user } from '$lib/server/db/schema';
 import * as v from 'valibot';
 import { formatTimeAgo } from '$lib/utils/format';
-import { apiError, parseBody, requireUser, withApi } from '$lib/server/api';
+import { apiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import { commentsCountOf } from '$lib/server/db/counters';
 
 const CreateComment = v.object({
@@ -57,8 +57,9 @@ export const GET: RequestHandler = withApi(async ({ params, locals }) => {
 	return json({ comments });
 });
 
-export const POST: RequestHandler = withApi(async ({ params, request, locals }) => {
+export const POST: RequestHandler = withApi(async ({ params, request, locals, platform }) => {
 	const currentUser = requireUser(locals);
+	await enforceRateLimit(platform, 'comment', currentUser.id);
 
 	const postId = params.id;
 	if (!postId) {

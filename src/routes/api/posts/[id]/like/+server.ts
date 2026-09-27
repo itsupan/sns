@@ -2,11 +2,12 @@ import { json } from '@sveltejs/kit';
 import { eq, and } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post, postLike } from '$lib/server/db/schema';
-import { apiError, requireUser, withApi } from '$lib/server/api';
+import { apiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 import { likesCountOf } from '$lib/server/db/counters';
 
-export const POST: RequestHandler = withApi(async ({ params, locals }) => {
+export const POST: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const currentUser = requireUser(locals);
+	await enforceRateLimit(platform, 'like', currentUser.id);
 
 	const postId = params.id;
 	if (!postId) {
