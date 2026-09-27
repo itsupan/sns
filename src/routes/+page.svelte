@@ -8,8 +8,6 @@
 	import type { PageData } from './$types';
 	import type { PostData } from '$lib/components/feed/PostCard.svelte';
 
-	const PAGE_SIZE = 10;
-
 	const DEFAULT_POSTS: PostData[] = [
 		{
 			id: 'post-1',
@@ -62,6 +60,8 @@
 	];
 
 	let { data }: { data?: PageData } = $props();
+	// Page size comes from FEED_PAGE_SIZE via the server load; the fallback only applies without data.
+	let pageSize = $derived(data?.pageSize ?? 10);
 
 	let initialPosts = $derived(data?.posts && data.posts.length > 0 ? data.posts : DEFAULT_POSTS);
 	let userCreatedPosts = $state<PostData[]>([]);
@@ -72,7 +72,7 @@
 			? serverHasMore
 			: data?.hasMore !== undefined
 				? data.hasMore
-				: initialPosts.length >= PAGE_SIZE
+				: initialPosts.length >= pageSize
 	);
 	let loadingMore = $state(false);
 	let sentinelEl = $state<HTMLDivElement | null>(null);
@@ -110,7 +110,7 @@
 		loadingMore = true;
 		try {
 			const currentServerCount = initialPosts.length + paginatedPosts.length;
-			const res = await fetch(`/api/posts?limit=${PAGE_SIZE}&offset=${currentServerCount}`);
+			const res = await fetch(`/api/posts?limit=${pageSize}&offset=${currentServerCount}`);
 			if (!res.ok) {
 				serverHasMore = false;
 				return;
@@ -121,7 +121,7 @@
 				serverHasMore = false;
 			} else {
 				paginatedPosts = [...paginatedPosts, ...nextPosts];
-				serverHasMore = result.hasMore ?? nextPosts.length === PAGE_SIZE;
+				serverHasMore = result.hasMore ?? nextPosts.length === pageSize;
 			}
 		} catch {
 			serverHasMore = false;

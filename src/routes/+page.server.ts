@@ -5,6 +5,7 @@ import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { loadPostMedia, notDeleted } from '$lib/server/db/posts';
+import { getConfig } from '$lib/server/config';
 
 const FALLBACK_POSTS: PostData[] = [
 	{
@@ -80,8 +81,8 @@ const FALLBACK_POSTS: PostData[] = [
 ];
 
 export const load: PageServerLoad = async ({ locals, platform }) => {
+	const pageSize = getConfig(platform?.env).feed.defaultPageSize;
 	try {
-		const PAGE_SIZE = 10;
 		const postRows = await locals.db
 			.select({
 				post: post,
@@ -97,10 +98,10 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			.innerJoin(user, eq(post.userId, user.id))
 			.where(notDeleted)
 			.orderBy(desc(post.createdAt))
-			.limit(PAGE_SIZE);
+			.limit(pageSize);
 
 		if (postRows.length === 0) {
-			return { posts: FALLBACK_POSTS, hasMore: false };
+			return { posts: FALLBACK_POSTS, hasMore: false, pageSize };
 		}
 
 		const postIds = postRows.map((r) => r.post.id);
@@ -185,9 +186,9 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			posts.map((p) => refreshPostMediaUrls(p, platform?.env))
 		);
 
-		return { posts: refreshedPosts, hasMore: postRows.length === PAGE_SIZE };
+		return { posts: refreshedPosts, hasMore: postRows.length === pageSize, pageSize };
 	} catch (err) {
 		console.error('Failed to load feed posts from database:', err);
-		return { posts: FALLBACK_POSTS, hasMore: false };
+		return { posts: FALLBACK_POSTS, hasMore: false, pageSize };
 	}
 };
