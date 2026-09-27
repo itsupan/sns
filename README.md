@@ -97,6 +97,43 @@ sonar-project.properties  SonarCloud project settings
 .github/workflows/cicd.yml
 ```
 
+## API conventions
+
+Shared helpers for `/api/*` routes live in `src/lib/server/api`. Every error response has the same shape:
+
+```json
+{
+	"error": {
+		"code": "validation_failed",
+		"message": "Invalid request",
+		"fields": { "content": "Required" }
+	}
+}
+```
+
+| Helper                        | Purpose                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| `withApi(handler)`            | Wraps a handler so a thrown `ApiError` becomes its JSON response.            |
+| `requireUser(locals)`         | Returns the signed-in user or throws `401 unauthorized`.                     |
+| `parseBody(request, schema)`  | Validates a JSON body with [valibot](https://valibot.dev); `400` on failure. |
+| `parseQuery(url, schema)`     | Same for query params (values are strings; use `v.toNumber()` etc.).         |
+| `apiError(status, code, msg)` | Returns an error response directly.                                          |
+
+```ts
+import * as v from 'valibot';
+import { json } from '@sveltejs/kit';
+import { parseBody, requireUser, withApi } from '$lib/server/api';
+
+const CreatePost = v.object({ content: v.pipe(v.string(), v.minLength(1)) });
+
+export const POST = withApi(async ({ request, locals }) => {
+	const user = requireUser(locals);
+	const { content } = await parseBody(request, CreatePost);
+	// ...
+	return json({ ok: true }, { status: 201 });
+});
+```
+
 ## Generated files
 
 `worker-configuration.d.ts` (the `Env` type for your bindings) and `.svelte-kit/` are
