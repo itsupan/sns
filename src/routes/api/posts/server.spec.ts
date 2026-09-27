@@ -1,3 +1,4 @@
+import type { ApiErrorBody } from '$lib/server/api';
 import { describe, expect, it, vi } from 'vitest';
 import { GET, POST } from './+server';
 import type { RequestEvent } from './$types';
@@ -111,8 +112,8 @@ describe('POST /api/posts', () => {
 
 		const res = await POST(event);
 		expect(res.status).toBe(401);
-		const data = (await res.json()) as { error: string };
-		expect(data.error).toBe('Unauthorized');
+		const data = (await res.json()) as ApiErrorBody;
+		expect(data.error.code).toBe('unauthorized');
 	});
 
 	it('returns 400 when content is empty', async () => {
@@ -125,8 +126,8 @@ describe('POST /api/posts', () => {
 
 		const res = await POST(event);
 		expect(res.status).toBe(400);
-		const data = (await res.json()) as { error: string };
-		expect(data.error).toBe('Post content is required');
+		const data = (await res.json()) as ApiErrorBody;
+		expect(data.error.message).toBe('Post content is required');
 	});
 
 	it('creates a new post with text and media successfully', async () => {

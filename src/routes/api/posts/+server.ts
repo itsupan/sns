@@ -1,12 +1,17 @@
 import { json } from '@sveltejs/kit';
+import * as v from 'valibot';
 import { eq, desc, inArray } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
+import { ApiError, parseBody, requireUser, withApi } from '$lib/server/api';
 
-export const GET: RequestHandler = async ({ url, locals, platform }) => {
+// Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
+const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
+
+export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => {
 	const limit = Math.min(Math.max(Number(url.searchParams.get('limit')) || 20, 1), 50);
 	const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
 
@@ -132,23 +137,17 @@ export const GET: RequestHandler = async ({ url, locals, platform }) => {
 	const hasMore = postRows.length === limit;
 	const nextOffset = hasMore ? offset + limit : null;
 	return json({ posts: refreshedPosts, hasMore, nextOffset });
-};
+});
 
-export const POST: RequestHandler = async ({ request, locals, platform }) => {
-	if (!locals.user) {
-		return json({ error: 'Unauthorized' }, { status: 401 });
-	}
-
-	let body: Record<string, unknown>;
-	try {
-		body = await request.json();
-	} catch {
-		return json({ error: 'Invalid JSON payload' }, { status: 400 });
-	}
+export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
+	const currentUser = requireUser(locals);
+	const body = await parseBody(request, CreatePostBody);
 
 	const content = typeof body.content === 'string' ? body.content.trim() : '';
 	if (!content) {
-		return json({ error: 'Post content is required' }, { status: 400 });
+		throw new ApiError(400, 'validation_failed', 'Post content is required', {
+			content: 'Post content is required'
+		});
 	}
 
 	const title = typeof body.title === 'string' ? body.title.trim() : null;
@@ -196,7 +195,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 	await locals.db.insert(post).values({
 		id: newPostId,
-		userId: locals.user.id,
+		userId: currentUser.id,
 		title,
 		content,
 		mediaUrl,
@@ -215,13 +214,13 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 	const createdPost: PostData = {
 		id: newPostId,
 		author: {
-			id: locals.user.id,
-			name: locals.user.name,
-			handle: locals.user.handle
-				? `@${locals.user.handle.replace(/^@/, '')}`
-				: `@${locals.user.name.toLowerCase().replace(/\s+/g, '')}`,
-			avatar: locals.user.image || '',
-			location: location || locals.user.location || undefined,
+			id: currentUser.id,
+			name: currentUser.name,
+			handle: currentUser.handle
+				? `@${currentUser.handle.replace(/^@/, '')}`
+				: `@${currentUser.name.toLowerCase().replace(/\s+/g, '')}`,
+			avatar: currentUser.image || '',
+			location: location || currentUser.location || undefined,
 			timeAgo: 'Just now'
 		},
 		title: title || '',
@@ -231,7 +230,7 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 		mediaType,
 		mediaItems,
 		aspectRatio,
-		location: location || locals.user.location || undefined,
+		location: location || currentUser.location || undefined,
 		cameraMeta: cameraMeta || undefined,
 		tags: tagsJson ? JSON.parse(tagsJson) : [],
 		likes: 0,
@@ -242,4 +241,4 @@ export const POST: RequestHandler = async ({ request, locals, platform }) => {
 
 	const refreshedCreatedPost = await refreshPostMediaUrls(createdPost, platform?.env);
 	return json({ post: refreshedCreatedPost }, { status: 201 });
-};
+});

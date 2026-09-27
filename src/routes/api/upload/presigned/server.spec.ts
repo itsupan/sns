@@ -1,3 +1,4 @@
+import type { ApiErrorBody } from '$lib/server/api';
 import { describe, expect, it } from 'vitest';
 import { POST } from './+server';
 import type { RequestEvent } from './$types';
@@ -17,7 +18,7 @@ describe('POST /api/upload/presigned', () => {
 		const response = await POST(event);
 		expect(response.status).toBe(401);
 		const data = await response.json();
-		expect(data).toEqual({ error: 'Unauthorized' });
+		expect(data).toEqual({ error: { code: 'unauthorized', message: 'You must be signed in' } });
 	});
 
 	it('returns 400 if filename is missing', async () => {
@@ -33,8 +34,9 @@ describe('POST /api/upload/presigned', () => {
 
 		const response = await POST(event);
 		expect(response.status).toBe(400);
-		const data = (await response.json()) as { error?: string };
-		expect(data.error).toBe('Filename is required');
+		const data = (await response.json()) as ApiErrorBody;
+		expect(data.error.message).toBe('Filename is required');
+		expect(data.error.fields).toHaveProperty('filename');
 	});
 
 	it('returns 400 if contentType is missing or invalid', async () => {
@@ -50,8 +52,8 @@ describe('POST /api/upload/presigned', () => {
 
 		const response = await POST(event);
 		expect(response.status).toBe(400);
-		const data = (await response.json()) as { error?: string };
-		expect(data.error).toContain('Invalid MIME type');
+		const data = (await response.json()) as ApiErrorBody;
+		expect(data.error.message).toContain('Invalid MIME type');
 	});
 
 	it('returns presigned URL details on valid request', async () => {

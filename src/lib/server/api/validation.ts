@@ -3,16 +3,30 @@ import { ApiError, type FieldErrors } from './errors';
 
 type AnySchema = v.GenericSchema | v.GenericSchemaAsync;
 
+function isMissingKey(issue: v.GenericIssue): boolean {
+	return issue.kind === 'schema' && issue.type === 'object' && issue.input === undefined;
+}
+
+/** `contentType` → `Content type`, `profile.name` → `Name`. */
+function humanize(key: string): string {
+	const words = (key.split('.').pop() ?? key).replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
+	return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 async function validate<S extends AnySchema>(schema: S, input: unknown): Promise<v.InferOutput<S>> {
 	const result = await v.safeParseAsync(schema, input);
 	if (result.success) return result.output;
 
-	const flat = v.flatten(result.issues);
 	const fields: FieldErrors = {};
-	for (const [key, messages] of Object.entries(flat.nested ?? {})) {
-		if (messages?.[0]) fields[key] = messages[0];
+	let rootMessage: string | undefined;
+	for (const issue of result.issues) {
+		const key = v.getDotPath(issue);
+		// A missing key reports "Invalid key: …" instead of the entry's own message.
+		const message = key && isMissingKey(issue) ? `${humanize(key)} is required` : issue.message;
+		if (key === null) rootMessage ??= message;
+		else fields[key] ??= message;
 	}
-	const message = flat.root?.[0] ?? 'Invalid request';
+	const message = rootMessage ?? Object.values(fields)[0] ?? 'Invalid request';
 	throw new ApiError(400, 'validation_failed', message, fields);
 }
 

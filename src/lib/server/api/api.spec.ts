@@ -70,6 +70,12 @@ describe('parseBody', () => {
 		expect(err.code).toBe('invalid_json');
 	});
 
+	it('reports missing required fields by name', async () => {
+		const err = await catchApiError(parseBody(jsonRequest('{}'), schema));
+		expect(err.fields).toEqual({ content: 'Content is required' });
+		expect(err.message).toBe('Content is required');
+	});
+
 	it('rejects invalid fields with per-field messages', async () => {
 		const err = await catchApiError(parseBody(jsonRequest('{"content":""}'), schema));
 		expect(err.status).toBe(400);

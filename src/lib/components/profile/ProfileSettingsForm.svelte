@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { readApiError } from '$lib/utils/api-error';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import Button from '$lib/components/shared/Button.svelte';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
@@ -253,19 +254,16 @@
 				body: JSON.stringify(payload)
 			});
 
-			const data = (await response.json()) as {
-				field?: string;
-				error?: string;
-				user?: UserProfileData;
-			};
+			const data = (await response.json()) as { user?: UserProfileData };
 
 			if (!response.ok) {
-				if (response.status === 409 && data.field) {
-					fieldErrors = { [data.field]: data.error || 'This handle is already taken' };
+				const apiError = readApiError(data, 'Failed to update profile');
+				if (apiError.fields && Object.keys(apiError.fields).length > 0) {
+					fieldErrors = apiError.fields;
 				} else {
-					formError = data.error || 'Failed to update profile';
+					formError = apiError.message;
 				}
-				toast.show(data.error || 'Failed to update profile');
+				toast.show(apiError.message);
 				return;
 			}
 
