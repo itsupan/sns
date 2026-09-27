@@ -1,4 +1,5 @@
 import { AwsClient } from 'aws4fetch';
+import { getConfig } from '$lib/server/config';
 
 export interface PresignedUrlOptions {
 	filename: string;
@@ -14,18 +15,9 @@ export interface PresignedUrlResult {
 	key: string;
 }
 
-const ALLOWED_MIME_TYPES = new Set([
-	'image/jpeg',
-	'image/png',
-	'image/webp',
-	'image/gif',
-	'image/avif',
-	'video/mp4',
-	'video/webm',
-	'video/quicktime'
-]);
-
-const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+function formatMegabytes(bytes: number): string {
+	return String(Math.round((bytes / (1024 * 1024)) * 10) / 10);
+}
 
 export function isValidCredential(val: string | undefined): boolean {
 	return Boolean(val && val.trim() !== '' && !val.includes('replace-me'));
@@ -142,7 +134,7 @@ export function isPresignedUrlExpired(
 export async function generatePresignedGetUrl(
 	env: Partial<Env> | undefined,
 	key: string,
-	expiresSeconds = 7 * 24 * 3600 // 7 days (maximum allowed by AWS SigV4)
+	expiresSeconds = getConfig(env).mediaUrlTtlSec
 ): Promise<string> {
 	// If R2_PUBLIC_URL is configured, prefer the permanent public CDN URL
 	if (env?.R2_PUBLIC_URL && isValidCredential(env.R2_PUBLIC_URL)) {
@@ -265,19 +257,18 @@ export async function generatePresignedUploadUrl(
 	options: PresignedUrlOptions
 ): Promise<PresignedUrlResult> {
 	const { filename, contentType, size, userId, prefix = 'avatars' } = options;
+	const { allowedMimeTypes, maxBytes } = getConfig(env).upload;
 
 	// Validate content type
-	if (!ALLOWED_MIME_TYPES.has(contentType)) {
+	if (!allowedMimeTypes.has(contentType)) {
 		throw new Error(
-			`Invalid MIME type: "${contentType}". Allowed types: ${Array.from(ALLOWED_MIME_TYPES).join(', ')}`
+			`Invalid MIME type: "${contentType}". Allowed types: ${Array.from(allowedMimeTypes).join(', ')}`
 		);
 	}
 
 	// Validate size if provided
-	if (size !== undefined && size > MAX_FILE_SIZE_BYTES) {
-		throw new Error(
-			`File size exceeds maximum allowed limit of ${MAX_FILE_SIZE_BYTES / (1024 * 1024)}MB`
-		);
+	if (size !== undefined && size > maxBytes) {
+		throw new Error(`File size exceeds maximum allowed limit of ${formatMegabytes(maxBytes)}MB`);
 	}
 
 	// Generate a safe unique key
