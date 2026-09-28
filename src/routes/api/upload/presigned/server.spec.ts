@@ -75,4 +75,25 @@ describe('POST /api/upload/presigned', () => {
 		expect(data).toHaveProperty('key');
 		expect(data.key).toContain('avatars/user-1/');
 	});
+
+	it('puts story uploads under stories/<userId>/ and rejects unknown folders', async () => {
+		const call = (folder: unknown) =>
+			POST({
+				locals: { user: { id: 'user-1' } },
+				request: new Request('http://localhost/api/upload/presigned', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ filename: 'clip.mp4', contentType: 'video/mp4', folder })
+				}),
+				platform: { env: {} }
+			} as unknown as RequestEvent);
+
+		const ok = await call('stories');
+		expect(ok.status).toBe(200);
+		expect(((await ok.json()) as { key: string }).key).toMatch(/^stories\/user-1\//);
+
+		const bad = await call('secrets');
+		expect(bad.status).toBe(400);
+		expect(((await bad.json()) as ApiErrorBody).error.fields).toHaveProperty('folder');
+	});
 });

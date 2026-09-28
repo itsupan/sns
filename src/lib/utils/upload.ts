@@ -4,7 +4,11 @@ export interface UploadOptions {
 	maxSizeMb?: number;
 	allowedTypes?: string[];
 	optimize?: boolean;
+	/** R2 folder for the object key; defaults to 'avatars' on the server. */
+	folder?: UploadFolder;
 }
+
+export type UploadFolder = 'avatars' | 'posts' | 'stories';
 
 export interface UploadResult {
 	uploadUrl: string;
@@ -108,11 +112,14 @@ export async function optimizeAvatarImage(
 /**
  * Requests a pre-signed URL from the backend for uploading a file to Cloudflare R2.
  */
-export async function getPresignedUploadUrl(file: {
-	name: string;
-	type: string;
-	size: number;
-}): Promise<UploadResult> {
+export async function getPresignedUploadUrl(
+	file: {
+		name: string;
+		type: string;
+		size: number;
+	},
+	folder?: UploadFolder
+): Promise<UploadResult> {
 	const response = await fetch('/api/upload/presigned', {
 		method: 'POST',
 		headers: {
@@ -121,7 +128,8 @@ export async function getPresignedUploadUrl(file: {
 		body: JSON.stringify({
 			filename: file.name,
 			contentType: file.type || 'application/octet-stream',
-			size: file.size
+			size: file.size,
+			folder
 		})
 	});
 
@@ -151,7 +159,8 @@ export async function uploadToR2(file: File, options: UploadOptions = {}): Promi
 		maxSizeMb = DEFAULT_MAX_SIZE_MB,
 		allowedTypes = DEFAULT_ALLOWED_TYPES,
 		optimize = true,
-		onProgress
+		onProgress,
+		folder
 	} = options;
 
 	// Validate original file type
@@ -169,7 +178,7 @@ export async function uploadToR2(file: File, options: UploadOptions = {}): Promi
 	const fileToUpload = optimize ? await optimizeAvatarImage(file) : file;
 
 	// Step 2: Request pre-signed URL from backend
-	const presigned = await getPresignedUploadUrl(fileToUpload);
+	const presigned = await getPresignedUploadUrl(fileToUpload, folder);
 
 	// Step 3: Perform direct PUT request to Cloudflare R2
 	if (typeof XMLHttpRequest !== 'undefined' && onProgress) {

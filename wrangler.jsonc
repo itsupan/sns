@@ -17,6 +17,7 @@
 		"RATE_LIMIT_COMMENT": "20/60",
 		"RATE_LIMIT_LIKE": "60/60",
 		"RATE_LIMIT_FOLLOW": "30/60",
+		"RATE_LIMIT_CREATE_STORY": "10/60",
 		"RATE_LIMIT_UPLOAD_PRESIGN": "20/60",
 		"UPLOAD_MAX_BYTES": "52428800",
 		"UPLOAD_ALLOWED_MIME_TYPES": "image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime",
@@ -40,6 +41,12 @@
 		{
 			"binding": "KV",
 			"id": "00000000000000000000000000000000"
+		},
+		// Stories: one key per story (`story:<userId>:<ts>`) written with a 24h expirationTtl,
+		// so KV deletes them itself. Local dev simulates it; the id is a placeholder.
+		{
+			"binding": "STORIES",
+			"id": "00000000000000000000000000000001"
 		}
 	],
 
@@ -53,6 +60,7 @@
 				"RATE_LIMIT_COMMENT": "20/60",
 				"RATE_LIMIT_LIKE": "60/60",
 				"RATE_LIMIT_FOLLOW": "30/60",
+				"RATE_LIMIT_CREATE_STORY": "10/60",
 				"RATE_LIMIT_UPLOAD_PRESIGN": "20/60",
 				"UPLOAD_MAX_BYTES": "52428800",
 				"UPLOAD_ALLOWED_MIME_TYPES": "image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime",
@@ -77,6 +85,12 @@
 				{
 					"binding": "KV",
 					"id": "fa46fc4c9e684fbbb1f38509a177509b"
+				},
+				// No id: `wrangler deploy` auto-provisions this namespace on first deploy. To pin an
+				// existing one instead, run `wrangler kv namespace create STORIES --env production`
+				// and paste the printed id here.
+				{
+					"binding": "STORIES"
 				}
 			]
 		}
