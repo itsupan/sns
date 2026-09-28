@@ -1,5 +1,12 @@
 import { relations, sql } from 'drizzle-orm';
-import { sqliteTable, text, integer, index, uniqueIndex } from 'drizzle-orm/sqlite-core';
+import {
+	sqliteTable,
+	text,
+	integer,
+	index,
+	uniqueIndex,
+	primaryKey
+} from 'drizzle-orm/sqlite-core';
 import { user } from './auth-schema';
 
 export * from './auth-schema';
@@ -16,7 +23,8 @@ export const post = sqliteTable(
 		aspectRatio: text('aspect_ratio').default('1:1'), // '1:1' | '4:5' | '16:9'
 		location: text('location'), // e.g. "Fondazione Prada, Milano"
 		cameraMeta: text('camera_meta'),
-		tags: text('tags'), // JSON string array of tags e.g. ["#MinimalArchitecture"]
+		// Legacy JSON tags: superseded by tag/post_tag, still dual-written until the contract step.
+		tags: text('tags'),
 		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article'
 		likesCount: integer('likes_count').default(0).notNull(),
 		commentsCount: integer('comments_count').default(0).notNull(),
@@ -56,6 +64,36 @@ export const postMedia = sqliteTable(
 			.notNull()
 	},
 	(table) => [uniqueIndex('post_media_postId_position_unique').on(table.postId, table.position)]
+);
+
+export const tag = sqliteTable('tag', {
+	id: text('id').primaryKey(),
+	// Lowercase name without '#': merges case variants (#WabiSabi = #wabisabi).
+	slug: text('slug').notNull().unique(),
+	// Display form of the first occurrence, without '#'.
+	name: text('name').notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+		.notNull()
+});
+
+export const postTag = sqliteTable(
+	'post_tag',
+	{
+		postId: text('post_id')
+			.notNull()
+			.references(() => post.id, { onDelete: 'cascade' }),
+		tagId: text('tag_id')
+			.notNull()
+			.references(() => tag.id, { onDelete: 'cascade' }),
+		// 0-based order as the author wrote them.
+		position: integer('position').notNull()
+	},
+	(table) => [
+		primaryKey({ columns: [table.postId, table.tagId] }),
+		// Posts by tag: WHERE tag_id = ?
+		index('post_tag_tagId_idx').on(table.tagId)
+	]
 );
 
 export const postLike = sqliteTable(
@@ -110,8 +148,24 @@ export const postRelations = relations(post, ({ one, many }) => ({
 		references: [user.id]
 	}),
 	media: many(postMedia),
+	tags: many(postTag),
 	likes: many(postLike),
 	comments: many(postComment)
+}));
+
+export const tagRelations = relations(tag, ({ many }) => ({
+	posts: many(postTag)
+}));
+
+export const postTagRelations = relations(postTag, ({ one }) => ({
+	post: one(post, {
+		fields: [postTag.postId],
+		references: [post.id]
+	}),
+	tag: one(tag, {
+		fields: [postTag.tagId],
+		references: [tag.id]
+	})
 }));
 
 export const postMediaRelations = relations(postMedia, ({ one }) => ({

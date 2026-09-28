@@ -8,7 +8,13 @@ import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
-import { loadPostMedia, notDeleted } from '$lib/server/db/posts';
+import {
+	attachTagsStatements,
+	loadPostMedia,
+	loadPostTags,
+	normalizeTags,
+	notDeleted
+} from '$lib/server/db/posts';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
 const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
@@ -44,7 +50,10 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 	}
 
 	const postIds = postRows.map((r) => r.post.id);
-	const mediaByPost = await loadPostMedia(locals.db, postIds);
+	const [mediaByPost, tagsByPost] = await Promise.all([
+		loadPostMedia(locals.db, postIds),
+		loadPostTags(locals.db, postIds)
+	]);
 
 	// Check which posts the current authenticated user has liked
 	const likedSet = new Set<string>();
@@ -82,15 +91,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 	}
 
 	const posts: PostData[] = postRows.map((r) => {
-		let parsedTags: string[] = [];
-		if (r.post.tags) {
-			try {
-				parsedTags = JSON.parse(r.post.tags);
-			} catch {
-				parsedTags = [];
-			}
-		}
-
+		const parsedTags = tagsByPost.get(r.post.id) ?? [];
 		const parsedMedia = mediaByPost.get(r.post.id) ?? [];
 
 		return {
@@ -176,13 +177,10 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 	const postType: 'photo' | 'story' | 'article' =
 		body.postType === 'story' || body.postType === 'article' ? body.postType : 'photo';
 
-	let tagsJson: string | null = null;
-	if (Array.isArray(body.tags)) {
-		const validTags = body.tags
-			.filter((t): t is string => typeof t === 'string' && t.trim().length > 0)
-			.map((t) => (t.startsWith('#') ? t : `#${t}`));
-		tagsJson = JSON.stringify(validTags);
-	}
+	const normalizedTags = normalizeTags(body.tags);
+	const tags = normalizedTags.map((t) => `#${t.name}`);
+	// Legacy JSON column, dual-written until the contract step of #33.
+	const tagsJson = Array.isArray(body.tags) ? JSON.stringify(tags) : null;
 
 	const newPostId = crypto.randomUUID();
 
@@ -201,23 +199,31 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		sharesCount: 0
 	});
 
-	// Post and its media land together.
-	if (mediaItems.length > 0) {
-		await locals.db.batch([
-			insertPost,
-			locals.db.insert(postMedia).values(
-				mediaItems.map((m, position) => ({
-					id: crypto.randomUUID(),
-					postId: newPostId,
-					url: m.url,
-					type: m.type,
-					position
-				}))
-			)
-		]);
-	} else {
-		await insertPost;
-	}
+	// Post, media and tags land together in one transaction.
+	const insertMedia =
+		mediaItems.length > 0
+			? [
+					locals.db.insert(postMedia).values(
+						mediaItems.map((m, position) => ({
+							id: crypto.randomUUID(),
+							postId: newPostId,
+							url: m.url,
+							type: m.type,
+							position
+						}))
+					)
+				]
+			: [];
+	await locals.db.batch([
+		insertPost,
+		...insertMedia,
+		...attachTagsStatements(locals.db, newPostId, normalizedTags)
+	]);
+	// Existing tags keep their original spelling, so read back what was stored.
+	const storedTags =
+		normalizedTags.length > 0
+			? ((await loadPostTags(locals.db, [newPostId])).get(newPostId) ?? [])
+			: [];
 
 	const createdPost: PostData = {
 		id: newPostId,
@@ -240,7 +246,7 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		aspectRatio,
 		location: location || currentUser.location || undefined,
 		cameraMeta: cameraMeta || undefined,
-		tags: tagsJson ? JSON.parse(tagsJson) : [],
+		tags: storedTags,
 		likes: 0,
 		commentsCount: 0,
 		repostsCount: 0,

@@ -27,6 +27,41 @@ VALUES
   ('media-post-5-0', 'post-5', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80', 'image', 0),
   ('media-post-6-0', 'post-6', 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&auto=format&fit=crop&q=80', 'image', 0);
 
+-- Tags (#33). Seeds run after migrations, so the 0007 backfill never sees the JSON above.
+-- #DesignArchive is shared by post-1 and post-5 (one tag row, two links).
+INSERT OR IGNORE INTO `tag` (`id`, `slug`, `name`)
+VALUES
+  ('tag-minimalarchitecture', 'minimalarchitecture', 'MinimalArchitecture'),
+  ('tag-lightandspace', 'lightandspace', 'LightAndSpace'),
+  ('tag-designarchive', 'designarchive', 'DesignArchive'),
+  ('tag-kyotoceramics', 'kyotoceramics', 'KyotoCeramics'),
+  ('tag-wabisabi', 'wabisabi', 'WabiSabi'),
+  ('tag-japanesecraft', 'japanesecraft', 'JapaneseCraft'),
+  ('tag-nordicdesign', 'nordicdesign', 'NordicDesign'),
+  ('tag-timberarchitecture', 'timberarchitecture', 'TimberArchitecture'),
+  ('tag-tactilespaces', 'tactilespaces', 'TactileSpaces'),
+  ('tag-alpineminimalism', 'alpineminimalism', 'AlpineMinimalism'),
+  ('tag-fjordlandscape', 'fjordlandscape', 'FjordLandscape'),
+  ('tag-rawearth', 'rawearth', 'RawEarth'),
+  ('tag-helicalform', 'helicalform', 'HelicalForm'),
+  ('tag-brutaliststairs', 'brutaliststairs', 'BrutalistStairs'),
+  ('tag-yakisugi', 'yakisugi', 'Yakisugi'),
+  ('tag-kyotocraft', 'kyotocraft', 'KyotoCraft'),
+  ('tag-japanesewoodwork', 'japanesewoodwork', 'JapaneseWoodwork');
+
+-- Link by slug (not id) so re-seeding works even when 0007 backfilled these tags with other ids.
+INSERT OR REPLACE INTO `post_tag` (`post_id`, `tag_id`, `position`)
+SELECT v.column1, t.`id`, v.column3
+FROM (VALUES
+  ('post-1', 'minimalarchitecture', 0), ('post-1', 'lightandspace', 1), ('post-1', 'designarchive', 2),
+  ('post-2', 'kyotoceramics', 0), ('post-2', 'wabisabi', 1), ('post-2', 'japanesecraft', 2),
+  ('post-3', 'nordicdesign', 0), ('post-3', 'timberarchitecture', 1), ('post-3', 'tactilespaces', 2),
+  ('post-4', 'alpineminimalism', 0), ('post-4', 'fjordlandscape', 1), ('post-4', 'rawearth', 2),
+  ('post-5', 'helicalform', 0), ('post-5', 'brutaliststairs', 1), ('post-5', 'designarchive', 2),
+  ('post-6', 'yakisugi', 0), ('post-6', 'kyotocraft', 1), ('post-6', 'japanesewoodwork', 2)
+) v
+JOIN `tag` t ON t.`slug` = v.column2;
+
 INSERT OR IGNORE INTO `post_comment` (`id`, `post_id`, `user_id`, `content`)
 VALUES
   ('cmt-1', 'post-1', 'usr_kai_dev', 'The texture gradation is immaculate. Concrete takes light like velvet here.'),

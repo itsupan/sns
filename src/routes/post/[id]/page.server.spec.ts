@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { load } from './+page.server';
 
-// Media now comes from post_media via loadPostMedia; stub it with fixture rows.
+// Media and tags come from post_media / post_tag via loaders; stub them.
 vi.mock('$lib/server/db/posts', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/db/posts')>();
 	const media: Record<string, Array<{ url: string; type: 'image' | 'video' }>> = {
@@ -13,7 +13,8 @@ vi.mock('$lib/server/db/posts', async (importOriginal) => {
 		loadPostMedia: vi.fn(
 			async (_db: unknown, ids: string[]) =>
 				new Map(ids.filter((id) => media[id]).map((id) => [id, media[id]]))
-		)
+		),
+		loadPostTags: vi.fn(async () => new Map<string, string[]>())
 	};
 });
 

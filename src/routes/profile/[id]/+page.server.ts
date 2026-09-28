@@ -5,7 +5,7 @@ import { formatTimeAgo } from '$lib/utils/format';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
 import { refreshMediaUrl } from '$lib/server/services/storage';
-import { loadPostMedia, notDeleted } from '$lib/server/db/posts';
+import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
 
 const FALLBACK_CURATORS: Record<
 	string,
@@ -131,22 +131,15 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					.where(and(eq(post.userId, targetUser.id as string), notDeleted))
 					.orderBy(desc(post.createdAt));
 
-				const mediaByPost = await loadPostMedia(
-					locals.db,
-					postRows.map((p) => p.id)
-				);
+				const postIds = postRows.map((p) => p.id);
+				const [mediaByPost, tagsByPost] = await Promise.all([
+					loadPostMedia(locals.db, postIds),
+					loadPostTags(locals.db, postIds)
+				]);
 
 				targetPosts = postRows.map((p) => {
 					const parsedMedia = mediaByPost.get(p.id) ?? [];
-
-					let parsedTags: string[] = [];
-					if (p.tags) {
-						try {
-							parsedTags = JSON.parse(p.tags);
-						} catch {
-							parsedTags = [];
-						}
-					}
+					const parsedTags = tagsByPost.get(p.id) ?? [];
 
 					return {
 						id: p.id,
