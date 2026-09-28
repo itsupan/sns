@@ -90,12 +90,6 @@ describe('Profile +page.server.ts', () => {
 			userId: 'user-auth-1',
 			title: 'Tea Bowl',
 			content: 'A study on clay',
-			mediaUrl: 'https://example.com/bowl.jpg',
-			mediaType: 'image',
-			mediaUrls: JSON.stringify([
-				{ url: 'https://example.com/bowl.jpg', type: 'image' },
-				{ url: 'https://example.com/bowl2.jpg', type: 'image' }
-			]),
 			likesCount: 15,
 			commentsCount: 3,
 			createdAt: new Date()

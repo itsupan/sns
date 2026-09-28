@@ -13,10 +13,6 @@ export const post = sqliteTable(
 			.references(() => user.id, { onDelete: 'cascade' }),
 		title: text('title'),
 		content: text('content').notNull(),
-		// Legacy media columns: superseded by post_media, still dual-written until the contract migration.
-		mediaUrl: text('media_url'),
-		mediaType: text('media_type').default('none').notNull(), // 'image' | 'video' | 'none'
-		mediaUrls: text('media_urls'), // JSON string array of media items: [{ url: string, type: 'image' | 'video' }]
 		aspectRatio: text('aspect_ratio').default('1:1'), // '1:1' | '4:5' | '16:9'
 		location: text('location'), // e.g. "Fondazione Prada, Milano"
 		cameraMeta: text('camera_meta'),
