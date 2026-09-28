@@ -64,9 +64,7 @@ describe('GET /api/posts', () => {
 						where: vi.fn(() => ({
 							orderBy: vi.fn(() =>
 								Object.assign(Promise.resolve([]), {
-									limit: vi.fn(() => ({
-										offset: vi.fn(async () => mockPosts)
-									}))
+									limit: vi.fn(async () => mockPosts)
 								})
 							)
 						}))
@@ -76,7 +74,7 @@ describe('GET /api/posts', () => {
 			}))
 		};
 
-		const url = new URL('http://localhost/api/posts?limit=10&offset=0');
+		const url = new URL('http://localhost/api/posts?limit=10');
 		const event = {
 			url,
 			locals: { db, user: null }
@@ -106,9 +104,7 @@ describe('GET /api/posts', () => {
 					innerJoin: vi.fn(() => ({
 						where: vi.fn(() => ({
 							orderBy: vi.fn(() => ({
-								limit: vi.fn(() => ({
-									offset: vi.fn(async () => [])
-								}))
+								limit: vi.fn(async () => [])
 							}))
 						}))
 					}))

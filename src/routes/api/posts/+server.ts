@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import * as v from 'valibot';
-import { eq, desc, inArray } from 'drizzle-orm';
+import { eq, desc, inArray, lt, and, or, type SQL } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post, postLike, postComment, postMedia, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
@@ -25,7 +25,22 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 		Math.max(Number(url.searchParams.get('limit')) || defaultPageSize, 1),
 		maxPageSize
 	);
-	const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
+	const cursorParam = url.searchParams.get('cursor');
+
+	let paginationCondition: SQL | undefined = notDeleted;
+	if (cursorParam) {
+		const [createdAtStr, idStr] = cursorParam.split('_');
+		if (createdAtStr && idStr) {
+			const cursorCreatedAt = new Date(parseInt(createdAtStr, 10));
+			paginationCondition = and(
+				notDeleted,
+				or(
+					lt(post.createdAt, cursorCreatedAt),
+					and(eq(post.createdAt, cursorCreatedAt), lt(post.id, idStr))
+				)
+			);
+		}
+	}
 
 	const postRows = await locals.db
 		.select({
@@ -40,13 +55,12 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 		})
 		.from(post)
 		.innerJoin(user, eq(post.userId, user.id))
-		.where(notDeleted)
-		.orderBy(desc(post.createdAt))
-		.limit(limit)
-		.offset(offset);
+		.where(paginationCondition)
+		.orderBy(desc(post.createdAt), desc(post.id))
+		.limit(limit);
 
 	if (postRows.length === 0) {
-		return json({ posts: [], hasMore: false, nextOffset: null });
+		return json({ posts: [], hasMore: false, nextCursor: null });
 	}
 
 	const postIds = postRows.map((r) => r.post.id);
@@ -129,8 +143,9 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 	);
 
 	const hasMore = postRows.length === limit;
-	const nextOffset = hasMore ? offset + limit : null;
-	return json({ posts: refreshedPosts, hasMore, nextOffset });
+	const lastPost = postRows[postRows.length - 1];
+	const nextCursor = hasMore ? `${lastPost.post.createdAt.getTime()}_${lastPost.post.id}` : null;
+	return json({ posts: refreshedPosts, hasMore, nextCursor });
 });
 
 export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
