@@ -59,14 +59,12 @@ describe('GET /api/posts', () => {
 			select: vi.fn(() => ({
 				from: vi.fn(() => ({
 					innerJoin: vi.fn(() => ({
-						// Feed query: .where(notDeleted).orderBy().limit().offset();
+						// Feed query: .where(notDeleted).orderBy().limit();
 						// comment previews: .where().orderBy() awaited directly.
 						where: vi.fn(() => ({
 							orderBy: vi.fn(() =>
 								Object.assign(Promise.resolve([]), {
-									limit: vi.fn(() => ({
-										offset: vi.fn(async () => mockPosts)
-									}))
+									limit: vi.fn(async () => mockPosts)
 								})
 							)
 						}))
@@ -76,7 +74,7 @@ describe('GET /api/posts', () => {
 			}))
 		};
 
-		const url = new URL('http://localhost/api/posts?limit=10&offset=0');
+		const url = new URL('http://localhost/api/posts?limit=10');
 		const event = {
 			url,
 			locals: { db, user: null }
@@ -106,9 +104,7 @@ describe('GET /api/posts', () => {
 					innerJoin: vi.fn(() => ({
 						where: vi.fn(() => ({
 							orderBy: vi.fn(() => ({
-								limit: vi.fn(() => ({
-									offset: vi.fn(async () => [])
-								}))
+								limit: vi.fn(async () => [])
 							}))
 						}))
 					}))

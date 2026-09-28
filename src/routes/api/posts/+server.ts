@@ -27,7 +27,6 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 		Math.max(Number(url.searchParams.get('limit')) || defaultPageSize, 1),
 		maxPageSize
 	);
-	const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
 
 	const rawCursor = url.searchParams.get('cursor');
 	const cursor = rawCursor ? decodeCursor(rawCursor) : null;
@@ -35,11 +34,11 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 		throw new ApiError(400, 'validation_failed', 'Invalid cursor', { cursor: 'Invalid cursor' });
 	}
 
-	const page = await loadFeedPage(locals.db, { limit, cursor, offset });
+	const page = await loadFeedPage(locals.db, { limit, cursor });
 	const postRows = page.rows;
 
 	if (postRows.length === 0) {
-		return json({ posts: [], hasMore: false, nextCursor: null, nextOffset: null });
+		return json({ posts: [], hasMore: false, nextCursor: null });
 	}
 
 	const postIds = postRows.map((r) => r.post.id);
@@ -124,9 +123,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 	return json({
 		posts: refreshedPosts,
 		hasMore: page.hasMore,
-		nextCursor: page.nextCursor,
-		// Legacy: the current client still pages by offset until #52 switches it to nextCursor.
-		nextOffset: page.hasMore && !cursor ? offset + limit : null
+		nextCursor: page.nextCursor
 	});
 });
 
