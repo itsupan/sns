@@ -125,7 +125,7 @@ describe('DELETE /api/posts/:id', () => {
 
 		const res = await DELETE(event);
 		expect(res.status).toBe(204);
-		
+
 		// Ensure that update was called (soft delete)
 		expect(updateMock).toHaveBeenCalled();
 	});

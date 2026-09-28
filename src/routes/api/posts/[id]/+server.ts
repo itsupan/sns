@@ -1,4 +1,4 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
+import type { RequestHandler } from '@sveltejs/kit';
 import { eq, and } from 'drizzle-orm';
 import { post } from '$lib/server/db/schema';
 import { ApiError, requireUser, withApi } from '$lib/server/api';
