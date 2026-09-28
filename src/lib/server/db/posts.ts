@@ -1,9 +1,72 @@
-import { asc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database } from '.';
-import { post, postMedia, postTag, tag } from './schema';
+import { post, postMedia, postTag, tag, user } from './schema';
 
 /** Every read or write of a post must exclude soft-deleted rows (see `post.deletedAt`). */
 export const notDeleted = isNull(post.deletedAt);
+
+/** Position in the feed: the last post seen, ordered by (created_at, id) descending. */
+export interface FeedCursor {
+	createdAt: number;
+	id: string;
+}
+
+/** Opaque-ish cursor `<createdAtMs>_<postId>` (post ids may contain '_', so split on the first). */
+export function encodeCursor({ createdAt, id }: { createdAt: Date; id: string }): string {
+	return `${createdAt.getTime()}_${id}`;
+}
+
+export function decodeCursor(raw: string): FeedCursor | null {
+	const match = /^(\d{1,16})_(.+)$/.exec(raw);
+	if (!match) return null;
+	const createdAt = Number(match[1]);
+	return Number.isSafeInteger(createdAt) ? { createdAt, id: match[2] } : null;
+}
+
+/**
+ * One feed page, newest first. With `cursor`, uses keyset pagination on (created_at, id),
+ * served by `post_createdAt_id_idx`, so posts added while scrolling never shift later pages.
+ * `offset` is the legacy fallback while old clients still send it (removed with #52).
+ * Fetches one extra row to know whether another page exists.
+ */
+export async function loadFeedPage(
+	db: Database,
+	{ limit, cursor, offset = 0 }: { limit: number; cursor?: FeedCursor | null; offset?: number }
+) {
+	const rows = await db
+		.select({
+			post: post,
+			user: {
+				id: user.id,
+				name: user.name,
+				handle: user.handle,
+				image: user.image,
+				location: user.location
+			}
+		})
+		.from(post)
+		.innerJoin(user, eq(post.userId, user.id))
+		.where(
+			and(
+				notDeleted,
+				cursor
+					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
+					: undefined
+			)
+		)
+		.orderBy(desc(post.createdAt), desc(post.id))
+		.limit(limit + 1)
+		.offset(cursor ? 0 : offset);
+
+	const hasMore = rows.length > limit;
+	const page = hasMore ? rows.slice(0, limit) : rows;
+	const last = page.at(-1);
+	return {
+		rows: page,
+		hasMore,
+		nextCursor: hasMore && last ? encodeCursor(last.post) : null
+	};
+}
 
 export interface MediaItem {
 	url: string;

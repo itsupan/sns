@@ -38,6 +38,7 @@ describe('home page', () => {
 						}
 					],
 					hasMore: false,
+					nextCursor: null,
 					pageSize: 10
 				}
 			}

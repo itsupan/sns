@@ -10,10 +10,11 @@ import { getConfig } from '$lib/server/config';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
 	attachTagsStatements,
+	decodeCursor,
+	loadFeedPage,
 	loadPostMedia,
 	loadPostTags,
-	normalizeTags,
-	notDeleted
+	normalizeTags
 } from '$lib/server/db/posts';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
@@ -27,26 +28,17 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 	);
 	const offset = Math.max(Number(url.searchParams.get('offset')) || 0, 0);
 
-	const postRows = await locals.db
-		.select({
-			post: post,
-			user: {
-				id: user.id,
-				name: user.name,
-				handle: user.handle,
-				image: user.image,
-				location: user.location
-			}
-		})
-		.from(post)
-		.innerJoin(user, eq(post.userId, user.id))
-		.where(notDeleted)
-		.orderBy(desc(post.createdAt))
-		.limit(limit)
-		.offset(offset);
+	const rawCursor = url.searchParams.get('cursor');
+	const cursor = rawCursor ? decodeCursor(rawCursor) : null;
+	if (rawCursor && !cursor) {
+		throw new ApiError(400, 'validation_failed', 'Invalid cursor', { cursor: 'Invalid cursor' });
+	}
+
+	const page = await loadFeedPage(locals.db, { limit, cursor, offset });
+	const postRows = page.rows;
 
 	if (postRows.length === 0) {
-		return json({ posts: [], hasMore: false, nextOffset: null });
+		return json({ posts: [], hasMore: false, nextCursor: null, nextOffset: null });
 	}
 
 	const postIds = postRows.map((r) => r.post.id);
@@ -128,9 +120,13 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 		posts.map((p) => refreshPostMediaUrls(p, platform?.env))
 	);
 
-	const hasMore = postRows.length === limit;
-	const nextOffset = hasMore ? offset + limit : null;
-	return json({ posts: refreshedPosts, hasMore, nextOffset });
+	return json({
+		posts: refreshedPosts,
+		hasMore: page.hasMore,
+		nextCursor: page.nextCursor,
+		// Legacy: the current client still pages by offset until #52 switches it to nextCursor.
+		nextOffset: page.hasMore && !cursor ? offset + limit : null
+	});
 });
 
 export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
