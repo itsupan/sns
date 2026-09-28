@@ -25,14 +25,13 @@ export function decodeCursor(raw: string): FeedCursor | null {
 }
 
 /**
- * One feed page, newest first. With `cursor`, uses keyset pagination on (created_at, id),
- * served by `post_createdAt_id_idx`, so posts added while scrolling never shift later pages.
- * `offset` is the legacy fallback while old clients still send it (removed with #52).
+ * One feed page, newest first, using keyset pagination on (created_at, id) served by
+ * `post_createdAt_id_idx`, so posts added while scrolling never shift later pages.
  * Fetches one extra row to know whether another page exists.
  */
 export async function loadFeedPage(
 	db: Database,
-	{ limit, cursor, offset = 0 }: { limit: number; cursor?: FeedCursor | null; offset?: number }
+	{ limit, cursor }: { limit: number; cursor?: FeedCursor | null }
 ) {
 	const rows = await db
 		.select({
@@ -56,8 +55,7 @@ export async function loadFeedPage(
 			)
 		)
 		.orderBy(desc(post.createdAt), desc(post.id))
-		.limit(limit + 1)
-		.offset(cursor ? 0 : offset);
+		.limit(limit + 1);
 
 	const hasMore = rows.length > limit;
 	const page = hasMore ? rows.slice(0, limit) : rows;

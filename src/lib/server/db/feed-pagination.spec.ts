@@ -10,7 +10,6 @@ interface FeedResponse {
 	posts: { id: string }[];
 	hasMore: boolean;
 	nextCursor: string | null;
-	nextOffset: number | null;
 }
 
 let t: TestDb;
@@ -116,11 +115,11 @@ describe('GET /api/posts cursor pagination on real D1', { timeout: REAL_D1_TIMEO
 		});
 	});
 
-	it('still supports legacy offset paging for current clients', async () => {
-		const first = await fetchPage('limit=5&offset=0');
-		expect(first.body.nextOffset).toBe(5);
-		const second = await fetchPage('limit=5&offset=5');
-		expect(second.body.posts.map((p) => p.id)).not.toContain(first.body.posts[0].id);
+	it('ignores the removed offset param and no longer returns nextOffset', async () => {
+		const first = await fetchPage('limit=5');
+		const withOffset = await fetchPage('limit=5&offset=5');
+		expect(withOffset.body.posts.map((p) => p.id)).toEqual(first.body.posts.map((p) => p.id));
+		expect(withOffset.body).not.toHaveProperty('nextOffset');
 	});
 
 	it('uses the (created_at, id) index without a temp sort', async () => {

@@ -7,6 +7,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import type { PageData } from './$types';
 	import type { PostData } from '$lib/components/feed/PostCard.svelte';
+	import { readApiError } from '$lib/utils/api-error';
 
 	const DEFAULT_POSTS: PostData[] = [
 		{
@@ -66,15 +67,12 @@
 	let initialPosts = $derived(data?.posts && data.posts.length > 0 ? data.posts : DEFAULT_POSTS);
 	let userCreatedPosts = $state<PostData[]>([]);
 	let paginatedPosts = $state<PostData[]>([]);
-	let serverHasMore = $state<boolean | null>(null);
-	let hasMore = $derived(
-		serverHasMore !== null
-			? serverHasMore
-			: data?.hasMore !== undefined
-				? data.hasMore
-				: initialPosts.length >= pageSize
-	);
+	// Keyset cursor for the next page; null once the feed is exhausted. `undefined` = use SSR's.
+	let loadedCursor = $state<string | null | undefined>(undefined);
+	let nextCursor = $derived(loadedCursor !== undefined ? loadedCursor : (data?.nextCursor ?? null));
+	let hasMore = $derived(nextCursor !== null);
 	let loadingMore = $state(false);
+	let loadError = $state<string | null>(null);
 	let sentinelEl = $state<HTMLDivElement | null>(null);
 
 	let posts = $derived.by(() => {
@@ -108,30 +106,30 @@
 	async function loadNextPage() {
 		if (loadingMore || !hasMore) return;
 		loadingMore = true;
+		loadError = null;
 		try {
-			const currentServerCount = initialPosts.length + paginatedPosts.length;
-			const res = await fetch(`/api/posts?limit=${pageSize}&offset=${currentServerCount}`);
-			if (!res.ok) {
-				serverHasMore = false;
+			const res = await fetch(
+				`/api/posts?limit=${pageSize}&cursor=${encodeURIComponent(nextCursor ?? '')}`
+			);
+			const result = (await res.json().catch(() => null)) as {
+				posts?: PostData[];
+				nextCursor?: string | null;
+			} | null;
+			if (!res.ok || !result) {
+				loadError = readApiError(result, 'Could not load more posts').message;
 				return;
 			}
-			const result = (await res.json()) as { posts?: PostData[]; hasMore?: boolean };
-			const nextPosts = result.posts || [];
-			if (nextPosts.length === 0) {
-				serverHasMore = false;
-			} else {
-				paginatedPosts = [...paginatedPosts, ...nextPosts];
-				serverHasMore = result.hasMore ?? nextPosts.length === pageSize;
-			}
+			paginatedPosts = [...paginatedPosts, ...(result.posts ?? [])];
+			loadedCursor = result.nextCursor ?? null;
 		} catch {
-			serverHasMore = false;
+			loadError = 'Could not load more posts';
 		} finally {
 			loadingMore = false;
 		}
 	}
 
 	$effect(() => {
-		if (!sentinelEl || !hasMore) return;
+		if (!sentinelEl || !hasMore || loadError) return;
 
 		const observer = new IntersectionObserver(
 			(entries) => {
@@ -177,7 +175,16 @@
 			{/each}
 		</div>
 
-		{#if hasMore}
+		{#if loadError}
+			<div class="py-8 flex flex-col items-center gap-2 text-center px-4" role="alert">
+				<p class="text-sm text-slate-600 dark:text-slate-300">{loadError}</p>
+				<button
+					type="button"
+					class="text-xs font-medium underline text-slate-800 dark:text-slate-200"
+					onclick={loadNextPage}>Try again</button
+				>
+			</div>
+		{:else if hasMore}
 			<!-- Sentinel element positioned preemptively for seamless infinite scroll -->
 			<div
 				bind:this={sentinelEl}
