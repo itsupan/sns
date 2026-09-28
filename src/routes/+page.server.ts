@@ -1,10 +1,10 @@
 import { eq, desc, inArray } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
-import { post, postLike, postComment, user } from '$lib/server/db/schema';
+import { postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
-import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
+import { loadFeedPage, loadPostMedia, loadPostTags } from '$lib/server/db/posts';
 import { getConfig } from '$lib/server/config';
 
 const FALLBACK_POSTS: PostData[] = [
@@ -83,25 +83,11 @@ const FALLBACK_POSTS: PostData[] = [
 export const load: PageServerLoad = async ({ locals, platform }) => {
 	const pageSize = getConfig(platform?.env).feed.defaultPageSize;
 	try {
-		const postRows = await locals.db
-			.select({
-				post: post,
-				user: {
-					id: user.id,
-					name: user.name,
-					handle: user.handle,
-					image: user.image,
-					location: user.location
-				}
-			})
-			.from(post)
-			.innerJoin(user, eq(post.userId, user.id))
-			.where(notDeleted)
-			.orderBy(desc(post.createdAt))
-			.limit(pageSize);
+		const page = await loadFeedPage(locals.db, { limit: pageSize });
+		const postRows = page.rows;
 
 		if (postRows.length === 0) {
-			return { posts: FALLBACK_POSTS, hasMore: false, pageSize };
+			return { posts: FALLBACK_POSTS, hasMore: false, nextCursor: null, pageSize };
 		}
 
 		const postIds = postRows.map((r) => r.post.id);
@@ -181,9 +167,14 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			posts.map((p) => refreshPostMediaUrls(p, platform?.env))
 		);
 
-		return { posts: refreshedPosts, hasMore: postRows.length === pageSize, pageSize };
+		return {
+			posts: refreshedPosts,
+			hasMore: page.hasMore,
+			nextCursor: page.nextCursor,
+			pageSize
+		};
 	} catch (err) {
 		console.error('Failed to load feed posts from database:', err);
-		return { posts: FALLBACK_POSTS, hasMore: false, pageSize };
+		return { posts: FALLBACK_POSTS, hasMore: false, nextCursor: null, pageSize };
 	}
 };
