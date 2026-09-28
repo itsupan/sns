@@ -54,7 +54,10 @@ export function authOptions(env: Env) {
 				title: { type: 'string', required: false },
 				website: { type: 'string', required: false },
 				location: { type: 'string', required: false },
-				cameraGear: { type: 'string', required: false }
+				cameraGear: { type: 'string', required: false },
+				// Denormalized follow counters, recomputed in the follow/unfollow batch; never user input.
+				followersCount: { type: 'number', required: true, defaultValue: 0, input: false },
+				followingCount: { type: 'number', required: true, defaultValue: 0, input: false }
 			}
 		}
 	} satisfies BetterAuthOptions;

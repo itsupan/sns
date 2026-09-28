@@ -4,6 +4,7 @@ import { eq, desc, inArray } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post, postLike, postComment, postMedia, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
+import { loadFollowedIds } from '$lib/server/db/follows';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
@@ -49,6 +50,11 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 	]);
 
 	// Check which posts the current authenticated user has liked
+	const followedAuthors = await loadFollowedIds(
+		locals.db,
+		locals.user?.id,
+		postRows.map((r) => r.user.id)
+	);
 	const likedSet = new Set<string>();
 	if (locals.user) {
 		const userLikes = await locals.db
@@ -97,7 +103,8 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 					: `@${r.user.name.toLowerCase().replace(/\s+/g, '')}`,
 				avatar: r.user.image || '',
 				location: r.post.location || r.user.location || undefined,
-				timeAgo: formatTimeAgo(r.post.createdAt)
+				timeAgo: formatTimeAgo(r.post.createdAt),
+				isFollowing: followedAuthors.has(r.user.id)
 			},
 			title: r.post.title || '',
 			description: r.post.content,

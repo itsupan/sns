@@ -3,6 +3,7 @@ import { eq, and, ne } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { user } from '$lib/server/db/schema';
+import { isFollowing } from '$lib/server/db/follows';
 import { ApiError, apiError, parseBody, requireUser, withApi } from '$lib/server/api';
 
 /** Optional nullable text field: `null` or `''` clears it, otherwise trimmed and length-checked. */
@@ -73,6 +74,8 @@ export const GET: RequestHandler = withApi(async ({ params, locals }) => {
 			website: user.website,
 			location: user.location,
 			cameraGear: user.cameraGear,
+			followersCount: user.followersCount,
+			followingCount: user.followingCount,
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt
 		})
@@ -84,7 +87,12 @@ export const GET: RequestHandler = withApi(async ({ params, locals }) => {
 		return apiError(404, 'not_found', 'User not found');
 	}
 
-	return json({ user: rows[0] });
+	// Whether the signed-in viewer follows this user; always false for anonymous viewers and yourself.
+	const viewerId = locals.user?.id;
+	const following =
+		viewerId && viewerId !== userId ? await isFollowing(locals.db, viewerId, userId) : false;
+
+	return json({ user: { ...rows[0], isFollowing: following } });
 });
 
 export const PATCH: RequestHandler = withApi(async ({ params, request, locals }) => {

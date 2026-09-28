@@ -15,7 +15,11 @@ const USERS = Array.from({ length: 20 }, (_, i) => `u-${i}`);
 
 beforeAll(async () => {
 	({ db, dispose } = await createTestDb());
-	await db.insert(user).values(USERS.map((id) => ({ id, name: id, email: `${id}@test.dev` })));
+	// One statement per user: a single multi-row insert would exceed D1's 100 bound variables.
+	const [first, ...rest] = USERS.map((id) =>
+		db.insert(user).values({ id, name: id, email: `${id}@test.dev` })
+	);
+	await db.batch([first, ...rest]);
 	await db.insert(post).values({ id: 'p-1', userId: 'u-0', content: 'hello' });
 }, 60_000);
 

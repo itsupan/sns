@@ -127,4 +127,68 @@ describe('PostCard component', () => {
 		await expect.element(screen.getByText('Original caption')).not.toBeInTheDocument();
 		expect(onDelete).toHaveBeenCalledWith('own-1');
 	});
+
+	const otherPost: PostData = {
+		...ownPost,
+		id: 'other-1',
+		author: { id: 'author-9', name: 'Aoi', handle: '@aoi', avatar: '', isFollowing: false }
+	};
+
+	it('links the author to their profile, and your own posts to /profile', async () => {
+		const other = render(PostCard, { props: { post: otherPost } });
+		await expect
+			.element(other.getByRole('link', { name: 'Aoi', exact: true }))
+			.toHaveAttribute('href', '/profile/author-9');
+		await expect
+			.element(other.getByRole('link', { name: "View Aoi's profile" }))
+			.toHaveAttribute('href', '/profile/author-9');
+		other.unmount();
+
+		const own = render(PostCard, { props: { post: ownPost } });
+		await expect
+			.element(own.getByRole('link', { name: 'Owner', exact: true }))
+			.toHaveAttribute('href', '/profile');
+		// No follow button on your own post.
+		expect(own.getByRole('button', { name: 'Follow', exact: true }).query()).toBeNull();
+	});
+
+	it('follows and unfollows the author, keeping every card by them in sync', async () => {
+		const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
+			Response.json({ following: init?.method === 'POST', followersCount: 1 })
+		);
+		vi.stubGlobal('fetch', fetchMock);
+		const screen = render(PostCard, { props: { post: otherPost } });
+		render(PostCard, { props: { post: { ...otherPost, id: 'other-2' } } });
+
+		const follow = screen.getByRole('button', { name: 'Follow', exact: true });
+		const following = screen.getByRole('button', { name: 'Following', exact: true });
+		await expect.element(follow.nth(1)).toBeInTheDocument();
+
+		await follow.first().click();
+		// Both cards by the same author switch together.
+		await expect.element(following.nth(1)).toBeInTheDocument();
+		expect(follow.query()).toBeNull();
+		expect(fetchMock).toHaveBeenCalledWith('/api/users/author-9/follow', { method: 'POST' });
+
+		await following.nth(1).click();
+		await expect.element(follow.nth(1)).toBeInTheDocument();
+		expect(following.query()).toBeNull();
+		expect(fetchMock).toHaveBeenCalledWith('/api/users/author-9/follow', { method: 'DELETE' });
+	});
+
+	it('rolls back the follow button when the request fails', async () => {
+		const fetchMock = vi.fn(async () =>
+			Response.json({ error: { code: 'rate_limited', message: 'Slow down' } }, { status: 429 })
+		);
+		vi.stubGlobal('fetch', fetchMock);
+		const screen = render(PostCard, {
+			props: { post: { ...otherPost, author: { ...otherPost.author, id: 'author-10' } } }
+		});
+		await screen.getByRole('button', { name: 'Follow', exact: true }).click();
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled());
+		await expect
+			.element(screen.getByRole('button', { name: 'Follow', exact: true }))
+			.toBeInTheDocument();
+		expect(screen.getByRole('button', { name: 'Following', exact: true }).query()).toBeNull();
+	});
 });

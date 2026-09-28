@@ -156,10 +156,20 @@ export const userFollow = sqliteTable(
 			.notNull()
 	},
 	(table) => [
-		// The PK serves "who does X follow" (WHERE follower_id = ?).
+		// One row per pair: makes follow idempotent (INSERT … ON CONFLICT DO NOTHING).
 		primaryKey({ columns: [table.followerId, table.followingId] }),
-		// Followers of a user: WHERE following_id = ?
-		index('user_follow_followingId_idx').on(table.followingId)
+		// Followers list: WHERE following_id = ? ORDER BY created_at DESC, follower_id DESC.
+		index('user_follow_followingId_createdAt_idx').on(
+			table.followingId,
+			table.createdAt,
+			table.followerId
+		),
+		// Following list: WHERE follower_id = ? ORDER BY created_at DESC, following_id DESC.
+		index('user_follow_followerId_createdAt_idx').on(
+			table.followerId,
+			table.createdAt,
+			table.followingId
+		)
 	]
 );
 

@@ -11,6 +11,9 @@
 	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
 	import { readApiError } from '$lib/utils/api-error';
+	import { followStore } from '$lib/utils/follow.svelte';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	export interface PostAuthor {
 		id?: string;
@@ -19,6 +22,8 @@
 		avatar: string;
 		location?: string;
 		timeAgo?: string;
+		/** Whether the viewer follows this author (false when signed out or for your own posts). */
+		isFollowing?: boolean;
 	}
 
 	export interface PostComment {
@@ -64,6 +69,8 @@
 		/** Called after the author deletes the post; the card hides itself either way. */
 		onDelete?: (id: string) => void;
 		onUpdate?: (post: PostData) => void;
+		/** Show Follow / Following next to the author (off on profile pages, where the header has it). */
+		showFollow?: boolean;
 	}
 
 	const defaultPost: PostData = {
@@ -118,7 +125,8 @@
 		onLike,
 		onSave,
 		onDelete,
-		onUpdate
+		onUpdate,
+		showFollow = true
 	}: Props = $props();
 
 	const session = authClient.useSession();
@@ -128,6 +136,38 @@
 	let deleted = $state(false);
 	let post = $derived<PostData>(edits ? { ...postProp, ...edits } : postProp);
 	let isOwner = $derived(Boolean(post.author.id && $session.data?.user?.id === post.author.id));
+
+	// Author's profile: your own posts go to /profile, demo posts without an id use the handle.
+	let profileHref = $derived(
+		isOwner
+			? resolve('/profile')
+			: resolve('/profile/[id]', {
+					id: post.author.id ?? post.author.handle.replace(/^@/, '')
+				})
+	);
+	let followingAuthor = $derived(
+		post.author.id ? followStore.isFollowing(post.author.id, post.author.isFollowing) : false
+	);
+	let canFollow = $derived(showFollow && Boolean(post.author.id) && !isOwner);
+
+	async function toggleFollowAuthor() {
+		const authorId = post.author.id;
+		if (!authorId || followStore.isPending(authorId)) return;
+		if (!$session.data?.user) {
+			toast.show('Please log in to follow curators');
+			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
+			return;
+		}
+		const next = !followingAuthor;
+		try {
+			await followStore.set(authorId, next);
+			toast.show(next ? `Following ${post.author.name}` : `Unfollowed ${post.author.name}`);
+		} catch (err) {
+			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+		}
+	}
 	let editOpen = $state(false);
 	let confirmDeleteOpen = $state(false);
 	let deleting = $state(false);
@@ -373,15 +413,37 @@
 		<!-- Post Header: Author info & options -->
 		<header class="flex items-center justify-between px-4 lg:px-0">
 			<div class="flex items-center gap-3 min-w-0">
-				<Avatar src={post.author.avatar} name={post.author.name} size="md" />
+				<a
+					href={profileHref}
+					class="shrink-0 rounded-full"
+					aria-label={`View ${post.author.name}'s profile`}
+				>
+					<Avatar src={post.author.avatar} name={post.author.name} size="md" />
+				</a>
 				<div class="flex flex-col min-w-0">
 					<div class="flex items-center gap-1.5 leading-tight min-w-0">
-						<span class="font-semibold text-sm text-slate-900 dark:text-dark-text truncate">
+						<a
+							href={profileHref}
+							class="font-semibold text-sm text-slate-900 dark:text-dark-text truncate no-underline hover:underline"
+						>
 							{post.author.name}
-						</span>
+						</a>
 						<span class="text-xs text-slate-500 dark:text-dark-muted truncate">
 							{post.author.handle}
 						</span>
+						{#if canFollow}
+							<span class="text-xs text-slate-400 dark:text-dark-subtle" aria-hidden="true">•</span>
+							<button
+								type="button"
+								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followingAuthor
+									? 'text-slate-500 dark:text-dark-muted hover:text-slate-800 dark:hover:text-dark-text'
+									: 'text-blue-600 dark:text-kizuna-blue hover:text-blue-700'}"
+								aria-pressed={followingAuthor}
+								onclick={toggleFollowAuthor}
+							>
+								{followingAuthor ? 'Following' : 'Follow'}
+							</button>
+						{/if}
 					</div>
 					{#if post.location || post.author.location || post.author.timeAgo}
 						<span class="text-xs text-slate-500 dark:text-dark-subtle mt-0.5 truncate">

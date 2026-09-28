@@ -82,7 +82,8 @@ describe('GET /api/users/:id', () => {
 		const res = await GET(event);
 		expect(res.status).toBe(200);
 		const body = (await res.json()) as { user?: unknown };
-		expect(body.user).toEqual(mockUser);
+		// Anonymous viewer: never following.
+		expect(body.user).toEqual({ ...mockUser, isFollowing: false });
 	});
 });
 
