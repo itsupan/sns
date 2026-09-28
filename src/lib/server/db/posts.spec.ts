@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { createTestDb } from '$lib/server/testing/d1';
+import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
 import { post, user } from './schema';
 import { GET as listPosts } from '../../../routes/api/posts/+server';
 import { POST as toggleLike } from '../../../routes/api/posts/[id]/like/+server';
@@ -37,7 +37,7 @@ function call(handler: Handler, id: string, body?: unknown) {
 	return (handler as (e: typeof event) => Promise<Response>)(event);
 }
 
-describe('soft-deleted posts on real D1', () => {
+describe('soft-deleted posts on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 	it('are excluded from the feed', async () => {
 		const res = await call(listPosts as Handler, '');
 		const { posts } = (await res.json()) as { posts: { id: string }[] };

@@ -4,6 +4,12 @@ import { drizzle } from 'drizzle-orm/d1';
 import { getPlatformProxy } from 'wrangler';
 import * as schema from '$lib/server/db/schema';
 
+/**
+ * Per-test timeout for specs that use a real D1. Concurrency tests take ~1s alone but can exceed
+ * Vitest's 5s default when the full suite (incl. browser tests) competes for CPU.
+ */
+export const REAL_D1_TIMEOUT = 30_000;
+
 const MIGRATIONS_DIR = join(process.cwd(), 'migrations');
 
 async function applyMigrations(d1: D1Database, files: string[]) {

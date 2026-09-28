@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { count, eq } from 'drizzle-orm';
-import { createTestDb } from '$lib/server/testing/d1';
+import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
 import { post, postComment, postLike, user } from './schema';
 import { POST as toggleLike } from '../../../routes/api/posts/[id]/like/+server';
 import { POST as sharePost } from '../../../routes/api/posts/[id]/share/+server';
@@ -44,7 +44,7 @@ async function counters() {
 	return { row, likeRows: likes.n, commentRows: comments.n };
 }
 
-describe('counters on real D1', () => {
+describe('counters on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 	it('returns the new like state and count', async () => {
 		const liked = await call(toggleLike as Handler, 'u-0');
 		expect(await liked.json()).toEqual({ liked: true, likesCount: 1 });
