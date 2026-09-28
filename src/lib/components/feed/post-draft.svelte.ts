@@ -109,6 +109,7 @@ export class PostDraft {
 			this.activePlateIndex = this.mediaPlates.length - 1;
 
 			uploadToR2(file, {
+				folder: 'posts',
 				optimize: !isVideo,
 				onProgress: (pct) => {
 					this.mediaPlates = this.mediaPlates.map((p) =>

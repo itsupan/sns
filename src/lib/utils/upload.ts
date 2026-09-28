@@ -30,13 +30,26 @@ const DEFAULT_ALLOWED_TYPES = [
 const DEFAULT_MAX_SIZE_MB = 50;
 
 /**
- * Downscales and compresses an image on a client-side canvas before uploading.
- * Reduces 5MB-15MB camera photos to crisp ~40-80KB WebP files, making upload 100x faster.
+ * Resize/quality per upload folder, sized for how the image is displayed on a 2x screen:
+ * - avatars: shown at most ~112px, so 512px is plenty and keeps them tiny.
+ * - posts: the feed card is up to 672px wide (1344px at 2x); 2048px also covers the lightbox.
+ * - stories: full screen 9:16, i.e. 1080x1920 on most phones.
  */
-export async function optimizeAvatarImage(
+export const IMAGE_PRESETS: Record<UploadFolder, { maxDimension: number; quality: number }> = {
+	avatars: { maxDimension: 512, quality: 0.85 },
+	posts: { maxDimension: 2048, quality: 0.9 },
+	stories: { maxDimension: 1920, quality: 0.9 }
+};
+
+/**
+ * Downscales and compresses an image on a client-side canvas before uploading (WebP).
+ * Images already within `maxDimension` keep their size and are only re-encoded, and the
+ * original file is kept whenever re-encoding would not make it smaller.
+ */
+export async function optimizeImage(
 	file: File,
-	maxDimension = 512,
-	quality = 0.85
+	maxDimension = IMAGE_PRESETS.avatars.maxDimension,
+	quality = IMAGE_PRESETS.avatars.quality
 ): Promise<File> {
 	if (
 		!file.type.startsWith('image/') ||
@@ -80,6 +93,9 @@ export async function optimizeAvatarImage(
 				return;
 			}
 
+			// Smooth, high-quality downscaling (default 'low' makes large photos look soft/jagged).
+			ctx.imageSmoothingEnabled = true;
+			ctx.imageSmoothingQuality = 'high';
 			ctx.drawImage(img, 0, 0, width, height);
 
 			const outputFormat = 'image/webp';
@@ -107,6 +123,11 @@ export async function optimizeAvatarImage(
 
 		img.src = objectUrl;
 	});
+}
+
+/** Avatar preset of {@link optimizeImage}; kept for existing callers. */
+export function optimizeAvatarImage(file: File): Promise<File> {
+	return optimizeImage(file, IMAGE_PRESETS.avatars.maxDimension, IMAGE_PRESETS.avatars.quality);
 }
 
 /**
@@ -174,8 +195,11 @@ export async function uploadToR2(file: File, options: UploadOptions = {}): Promi
 		throw new Error(`File size exceeds maximum allowed limit of ${maxSizeMb}MB`);
 	}
 
-	// Step 1: Optimize/compress avatar if enabled (converts large photos to fast, lightweight files)
-	const fileToUpload = optimize ? await optimizeAvatarImage(file) : file;
+	// Step 1: Resize/compress for where the image will be shown (see IMAGE_PRESETS).
+	const preset = IMAGE_PRESETS[folder ?? 'avatars'];
+	const fileToUpload = optimize
+		? await optimizeImage(file, preset.maxDimension, preset.quality)
+		: file;
 
 	// Step 2: Request pre-signed URL from backend
 	const presigned = await getPresignedUploadUrl(fileToUpload, folder);
