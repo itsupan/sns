@@ -85,7 +85,6 @@ describe('home page', () => {
 
 			await expect.element(screen.getByText('Invalid cursor')).toBeInTheDocument();
 			await expect.element(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
-			window.scrollTo(0, document.body.scrollHeight);
 			await new Promise((r) => setTimeout(r, 300));
 			expect(fetchMock.calls).toHaveLength(1);
 		});
@@ -122,12 +121,15 @@ function mockFeedApi(respond: () => Response) {
 }
 
 // The sentinel sits below the stories bar, composer and first card, outside the test viewport,
-// and may render after the first scroll, so keep scrolling until the feed request fires.
+// and may mount after render, so keep scrolling it into view until the feed request fires.
 async function scrollUntilFetched(mock: { calls: string[] }) {
 	await expect
-		.poll(() => {
-			window.scrollTo(0, document.body.scrollHeight);
-			return mock.calls.length;
-		})
+		.poll(
+			() => {
+				document.querySelector('[data-testid="feed-sentinel"]')?.scrollIntoView();
+				return mock.calls.length;
+			},
+			{ timeout: 10_000 }
+		)
 		.toBeGreaterThan(0);
 }
