@@ -7,6 +7,7 @@ import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
+import { MAX_MEDIA_PER_POST, MAX_TAGS_PER_POST, MAX_TAG_LENGTH } from '$lib/constants/post-limits';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
 	attachTagsStatements,
@@ -162,6 +163,11 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		mediaItems = [{ url: body.mediaUrl.trim(), type: isVid ? 'video' : 'image' }];
 	}
 
+	if (mediaItems.length > MAX_MEDIA_PER_POST) {
+		const message = `A post can have at most ${MAX_MEDIA_PER_POST} media items`;
+		throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
+	}
+
 	const primaryMedia = mediaItems[0] ?? null;
 	const mediaUrl = primaryMedia?.url ?? null;
 	const mediaType = primaryMedia?.type ?? 'none';
@@ -174,6 +180,14 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		body.postType === 'story' || body.postType === 'article' ? body.postType : 'photo';
 
 	const normalizedTags = normalizeTags(body.tags);
+	if (normalizedTags.length > MAX_TAGS_PER_POST) {
+		const message = `A post can have at most ${MAX_TAGS_PER_POST} tags`;
+		throw new ApiError(400, 'validation_failed', message, { tags: message });
+	}
+	if (normalizedTags.some((t) => t.name.length > MAX_TAG_LENGTH)) {
+		const message = `Tags can be at most ${MAX_TAG_LENGTH} characters`;
+		throw new ApiError(400, 'validation_failed', message, { tags: message });
+	}
 
 	const newPostId = crypto.randomUUID();
 
