@@ -21,6 +21,8 @@ export interface AppConfig {
 	feed: { defaultPageSize: number; maxPageSize: number };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
 	mediaUrlTtlSec: number;
+	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
+	auth: { blockedSignupEmails: ReadonlySet<string> };
 }
 
 const MAX_SIGV4_TTL_SEC = 7 * 24 * 3600;
@@ -47,7 +49,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 		])
 	},
 	feed: { defaultPageSize: 10, maxPageSize: 50 },
-	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC
+	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
+	auth: { blockedSignupEmails: new Set() }
 };
 
 /** Env var name for each rate limit. Value format: `<limit>/<windowSeconds>`, e.g. `10/60`. */
@@ -84,6 +87,38 @@ const MimeList = v.pipe(
 			)
 	),
 	v.check((set) => set.size > 0)
+);
+
+/**
+ * Canonical form used to compare emails: trimmed and lowercased. Gmail ignores dots and
+ * `+suffix` in the local part, so those variants map to the same address.
+ */
+export function normalizeEmail(email: string): string {
+	const trimmed = email.trim().toLowerCase();
+	const at = trimmed.lastIndexOf('@');
+	if (at < 0) return trimmed;
+	let local = trimmed.slice(0, at);
+	let domain = trimmed.slice(at + 1);
+	if (domain === 'gmail.com' || domain === 'googlemail.com') {
+		local = local.split('+')[0].replaceAll('.', '');
+		domain = 'gmail.com';
+	}
+	return `${local}@${domain}`;
+}
+
+const EmailList = v.pipe(
+	v.string(),
+	v.transform(
+		(value) =>
+			new Set(
+				value
+					.split(',')
+					.map((e) => e.trim())
+					.filter(Boolean)
+					.map(normalizeEmail)
+			)
+	),
+	v.check((set) => [...set].every((e) => /^[^@\s]+@[^@\s]+$/.test(e)))
 );
 
 type Vars = Record<string, unknown>;
@@ -125,7 +160,15 @@ export function loadConfig(env: object | undefined): AppConfig {
 		mediaUrlTtlSec: Math.min(
 			read(vars, 'MEDIA_URL_TTL_SECONDS', PositiveInt, d.mediaUrlTtlSec),
 			MAX_SIGV4_TTL_SEC
-		)
+		),
+		auth: {
+			blockedSignupEmails: read(
+				vars,
+				'SIGNUP_BLOCKED_EMAILS',
+				EmailList,
+				d.auth.blockedSignupEmails
+			)
+		}
 	};
 }
 

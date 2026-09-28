@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_CONFIG, getConfig, loadConfig } from './config';
+import { DEFAULT_CONFIG, getConfig, loadConfig, normalizeEmail } from './config';
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -56,5 +56,24 @@ describe('getConfig', () => {
 		const env = { FEED_PAGE_SIZE: '7' };
 		expect(getConfig(env)).toBe(getConfig(env));
 		expect(getConfig(env).feed.defaultPageSize).toBe(7);
+	});
+});
+
+describe('SIGNUP_BLOCKED_EMAILS', () => {
+	it('normalizes emails, including Gmail dot and +suffix variants', () => {
+		expect(normalizeEmail('  Foo.Bar+spam@GMail.com ')).toBe('foobar@gmail.com');
+		expect(normalizeEmail('foo.bar@googlemail.com')).toBe('foobar@gmail.com');
+		// Other providers treat dots and + as significant.
+		expect(normalizeEmail('Foo.Bar+x@Example.com')).toBe('foo.bar+x@example.com');
+	});
+
+	it('parses a comma-separated list and ignores invalid values', () => {
+		const config = loadConfig({ SIGNUP_BLOCKED_EMAILS: ' A.b@gmail.com , x@y.dev ,' });
+		expect([...config.auth.blockedSignupEmails]).toEqual(['ab@gmail.com', 'x@y.dev']);
+
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		expect(
+			loadConfig({ SIGNUP_BLOCKED_EMAILS: 'not-an-email' }).auth.blockedSignupEmails.size
+		).toBe(0);
 	});
 });
