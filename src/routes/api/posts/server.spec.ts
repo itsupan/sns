@@ -3,17 +3,29 @@ import { describe, expect, it, vi } from 'vitest';
 import { GET, POST } from './+server';
 import type { RequestEvent } from './$types';
 
-// Media now comes from post_media via loadPostMedia; stub it with fixture rows.
+// Media and tags come from post_media / post_tag via loaders; stub them with fixture rows.
+// attachTagsStatements records what the handler would store so loadPostTags can echo it.
 vi.mock('$lib/server/db/posts', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/db/posts')>();
 	const media: Record<string, Array<{ url: string; type: 'image' | 'video' }>> = {
 		'post-1': [{ url: 'https://example.com/photo.jpg', type: 'image' }]
 	};
+	const tags: Record<string, string[]> = { 'post-1': ['#MinimalArchitecture'] };
 	return {
 		...actual,
 		loadPostMedia: vi.fn(
 			async (_db: unknown, ids: string[]) =>
 				new Map(ids.filter((id) => media[id]).map((id) => [id, media[id]]))
+		),
+		loadPostTags: vi.fn(
+			async (_db: unknown, ids: string[]) =>
+				new Map(ids.filter((id) => tags[id]).map((id) => [id, tags[id]]))
+		),
+		attachTagsStatements: vi.fn(
+			(_db: unknown, postId: string, normalized: Array<{ name: string }>) => {
+				tags[postId] = normalized.map((t) => `#${t.name}`);
+				return [];
+			}
 		)
 	};
 });

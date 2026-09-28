@@ -5,7 +5,7 @@ import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
-import { loadPostMedia, notDeleted } from '$lib/server/db/posts';
+import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
 
 const FALLBACK_POSTS: PostData[] = [
 	{
@@ -118,17 +118,11 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 
 			if (rows.length > 0) {
 				const r = rows[0];
-				const mediaByPost = await loadPostMedia(locals.db, [r.post.id]);
-
-				let parsedTags: string[] = [];
-				if (r.post.tags) {
-					try {
-						parsedTags = JSON.parse(r.post.tags);
-					} catch {
-						parsedTags = [];
-					}
-				}
-
+				const [mediaByPost, tagsByPost] = await Promise.all([
+					loadPostMedia(locals.db, [r.post.id]),
+					loadPostTags(locals.db, [r.post.id])
+				]);
+				const parsedTags = tagsByPost.get(r.post.id) ?? [];
 				const parsedMedia = mediaByPost.get(r.post.id) ?? [];
 
 				let isLiked = false;
