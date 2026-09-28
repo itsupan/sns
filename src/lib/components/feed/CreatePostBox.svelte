@@ -8,6 +8,11 @@
 	import { authClient } from '$lib/auth-client';
 	import { uploadToR2 } from '$lib/utils/upload';
 	import { toast } from '$lib/utils/toast.svelte';
+	import {
+		MAX_MEDIA_PER_POST,
+		MAX_TAGS_PER_POST,
+		MAX_TAG_LENGTH
+	} from '$lib/constants/post-limits';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { PostData } from './PostCard.svelte';
@@ -105,9 +110,16 @@
 			return;
 		}
 
-		const validFiles = Array.from(files).filter(
+		const mediaFiles = Array.from(files).filter(
 			(f) => f.type.startsWith('image/') || f.type.startsWith('video/')
 		);
+		if (mediaFiles.length === 0) return;
+
+		const room = MAX_MEDIA_PER_POST - mediaPlates.length;
+		if (mediaFiles.length > room) {
+			toast.show(`A post can have at most ${MAX_MEDIA_PER_POST} photos or videos`);
+		}
+		const validFiles = mediaFiles.slice(0, Math.max(room, 0));
 		if (validFiles.length === 0) return;
 
 		for (const file of validFiles) {
@@ -187,8 +199,12 @@
 	}
 
 	function addTag() {
-		const clean = tagInput.trim().replace(/^#/, '');
-		if (clean && !tags.includes(`#${clean}`)) {
+		const clean = tagInput.trim().replace(/^#+/, '').slice(0, MAX_TAG_LENGTH);
+		if (clean && tags.length >= MAX_TAGS_PER_POST) {
+			toast.show(`A post can have at most ${MAX_TAGS_PER_POST} tags`);
+			return;
+		}
+		if (clean && !tags.some((t) => t.toLowerCase() === `#${clean}`.toLowerCase())) {
 			tags = [...tags, `#${clean}`];
 			tagInput = '';
 		}

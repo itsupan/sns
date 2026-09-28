@@ -1,6 +1,7 @@
 import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postMedia, postTag, tag, user } from './schema';
+import { MAX_TAGS_PER_POST } from '$lib/constants/post-limits';
 
 /** Every read or write of a post must exclude soft-deleted rows (see `post.deletedAt`). */
 export const notDeleted = isNull(post.deletedAt);
@@ -151,6 +152,10 @@ export async function loadPostTags(
  */
 export function attachTagsStatements(db: Database, postId: string, tags: NormalizedTag[]) {
 	if (tags.length === 0) return [];
+	// Callers validate first; this guards D1's 100-variable limit if a new caller forgets.
+	if (tags.length > MAX_TAGS_PER_POST) {
+		throw new Error(`attachTagsStatements: ${tags.length} tags exceeds ${MAX_TAGS_PER_POST}`);
+	}
 
 	const positionBySlug = sql.join(
 		tags.map((t, i) => sql`when ${t.slug} then ${i}`),
