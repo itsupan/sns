@@ -15,20 +15,22 @@ const PresignRequest = v.object({
 			v.number('Size must be a positive number'),
 			v.minValue(0, 'Size must be a positive number')
 		)
-	)
+	),
+	folder: v.optional(v.picklist(['avatars', 'posts', 'stories'], 'Invalid upload folder'))
 });
 
 export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
 	const currentUser = requireUser(locals);
 	await enforceRateLimit(platform, 'uploadPresign', currentUser.id);
-	const { filename, contentType, size } = await parseBody(request, PresignRequest);
+	const { filename, contentType, size, folder } = await parseBody(request, PresignRequest);
 
 	try {
 		const result = await generatePresignedUploadUrl(platform?.env, {
 			filename,
 			contentType,
 			size,
-			userId: currentUser.id
+			userId: currentUser.id,
+			prefix: folder
 		});
 
 		return json(result);

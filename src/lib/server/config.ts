@@ -13,7 +13,8 @@ export interface RateLimitRule {
 	windowSec: number;
 }
 
-export type RateLimitName = 'createPost' | 'comment' | 'like' | 'follow' | 'uploadPresign';
+export type RateLimitName =
+	'createPost' | 'createStory' | 'comment' | 'like' | 'follow' | 'uploadPresign';
 
 export interface AppConfig {
 	rateLimits: Record<RateLimitName, RateLimitRule>;
@@ -30,6 +31,7 @@ const MAX_SIGV4_TTL_SEC = 7 * 24 * 3600;
 export const DEFAULT_CONFIG: AppConfig = {
 	rateLimits: {
 		createPost: { limit: 10, windowSec: 60 },
+		createStory: { limit: 10, windowSec: 60 },
 		comment: { limit: 20, windowSec: 60 },
 		like: { limit: 60, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
@@ -56,6 +58,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 /** Env var name for each rate limit. Value format: `<limit>/<windowSeconds>`, e.g. `10/60`. */
 export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	createPost: 'RATE_LIMIT_CREATE_POST',
+	createStory: 'RATE_LIMIT_CREATE_STORY',
 	comment: 'RATE_LIMIT_COMMENT',
 	like: 'RATE_LIMIT_LIKE',
 	follow: 'RATE_LIMIT_FOLLOW',
