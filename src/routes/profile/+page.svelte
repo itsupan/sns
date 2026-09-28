@@ -93,7 +93,7 @@
 <main class="w-full flex-1 flex flex-col items-center">
 	<div class="w-full max-w-6xl mx-auto px-0 sm:px-6 lg:px-8 py-0 sm:py-6 flex flex-col">
 		<!-- Profile Header (Responsive: Mobile Profile Bar / Desktop Master Curator Card) -->
-		<ProfileHeader user={data?.user} />
+		<ProfileHeader user={data?.user} profile={data?.stats} />
 
 		<!-- Story Collections / Highlights -->
 		<ProfileHighlights highlights={userHighlights} />

@@ -105,6 +105,7 @@
 		<ProfileHeader
 			user={data.targetUser}
 			profile={{
+				...data.stats,
 				isOwnProfile: data.isOwnProfile
 			}}
 		/>

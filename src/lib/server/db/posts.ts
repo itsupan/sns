@@ -94,6 +94,25 @@ export async function loadPostMedia(
 	return byPost;
 }
 
+const VIDEO_URL = /\.(mp4|webm|mov)(\?.*)?$/i;
+
+/**
+ * Cleans a `mediaUrls` payload (`[{ url, type? }]`) from the composer: drops blank entries and
+ * infers video from the declared type or the file extension. Order is kept (first = cover).
+ */
+export function normalizeMedia(input: unknown): MediaItem[] {
+	if (!Array.isArray(input)) return [];
+	return input
+		.filter(
+			(m): m is { url: string; type?: string } =>
+				typeof m === 'object' && m !== null && typeof m.url === 'string' && m.url.trim().length > 0
+		)
+		.map((m) => ({
+			url: m.url.trim(),
+			type: m.type === 'video' || VIDEO_URL.test(m.url) ? 'video' : 'image'
+		}));
+}
+
 export interface NormalizedTag {
 	/** Lowercase, no '#'. Unique key in `tag`. */
 	slug: string;

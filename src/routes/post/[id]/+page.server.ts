@@ -1,5 +1,5 @@
 import { error } from '@sveltejs/kit';
-import { eq, desc, and } from 'drizzle-orm';
+import { eq, desc, and, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
@@ -118,6 +118,18 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 
 			if (rows.length > 0) {
 				const r = rows[0];
+
+				// Count an impression when someone other than the author opens the post.
+				if (locals.user?.id !== r.post.userId) {
+					try {
+						await locals.db
+							.update(post)
+							.set({ viewsCount: sql`${post.viewsCount} + 1` })
+							.where(eq(post.id, r.post.id));
+					} catch (err) {
+						console.error('Failed to count post view:', err);
+					}
+				}
 				const [mediaByPost, tagsByPost] = await Promise.all([
 					loadPostMedia(locals.db, [r.post.id]),
 					loadPostTags(locals.db, [r.post.id])
@@ -180,6 +192,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					mediaType: parsedMedia[0]?.type || 'none',
 					mediaItems: parsedMedia,
 					aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
+					postType: r.post.postType as 'photo' | 'story' | 'article',
 					location: r.post.location || r.user.location || undefined,
 					cameraMeta: r.post.cameraMeta || undefined,
 					tags: parsedTags,

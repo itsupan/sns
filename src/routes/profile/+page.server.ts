@@ -1,12 +1,16 @@
 import { redirect } from '@sveltejs/kit';
 import { resolve } from '$app/paths';
-import { eq, desc, and } from 'drizzle-orm';
-import { user, post } from '$lib/server/db/schema';
-import { formatTimeAgo } from '$lib/utils/format';
-import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
+import { eq } from 'drizzle-orm';
+import { user } from '$lib/server/db/schema';
+import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import type { PageServerLoad } from './$types';
-import { refreshMediaUrl } from '$lib/server/services/storage';
-import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
+import { refreshMediaUrl, refreshPostMediaUrls } from '$lib/server/services/storage';
+import {
+	EMPTY_PROFILE_STATS,
+	loadProfilePosts,
+	loadProfileStats,
+	toGridItem
+} from '$lib/server/db/profiles';
 
 export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	if (!locals.user) {
@@ -17,7 +21,8 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	}
 
 	let dbUser: Record<string, unknown> | null = null;
-	let userPosts: GridItem[] = [];
+	let userPosts: PostData[] = [];
+	let stats = EMPTY_PROFILE_STATS;
 
 	if (locals.db) {
 		try {
@@ -40,40 +45,27 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 				.where(eq(user.id, locals.user.id))
 				.limit(1);
 
-			dbUser = rows[0] ?? null;
-
-			const postRows = await locals.db
-				.select()
-				.from(post)
-				.where(and(eq(post.userId, locals.user.id), notDeleted))
-				.orderBy(desc(post.createdAt));
-
-			const postIds = postRows.map((p) => p.id);
-			const [mediaByPost, tagsByPost] = await Promise.all([
-				loadPostMedia(locals.db, postIds),
-				loadPostTags(locals.db, postIds)
-			]);
-
-			userPosts = postRows.map((p) => {
-				const parsedMedia = mediaByPost.get(p.id) ?? [];
-				const parsedTags = tagsByPost.get(p.id) ?? [];
-
-				return {
-					id: p.id,
-					title: p.title || p.content.slice(0, 40),
-					image: parsedMedia[0]?.url || '',
-					likes: p.likesCount,
-					comments: p.commentsCount,
-					isCarousel: parsedMedia.length > 1,
-					cameraMeta: p.cameraMeta || undefined,
-					description: p.content,
-					tags: parsedTags,
-					date: formatTimeAgo(p.createdAt),
-					location: p.location || undefined
-				};
-			});
+			const found = rows[0] ?? null;
+			dbUser = found;
+			userPosts = await loadProfilePosts(
+				locals.db,
+				{
+					id: locals.user.id,
+					name: found?.name ?? locals.user.name,
+					handle: found?.handle ?? null,
+					image: found?.image ?? null,
+					location: found?.location ?? null
+				},
+				locals.user.id
+			);
 		} catch {
 			// Fallback to locals.user
+		}
+
+		try {
+			stats = await loadProfileStats(locals.db, locals.user.id, locals.user.id);
+		} catch {
+			// Stats are optional; keep zeros.
 		}
 	}
 
@@ -84,10 +76,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 		: null;
 
 	const refreshedPosts = await Promise.all(
-		userPosts.map(async (p) => ({
-			...p,
-			image: p.image ? await refreshMediaUrl(p.image, platform?.env) : ''
-		}))
+		userPosts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
 	);
 
 	return {
@@ -103,6 +92,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 			location: (currentUser.location as string | null | undefined) ?? null,
 			cameraGear: (currentUser.cameraGear as string | null | undefined) ?? null
 		},
-		posts: refreshedPosts
+		posts: refreshedPosts,
+		stats
 	};
 };

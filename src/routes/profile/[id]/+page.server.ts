@@ -1,11 +1,15 @@
 import { error } from '@sveltejs/kit';
-import { eq, or, desc, and } from 'drizzle-orm';
-import { user, post } from '$lib/server/db/schema';
-import { formatTimeAgo } from '$lib/utils/format';
+import { eq, or } from 'drizzle-orm';
+import { user } from '$lib/server/db/schema';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
-import { refreshMediaUrl } from '$lib/server/services/storage';
-import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
+import { refreshMediaUrl, refreshPostMediaUrls } from '$lib/server/services/storage';
+import {
+	EMPTY_PROFILE_STATS,
+	loadProfilePosts,
+	loadProfileStats,
+	toGridItem
+} from '$lib/server/db/profiles';
 
 const FALLBACK_CURATORS: Record<
 	string,
@@ -100,6 +104,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 
 	let targetUser: Record<string, unknown> | null = null;
 	let targetPosts: GridItem[] = [];
+	let stats = EMPTY_PROFILE_STATS;
 
 	if (locals.db) {
 		try {
@@ -122,39 +127,19 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 				.where(or(eq(user.id, cleanId), eq(user.handle, cleanId)))
 				.limit(1);
 
-			targetUser = rows[0] ?? null;
+			const found = rows[0] ?? null;
+			targetUser = found;
 
-			if (targetUser) {
-				const postRows = await locals.db
-					.select()
-					.from(post)
-					.where(and(eq(post.userId, targetUser.id as string), notDeleted))
-					.orderBy(desc(post.createdAt));
-
-				const postIds = postRows.map((p) => p.id);
-				const [mediaByPost, tagsByPost] = await Promise.all([
-					loadPostMedia(locals.db, postIds),
-					loadPostTags(locals.db, postIds)
+			if (found) {
+				const viewerId = locals.user?.id ?? null;
+				const [posts, loadedStats] = await Promise.all([
+					loadProfilePosts(locals.db, found, viewerId),
+					loadProfileStats(locals.db, found.id, viewerId).catch(() => EMPTY_PROFILE_STATS)
 				]);
-
-				targetPosts = postRows.map((p) => {
-					const parsedMedia = mediaByPost.get(p.id) ?? [];
-					const parsedTags = tagsByPost.get(p.id) ?? [];
-
-					return {
-						id: p.id,
-						title: p.title || p.content.slice(0, 40),
-						image: parsedMedia[0]?.url || '',
-						likes: p.likesCount,
-						comments: p.commentsCount,
-						isCarousel: parsedMedia.length > 1,
-						cameraMeta: p.cameraMeta || undefined,
-						description: p.content,
-						tags: parsedTags,
-						date: formatTimeAgo(p.createdAt),
-						location: p.location || undefined
-					};
-				});
+				targetPosts = await Promise.all(
+					posts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
+				);
+				stats = loadedStats;
 			}
 		} catch {
 			// Query failed
@@ -172,6 +157,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		if (fallback) {
 			targetUser = fallback.user;
 			targetPosts = fallback.posts;
+			stats = { ...EMPTY_PROFILE_STATS, postsCount: fallback.posts.length };
 		}
 	}
 
@@ -194,11 +180,11 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		? await refreshMediaUrl(targetUser.image as string, platform?.env)
 		: null;
 
+	// DB posts were refreshed above; this covers the fallback curators' plain image URLs.
 	const refreshedPosts = await Promise.all(
-		targetPosts.map(async (p) => ({
-			...p,
-			image: p.image ? await refreshMediaUrl(p.image, platform?.env) : ''
-		}))
+		targetPosts.map(async (p) =>
+			p.post ? p : { ...p, image: p.image ? await refreshMediaUrl(p.image, platform?.env) : '' }
+		)
 	);
 
 	return {
@@ -216,6 +202,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		},
 		isOwnProfile,
 		posts: refreshedPosts,
+		stats,
 		canonicalUrl,
 		origin
 	};

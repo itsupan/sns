@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import SidebarNav from '$lib/components/shared/SidebarNav.svelte';
 	import RightSidebar from '$lib/components/feed/RightSidebar.svelte';
@@ -138,7 +139,7 @@
 
 		<!-- The Post -->
 		<div class="feed-posts flex flex-col">
-			<PostCard {post} priority={true} />
+			<PostCard {post} priority={true} onDelete={() => goto(resolve('/profile'))} />
 		</div>
 	</main>
 

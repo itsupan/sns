@@ -10,9 +10,9 @@ export interface ProfileData {
 	badgeText: string;
 	avatar: string;
 	postsCount: number;
-	followersCount: string;
+	followersCount: number;
 	followingCount: number;
-	impressionsCount: string;
+	impressionsCount: number;
 	isVerified: boolean;
 	isFollowing: boolean;
 	isOwnProfile?: boolean;
@@ -30,9 +30,9 @@ export const defaultProfile: ProfileData = {
 	avatar:
 		'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80',
 	postsCount: 42,
-	followersCount: '18.4k',
+	followersCount: 18400,
 	followingCount: 620,
-	impressionsCount: '94.2k',
+	impressionsCount: 94200,
 	isVerified: true,
 	isFollowing: true,
 	isOwnProfile: false
@@ -89,6 +89,10 @@ class ProfileStore {
 
 export const profileStore = new ProfileStore();
 
+function countOr(value: unknown, fallback: number | undefined): number {
+	return typeof value === 'number' && Number.isFinite(value) ? value : (fallback ?? 0);
+}
+
 export function resolveProfile(
 	sessionUser: Record<string, unknown> | undefined,
 	updatedUser: Record<string, unknown> | null,
@@ -122,17 +126,10 @@ export function resolveProfile(
 		cameraGear: (user.cameraGear as string) ?? custom?.cameraGear ?? '',
 		badgeText: (user.badgeText as string) ?? custom?.badgeText ?? '',
 		isVerified: Boolean(user.isVerified || user.emailVerified || custom?.isVerified),
-		postsCount: typeof user.postsCount === 'number' ? user.postsCount : (custom?.postsCount ?? 0),
-		followersCount:
-			typeof user.followersCount === 'string' || typeof user.followersCount === 'number'
-				? String(user.followersCount)
-				: (custom?.followersCount ?? '0'),
-		followingCount:
-			typeof user.followingCount === 'number' ? user.followingCount : (custom?.followingCount ?? 0),
-		impressionsCount:
-			typeof user.impressionsCount === 'string' || typeof user.impressionsCount === 'number'
-				? String(user.impressionsCount)
-				: (custom?.impressionsCount ?? '0'),
+		postsCount: countOr(user.postsCount, custom?.postsCount),
+		followersCount: countOr(user.followersCount, custom?.followersCount),
+		followingCount: countOr(user.followingCount, custom?.followingCount),
+		impressionsCount: countOr(user.impressionsCount, custom?.impressionsCount),
 		isFollowing: custom?.isFollowing ?? false,
 		isOwnProfile: custom?.isOwnProfile ?? true,
 		...custom

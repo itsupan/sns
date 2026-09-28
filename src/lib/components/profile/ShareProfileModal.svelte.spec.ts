@@ -15,9 +15,9 @@ const testProfile = {
 	badgeText: '',
 	isVerified: false,
 	postsCount: 10,
-	followersCount: '150',
+	followersCount: 150,
 	followingCount: 50,
-	impressionsCount: '1.2k',
+	impressionsCount: 1200,
 	isFollowing: false,
 	isOwnProfile: true
 };

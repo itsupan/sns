@@ -8,13 +8,10 @@
 	import ShareProfileModal from './ShareProfileModal.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { formatCount } from '$lib/utils/format';
+	import { readApiError } from '$lib/utils/api-error';
 
-	import {
-		defaultProfile,
-		profileStore,
-		resolveProfile,
-		type ProfileData
-	} from '$lib/utils/profile.svelte';
+	import { profileStore, resolveProfile, type ProfileData } from '$lib/utils/profile.svelte';
 
 	interface Props {
 		profile?: Partial<ProfileData>;
@@ -30,7 +27,10 @@
 		user: initialUser
 	}: Props = $props();
 
-	let isFollowing = $state(defaultProfile.isFollowing);
+	// Optimistic follow state; null means "use what the server loaded".
+	let followOverride = $state<boolean | null>(null);
+	let followersDelta = $state(0);
+	let followPending = $state(false);
 	let settingsOpen = $state(false);
 	let desktopDropdownOpen = $state(false);
 	let shareModalOpen = $state(false);
@@ -73,6 +73,9 @@
 		});
 	});
 
+	let isFollowing = $derived(followOverride ?? customProfile?.isFollowing ?? false);
+	let followersCount = $derived(profile.followersCount + followersDelta);
+
 	async function toggleFollow() {
 		if (!$session.data?.user) {
 			toast.show('Please log in to follow curators');
@@ -89,9 +92,35 @@
 			return;
 		}
 
-		isFollowing = !isFollowing;
-		onFollowChange?.(isFollowing);
-		toast.show(isFollowing ? `Following ${profile.name}` : `Unfollowed ${profile.name}`);
+		if (followPending || !profile.id) return;
+		const next = !isFollowing;
+		followOverride = next;
+		followersDelta += next ? 1 : -1;
+		followPending = true;
+		try {
+			const res = await fetch(`/api/users/${encodeURIComponent(profile.id)}/follow`, {
+				method: 'POST'
+			});
+			const body = (await res.json().catch(() => null)) as {
+				following?: boolean;
+				followersCount?: number;
+			} | null;
+			if (!res.ok || typeof body?.following !== 'boolean') {
+				throw new Error(readApiError(body, 'Could not update follow').message);
+			}
+			followOverride = body.following;
+			if (typeof body.followersCount === 'number') {
+				followersDelta = body.followersCount - profile.followersCount;
+			}
+			onFollowChange?.(body.following);
+			toast.show(body.following ? `Following ${profile.name}` : `Unfollowed ${profile.name}`);
+		} catch (err) {
+			followOverride = !next;
+			followersDelta += next ? -1 : 1;
+			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+		} finally {
+			followPending = false;
+		}
 	}
 
 	async function handleMessage() {
@@ -208,11 +237,10 @@
 					<span
 						class="font-bold text-lg sm:text-2xl text-slate-950 dark:text-white tracking-tight leading-tight"
 					>
-						{profile.postsCount}
+						{formatCount(profile.postsCount)}
 					</span>
 					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
-						<span class="sm:hidden">posts</span>
-						<span class="hidden sm:inline">Archived Works</span>
+						posts
 					</span>
 				</div>
 
@@ -221,11 +249,10 @@
 					<span
 						class="font-bold text-lg sm:text-2xl text-slate-950 dark:text-white tracking-tight leading-tight"
 					>
-						{profile.followersCount}
+						{formatCount(followersCount)}
 					</span>
 					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
-						<span class="sm:hidden">followers</span>
-						<span class="hidden sm:inline">Curators Following</span>
+						followers
 					</span>
 				</div>
 
@@ -234,22 +261,22 @@
 					<span
 						class="font-bold text-lg sm:text-2xl text-slate-950 dark:text-white tracking-tight leading-tight"
 					>
-						{profile.followingCount}
+						{formatCount(profile.followingCount)}
 					</span>
 					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
 						following
 					</span>
 				</div>
 
-				<!-- Impressions (Desktop only) -->
-				<div class="hidden sm:flex flex-row items-baseline gap-2">
+				<!-- Impressions: total views of this user's posts -->
+				<div class="flex flex-col sm:flex-row sm:items-baseline gap-0 sm:gap-2">
 					<span
-						class="font-bold text-2xl text-slate-950 dark:text-white tracking-tight leading-tight"
+						class="font-bold text-lg sm:text-2xl text-slate-950 dark:text-white tracking-tight leading-tight"
 					>
-						{profile.impressionsCount}
+						{formatCount(profile.impressionsCount)}
 					</span>
-					<span class="text-xs font-medium text-slate-500 dark:text-dark-muted">
-						Total Impressions
+					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
+						impressions
 					</span>
 				</div>
 			</div>

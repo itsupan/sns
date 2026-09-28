@@ -1,12 +1,17 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import PostCard, { type PostData } from '$lib/components/feed/PostCard.svelte';
+	import { formatCount } from '$lib/utils/format';
 	import type { TabId, ViewMode } from './ProfileTabs.svelte';
 
 	export interface GridItem {
 		id: string;
 		title: string;
 		image: string;
+		/** Type of `image`; 'none' for text-only posts. Inferred from the URL when missing. */
+		mediaType?: 'image' | 'video' | 'none';
 		likes: number;
 		comments: number;
 		isCarousel?: boolean;
@@ -15,6 +20,8 @@
 		tags?: string[];
 		date?: string;
 		location?: string;
+		/** Full post for real (database) items: list view renders it with `PostCard`. */
+		post?: PostData;
 	}
 
 	export interface EssayItem {
@@ -246,6 +253,44 @@
 	}: Props = $props();
 
 	let activeModalItem = $state<GridItem | null>(null);
+	// Posts the author deleted or edited from list view, so grid and compact views match.
+	let removedIds = $state<Record<string, boolean>>({});
+	let updatedPosts = $state<Record<string, PostData>>({});
+
+	let visibleItems = $derived<GridItem[]>(
+		items
+			.filter((item) => !removedIds[item.id])
+			.map((item): GridItem => {
+				const updated = updatedPosts[item.id];
+				return updated
+					? {
+							...item,
+							post: updated,
+							title: updated.title || updated.description.slice(0, 40),
+							image: updated.mediaItems?.[0]?.url ?? updated.image,
+							mediaType: updated.mediaItems?.[0]?.type ?? 'none',
+							isCarousel: (updated.mediaItems?.length ?? 0) > 1,
+							description: updated.description,
+							tags: updated.tags,
+							location: updated.location
+						}
+					: item;
+			})
+	);
+
+	function kindOf(item: GridItem): 'image' | 'video' | 'none' {
+		if (!item.image) return 'none';
+		if (item.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(item.image)) return 'video';
+		return 'image';
+	}
+
+	function handleDeleted(id: string) {
+		removedIds[id] = true;
+	}
+
+	function handleUpdated(next: PostData) {
+		updatedPosts[next.id] = next;
+	}
 	let likedItems = $state<Record<string, boolean>>({});
 	let savedItems = $state<Record<string, boolean>>({});
 
@@ -258,8 +303,13 @@
 	}
 
 	function openItem(item: GridItem) {
-		activeModalItem = item;
 		onSelectItem?.(item);
+		// Real posts open their own page (comments, edit, delete); demo items use the lightbox.
+		if (item.post) {
+			goto(resolve('/post/[id]', { id: item.id }));
+			return;
+		}
+		activeModalItem = item;
 	}
 
 	function closeModal() {
@@ -267,10 +317,53 @@
 	}
 </script>
 
+<!-- Square/portrait preview for any post: photo, first video frame, or its text. -->
+{#snippet preview(item: GridItem, textSize: string)}
+	{@const kind = kindOf(item)}
+	{#if kind === 'image'}
+		<img
+			src={item.image}
+			alt={item.title}
+			class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+			loading="lazy"
+		/>
+	{:else if kind === 'video'}
+		<video
+			src={item.image}
+			muted
+			playsinline
+			preload="metadata"
+			class="w-full h-full object-cover pointer-events-none"
+			aria-label={item.title}
+		></video>
+		<div
+			class="absolute bottom-2 left-2 p-1 rounded-md bg-black/50 text-white flex items-center"
+			aria-hidden="true"
+		>
+			<Icon name="play" type="sr" class="text-[10px]" />
+		</div>
+	{:else}
+		<div
+			class="w-full h-full flex flex-col items-center justify-center gap-1 p-3 sm:p-5 bg-slate-200/70 dark:bg-dark-elevated text-center"
+		>
+			{#if item.post?.title}
+				<span
+					class="font-semibold text-slate-900 dark:text-white line-clamp-2 leading-snug {textSize}"
+				>
+					{item.post.title}
+				</span>
+			{/if}
+			<span class="text-slate-600 dark:text-dark-muted line-clamp-4 leading-snug {textSize}">
+				{item.description || item.title}
+			</span>
+		</div>
+	{/if}
+{/snippet}
+
 <div class="w-full {className}">
 	<!-- 1. CURATED GRID TAB -->
 	{#if activeTab === 'grid'}
-		{#if items.length === 0}
+		{#if visibleItems.length === 0}
 			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
 				<div
 					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
@@ -298,20 +391,14 @@
 			<!-- A. GRID VIEW MODE (3 Columns) -->
 		{:else if viewMode === 'grid'}
 			<div class="grid grid-cols-3 gap-0.5 sm:gap-4 md:gap-6 py-0.5 sm:py-6">
-				{#each items as item (item.id)}
+				{#each visibleItems as item (item.id)}
 					<button
 						type="button"
-						class="group relative w-full aspect-square sm:aspect-[4/5] rounded-none sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
+						class="group relative w-full aspect-square overflow-hidden rounded-2xl bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
 						onclick={() => openItem(item)}
-						aria-label={`View photo ${item.title}`}
+						aria-label={`View post ${item.title}`}
 					>
-						<!-- Main Image -->
-						<img
-							src={item.image}
-							alt={item.title}
-							class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-							loading="lazy"
-						/>
+						{@render preview(item, 'text-[11px] sm:text-sm')}
 
 						<!-- Multi-photo Carousel Indicator Icon -->
 						{#if item.isCarousel}
@@ -330,11 +417,11 @@
 						>
 							<div class="flex items-center gap-2">
 								<Icon name="heart" class="text-base" />
-								<span>{item.likes + (likedItems[item.id] ? 1 : 0)}</span>
+								<span>{formatCount(item.likes + (likedItems[item.id] ? 1 : 0))}</span>
 							</div>
 							<div class="flex items-center gap-2">
 								<Icon name="comment-alt" class="text-base" />
-								<span>{item.comments}</span>
+								<span>{formatCount(item.comments)}</span>
 							</div>
 						</div>
 					</button>
@@ -343,145 +430,151 @@
 
 			<!-- B. FEED / LIST VIEW MODE (Full-width post cards) -->
 		{:else if viewMode === 'feed'}
-			<div class="flex flex-col gap-6 max-w-2xl mx-auto w-full py-4 sm:py-6 px-3 sm:px-0">
-				{#each items as item (item.id)}
+			<div class="flex flex-col max-w-2xl mx-auto w-full pt-2 sm:pt-4">
+				{#each visibleItems as item (item.id)}
 					{@const isLiked = likedItems[item.id] ?? false}
 					{@const isSaved = savedItems[item.id] ?? false}
-					<article
-						class="bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xs dark:shadow-none transition-colors"
-					>
-						<!-- Header -->
-						<div class="flex items-center justify-between mb-3.5">
-							<div class="flex items-center gap-3">
-								<div
-									class="size-10 rounded-full overflow-hidden bg-slate-100 dark:bg-dark-elevated flex items-center justify-center shrink-0"
-								>
-									{#if user?.image}
-										<img
-											src={user.image}
-											alt={user.name || 'User'}
-											class="w-full h-full object-cover"
-										/>
-									{:else}
-										<span class="font-bold text-xs text-slate-600 dark:text-dark-text select-none">
-											{(user?.name || 'U').slice(0, 1).toUpperCase()}
-										</span>
-									{/if}
-								</div>
-								<div class="flex flex-col">
-									<div class="flex items-center gap-1.5 leading-tight">
-										<span class="font-semibold text-sm text-slate-900 dark:text-white">
-											{user?.name || 'User'}
-										</span>
-										<span class="text-xs text-slate-400">@{user?.handle || 'user'}</span>
+					{#if item.post}
+						<PostCard post={item.post} onDelete={handleDeleted} onUpdate={handleUpdated} />
+					{:else}
+						<article
+							class="mb-2 lg:mb-6 mx-3 sm:mx-0 bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xs dark:shadow-none transition-colors"
+						>
+							<!-- Header -->
+							<div class="flex items-center justify-between mb-3.5">
+								<div class="flex items-center gap-3">
+									<div
+										class="size-10 rounded-full overflow-hidden bg-slate-100 dark:bg-dark-elevated flex items-center justify-center shrink-0"
+									>
+										{#if user?.image}
+											<img
+												src={user.image}
+												alt={user.name || 'User'}
+												class="w-full h-full object-cover"
+											/>
+										{:else}
+											<span
+												class="font-bold text-xs text-slate-600 dark:text-dark-text select-none"
+											>
+												{(user?.name || 'U').slice(0, 1).toUpperCase()}
+											</span>
+										{/if}
 									</div>
-									<span class="text-xs text-slate-400 mt-0.5">
-										{[item.location, item.date].filter(Boolean).join(' • ')}
-									</span>
+									<div class="flex flex-col">
+										<div class="flex items-center gap-1.5 leading-tight">
+											<span class="font-semibold text-sm text-slate-900 dark:text-white">
+												{user?.name || 'User'}
+											</span>
+											<span class="text-xs text-slate-400">@{user?.handle || 'user'}</span>
+										</div>
+										<span class="text-xs text-slate-400 mt-0.5">
+											{[item.location, item.date].filter(Boolean).join(' • ')}
+										</span>
+									</div>
 								</div>
+
+								<button
+									type="button"
+									class="size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-black dark:hover:text-white border-0 bg-transparent cursor-pointer"
+									aria-label="Post options"
+								>
+									<Icon name="menu-dots" class="text-base" />
+								</button>
 							</div>
 
+							<!-- Title -->
+							<h2 class="text-lg font-bold text-slate-950 dark:text-white mb-3">
+								{item.title}
+							</h2>
+
+							<!-- Image with camera badge -->
 							<button
 								type="button"
-								class="size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-black dark:hover:text-white border-0 bg-transparent cursor-pointer"
-								aria-label="Post options"
+								class="relative w-full aspect-[16/10] rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-4 group cursor-pointer border-0 p-0 text-left block"
+								onclick={() => openItem(item)}
+								aria-label={`View post ${item.title}`}
 							>
-								<Icon name="menu-dots" class="text-base" />
+								<img
+									src={item.image}
+									alt={item.title}
+									class="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
+									loading="lazy"
+								/>
+								{#if item.cameraMeta}
+									<div
+										class="absolute bottom-3 right-3 bg-black/75 backdrop-blur-xs text-white text-[11px] font-mono px-3 py-1 rounded-md tracking-wider"
+									>
+										{item.cameraMeta}
+									</div>
+								{/if}
 							</button>
-						</div>
 
-						<!-- Title -->
-						<h2 class="text-lg font-bold text-slate-950 dark:text-white mb-3">
-							{item.title}
-						</h2>
+							<!-- Description -->
+							{#if item.description}
+								<p class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mb-3.5">
+									{item.description}
+								</p>
+							{/if}
 
-						<!-- Image with camera badge -->
-						<button
-							type="button"
-							class="relative w-full aspect-[16/10] rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-4 group cursor-pointer border-0 p-0 text-left block"
-							onclick={() => openItem(item)}
-							aria-label={`View photo ${item.title}`}
-						>
-							<img
-								src={item.image}
-								alt={item.title}
-								class="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
-								loading="lazy"
-							/>
-							{#if item.cameraMeta}
-								<div
-									class="absolute bottom-3 right-3 bg-black/75 backdrop-blur-xs text-white text-[11px] font-mono px-3 py-1 rounded-md tracking-wider"
-								>
-									{item.cameraMeta}
+							<!-- Tags -->
+							{#if item.tags}
+								<div class="flex items-center gap-2 flex-wrap mb-4">
+									{#each item.tags as tag (tag)}
+										<span
+											class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted"
+										>
+											{tag}
+										</span>
+									{/each}
 								</div>
 							{/if}
-						</button>
 
-						<!-- Description -->
-						{#if item.description}
-							<p class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mb-3.5">
-								{item.description}
-							</p>
-						{/if}
-
-						<!-- Tags -->
-						{#if item.tags}
-							<div class="flex items-center gap-2 flex-wrap mb-4">
-								{#each item.tags as tag (tag)}
-									<span
-										class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted"
-									>
-										{tag}
-									</span>
-								{/each}
-							</div>
-						{/if}
-
-						<!-- Action Bar -->
-						<div
-							class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-dark-border text-xs text-slate-600 dark:text-dark-muted"
-						>
-							<div class="flex items-center gap-5">
-								<button
-									type="button"
-									class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 {isLiked
-										? 'text-rose-500 font-semibold'
-										: 'hover:text-black dark:hover:text-white'}"
-									onclick={() => toggleLike(item.id)}
-								>
-									<Icon name="heart" class="text-base {isLiked ? 'text-rose-500' : ''}" />
-									<span>{item.likes + (isLiked ? 1 : 0)}</span>
-								</button>
-
-								<button
-									type="button"
-									class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 hover:text-black dark:hover:text-white"
-									onclick={() => openItem(item)}
-								>
-									<Icon name="comment-alt" class="text-base" />
-									<span>{item.comments}</span>
-								</button>
-
-								<button
-									type="button"
-									class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 hover:text-black dark:hover:text-white"
-								>
-									<Icon name="share" class="text-base" />
-								</button>
-							</div>
-
-							<button
-								type="button"
-								class="p-1 cursor-pointer border-0 bg-transparent {isSaved
-									? 'text-blue-600'
-									: 'hover:text-black dark:hover:text-white'}"
-								onclick={() => toggleSave(item.id)}
-								aria-label="Save work"
+							<!-- Action Bar -->
+							<div
+								class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-dark-border text-xs text-slate-600 dark:text-dark-muted"
 							>
-								<Icon name="bookmark" class="text-base" />
-							</button>
-						</div>
-					</article>
+								<div class="flex items-center gap-5">
+									<button
+										type="button"
+										class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 {isLiked
+											? 'text-rose-500 font-semibold'
+											: 'hover:text-black dark:hover:text-white'}"
+										onclick={() => toggleLike(item.id)}
+									>
+										<Icon name="heart" class="text-base {isLiked ? 'text-rose-500' : ''}" />
+										<span>{item.likes + (isLiked ? 1 : 0)}</span>
+									</button>
+
+									<button
+										type="button"
+										class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 hover:text-black dark:hover:text-white"
+										onclick={() => openItem(item)}
+									>
+										<Icon name="comment-alt" class="text-base" />
+										<span>{item.comments}</span>
+									</button>
+
+									<button
+										type="button"
+										class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 hover:text-black dark:hover:text-white"
+									>
+										<Icon name="share" class="text-base" />
+									</button>
+								</div>
+
+								<button
+									type="button"
+									class="p-1 cursor-pointer border-0 bg-transparent {isSaved
+										? 'text-blue-600'
+										: 'hover:text-black dark:hover:text-white'}"
+									onclick={() => toggleSave(item.id)}
+									aria-label="Save work"
+								>
+									<Icon name="bookmark" class="text-base" />
+								</button>
+							</div>
+						</article>
+					{/if}
 				{/each}
 			</div>
 
@@ -490,40 +583,39 @@
 			<div
 				class="w-full flex flex-col divide-y divide-slate-100 dark:divide-dark-border py-4 px-2 sm:px-0"
 			>
-				{#each items as item (item.id)}
+				{#each visibleItems as item (item.id)}
 					<button
 						type="button"
 						class="w-full flex items-center justify-between gap-4 py-3 sm:py-3.5 hover:bg-slate-50/80 dark:hover:bg-dark-elevated/40 px-2 sm:px-3 rounded-xl transition-colors cursor-pointer border-0 bg-transparent text-left"
 						onclick={() => openItem(item)}
-						aria-label={`View photo ${item.title}`}
+						aria-label={`View post ${item.title}`}
 					>
 						<!-- Left: Thumbnail + Title -->
 						<div class="flex items-center gap-3.5 min-w-0">
 							<div
-								class="size-12 sm:size-14 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-dark-elevated"
+								class="group relative size-12 sm:size-14 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-dark-elevated"
 							>
-								<img
-									src={item.image}
-									alt={item.title}
-									class="w-full h-full object-cover"
-									loading="lazy"
-								/>
+								{@render preview(item, 'text-[8px]')}
 							</div>
 							<div class="flex flex-col min-w-0">
 								<span class="font-semibold text-sm text-slate-900 dark:text-white truncate">
 									{item.title}
 								</span>
-								<span class="text-xs text-slate-400 dark:text-dark-muted truncate">
-									{item.cameraMeta || '35mm format'}
-								</span>
+								{#if item.cameraMeta || item.tags?.length}
+									<span class="text-xs text-slate-400 dark:text-dark-muted truncate">
+										{item.cameraMeta || item.tags?.join(' ')}
+									</span>
+								{/if}
 							</div>
 						</div>
 
 						<!-- Center: Location & Date -->
 						<div class="hidden md:flex flex-col text-left">
-							<span class="text-xs font-medium text-slate-700 dark:text-dark-text">
-								{item.location || 'Scandinavia'}
-							</span>
+							{#if item.location}
+								<span class="text-xs font-medium text-slate-700 dark:text-dark-text">
+									{item.location}
+								</span>
+							{/if}
 							<span class="text-[11px] text-slate-400">{item.date}</span>
 						</div>
 
@@ -533,11 +625,11 @@
 						>
 							<div class="flex items-center gap-1.5">
 								<Icon name="heart" class="text-sm" />
-								<span>{item.likes}</span>
+								<span>{formatCount(item.likes)}</span>
 							</div>
 							<div class="hidden sm:flex items-center gap-1.5">
 								<Icon name="comment-alt" class="text-sm" />
-								<span>{item.comments}</span>
+								<span>{formatCount(item.comments)}</span>
 							</div>
 							<span
 								class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-white"
@@ -694,13 +786,13 @@
 				</p>
 			</div>
 		{:else}
-			<div class="grid grid-cols-3 gap-0.5 sm:gap-4 md:gap-6 py-0.5 sm:py-6">
+			<div class="grid grid-cols-3 gap-0.5 sm:gap-1 py-0.5 sm:py-1">
 				{#each items.slice(0, 6) as item (item.id)}
 					<button
 						type="button"
-						class="group relative w-full aspect-square sm:aspect-[4/5] rounded-none sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
+						class="group relative w-full aspect-square overflow-hidden bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
 						onclick={() => openItem(item)}
-						aria-label={`View saved photo ${item.title}`}
+						aria-label={`View saved post ${item.title}`}
 					>
 						<img
 							src={item.image}
