@@ -22,7 +22,8 @@
 		"UPLOAD_ALLOWED_MIME_TYPES": "image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime",
 		"FEED_PAGE_SIZE": "10",
 		"FEED_MAX_PAGE_SIZE": "50",
-		"MEDIA_URL_TTL_SECONDS": "604800"
+		"MEDIA_URL_TTL_SECONDS": "604800",
+		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
 	},
 	"secrets": {
 		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
@@ -57,7 +58,8 @@
 				"UPLOAD_ALLOWED_MIME_TYPES": "image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime",
 				"FEED_PAGE_SIZE": "10",
 				"FEED_MAX_PAGE_SIZE": "50",
-				"MEDIA_URL_TTL_SECONDS": "604800"
+				"MEDIA_URL_TTL_SECONDS": "604800",
+				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
 			},
 			"routes": [{ "pattern": "sns.ecoapsara.com", "custom_domain": true }],
 			"secrets": {

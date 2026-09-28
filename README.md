@@ -160,6 +160,9 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `FEED_PAGE_SIZE`            | integer (≤ max)               | `10`                              |
 | `FEED_MAX_PAGE_SIZE`        | integer                       | `50`                              |
 | `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                 |
+| `SIGNUP_BLOCKED_EMAILS`     | comma-separated emails        | empty (nobody blocked)            |
+
+`SIGNUP_BLOCKED_EMAILS` is checked in Better Auth's `user.create.before` hook, so it blocks email/password and Google signups alike (`403 SIGNUP_NOT_ALLOWED`). Matching ignores case, and for Gmail also dots and `+suffix`. It only prevents new accounts; an existing account is not affected.
 
 Product rules tied to the data model (comment/bio length, handle format) stay in their valibot schemas. Secrets never go in `vars`: use `wrangler secret put` / `.dev.vars`.
 

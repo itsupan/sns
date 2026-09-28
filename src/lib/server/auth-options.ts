@@ -1,4 +1,6 @@
 import type { BetterAuthOptions } from 'better-auth';
+import { APIError } from 'better-auth/api';
+import { getConfig, normalizeEmail } from './config';
 
 export function authOptions(env: Env) {
 	const hasGoogleCredentials = Boolean(
@@ -24,6 +26,22 @@ export function authOptions(env: Env) {
 						}
 					}
 				: {})
+		},
+		databaseHooks: {
+			user: {
+				create: {
+					// Runs for every signup path (email/password and Google), so one check covers both.
+					before: async (user) => {
+						const blocked = getConfig(env).auth.blockedSignupEmails;
+						if (blocked.has(normalizeEmail(user.email))) {
+							throw new APIError('FORBIDDEN', {
+								code: 'SIGNUP_NOT_ALLOWED',
+								message: 'This email cannot be used to create an account.'
+							});
+						}
+					}
+				}
+			}
 		},
 		session: {
 			// Disable cookieCache so profile updates and database changes reflect immediately without stale cache
