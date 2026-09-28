@@ -168,7 +168,6 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 	const primaryMedia = mediaItems[0] ?? null;
 	const mediaUrl = primaryMedia?.url ?? null;
 	const mediaType = primaryMedia?.type ?? 'none';
-	const mediaUrlsJson = mediaItems.length > 0 ? JSON.stringify(mediaItems) : null;
 	const aspectRatio =
 		body.aspectRatio === '4:5' || body.aspectRatio === '16:9' ? body.aspectRatio : '1:1';
 	const location = typeof body.location === 'string' ? body.location.trim() || null : null;
@@ -192,9 +191,6 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		userId: currentUser.id,
 		title,
 		content,
-		mediaUrl,
-		mediaType,
-		mediaUrls: mediaUrlsJson,
 		aspectRatio,
 		location,
 		cameraMeta,
@@ -205,7 +201,7 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		sharesCount: 0
 	});
 
-	// Post and its media land together; legacy media columns above are still dual-written.
+	// Post and its media land together.
 	if (mediaItems.length > 0) {
 		await locals.db.batch([
 			insertPost,

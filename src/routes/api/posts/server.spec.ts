@@ -27,8 +27,6 @@ describe('GET /api/posts', () => {
 					userId: 'user-1',
 					title: 'Brutalist Concrete',
 					content: 'A study on dawn light.',
-					mediaUrl: 'https://example.com/photo.jpg',
-					mediaType: 'image',
 					cameraMeta: '35mm',
 					tags: JSON.stringify(['#MinimalArchitecture']),
 					likesCount: 10,
