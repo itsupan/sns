@@ -54,41 +54,40 @@ describe('home page', () => {
 		afterEach(() => vi.unstubAllGlobals());
 
 		it('pages with nextCursor and stops when it is null', async () => {
-			const fetchMock = vi.fn(async () =>
+			const fetchMock = mockFeedApi(() =>
 				Response.json({ posts: [makePost('page-2')], hasMore: false, nextCursor: null })
 			);
-			vi.stubGlobal('fetch', fetchMock);
 			const screen = render(Page, {
 				props: {
 					data: { posts: [makePost('page-1')], hasMore: true, nextCursor: '1700_p1', pageSize: 1 }
 				}
 			});
-			scrollToFeedEnd();
+			await scrollUntilFetched(fetchMock);
 
 			await expect.element(screen.getByText('Title page-2')).toBeInTheDocument();
 			await expect.element(screen.getByText("You're all caught up")).toBeInTheDocument();
-			expect(fetchMock).toHaveBeenCalledTimes(1);
-			expect(fetchMock).toHaveBeenCalledWith('/api/posts?limit=1&cursor=1700_p1');
+			expect(fetchMock.calls).toEqual(['/api/posts?limit=1&cursor=1700_p1']);
 		});
 
 		it('shows the API error and a retry button instead of looping', async () => {
-			const fetchMock = vi.fn(async () =>
+			const fetchMock = mockFeedApi(() =>
 				Response.json(
 					{ error: { code: 'validation_failed', message: 'Invalid cursor' } },
 					{ status: 400 }
 				)
 			);
-			vi.stubGlobal('fetch', fetchMock);
 			const screen = render(Page, {
 				props: {
 					data: { posts: [makePost('page-1')], hasMore: true, nextCursor: 'bad', pageSize: 1 }
 				}
 			});
-			scrollToFeedEnd();
+			await scrollUntilFetched(fetchMock);
 
 			await expect.element(screen.getByText('Invalid cursor')).toBeInTheDocument();
 			await expect.element(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
-			expect(fetchMock).toHaveBeenCalledTimes(1);
+			window.scrollTo(0, document.body.scrollHeight);
+			await new Promise((r) => setTimeout(r, 300));
+			expect(fetchMock.calls).toHaveLength(1);
 		});
 	});
 });
@@ -107,7 +106,28 @@ function makePost(id: string) {
 	};
 }
 
-// The sentinel sits below the stories bar, composer and first card, outside the test viewport.
-function scrollToFeedEnd() {
-	window.scrollTo(0, document.body.scrollHeight);
+/** Stubs fetch for /api/posts only; other components' requests get an empty 200. */
+function mockFeedApi(respond: () => Response) {
+	const calls: string[] = [];
+	vi.stubGlobal(
+		'fetch',
+		vi.fn(async (input: RequestInfo | URL) => {
+			const url = String(input);
+			if (!url.startsWith('/api/posts')) return Response.json({});
+			calls.push(url);
+			return respond();
+		})
+	);
+	return { calls };
+}
+
+// The sentinel sits below the stories bar, composer and first card, outside the test viewport,
+// and may render after the first scroll, so keep scrolling until the feed request fires.
+async function scrollUntilFetched(mock: { calls: string[] }) {
+	await expect
+		.poll(() => {
+			window.scrollTo(0, document.body.scrollHeight);
+			return mock.calls.length;
+		})
+		.toBeGreaterThan(0);
 }
