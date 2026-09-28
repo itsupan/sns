@@ -71,6 +71,13 @@
       "when": 1790619045232,
       "tag": "0009_user_follow_post_views",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790624664788,
+      "tag": "0010_user_follow_counters",
+      "breakpoints": true
     }
   ]
 }

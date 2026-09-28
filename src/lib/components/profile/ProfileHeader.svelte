@@ -9,7 +9,7 @@
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { formatCount } from '$lib/utils/format';
-	import { readApiError } from '$lib/utils/api-error';
+	import { followStore } from '$lib/utils/follow.svelte';
 
 	import { profileStore, resolveProfile, type ProfileData } from '$lib/utils/profile.svelte';
 
@@ -27,10 +27,6 @@
 		user: initialUser
 	}: Props = $props();
 
-	// Optimistic follow state; null means "use what the server loaded".
-	let followOverride = $state<boolean | null>(null);
-	let followersDelta = $state(0);
-	let followPending = $state(false);
 	let settingsOpen = $state(false);
 	let desktopDropdownOpen = $state(false);
 	let shareModalOpen = $state(false);
@@ -73,8 +69,14 @@
 		});
 	});
 
-	let isFollowing = $derived(followOverride ?? customProfile?.isFollowing ?? false);
-	let followersCount = $derived(profile.followersCount + followersDelta);
+	// Shared with post cards, so following from the feed shows here too (and the other way round).
+	let loadedFollowing = $derived(customProfile?.isFollowing ?? false);
+	let isFollowing = $derived(
+		profile.id ? followStore.isFollowing(profile.id, loadedFollowing) : loadedFollowing
+	);
+	let followersCount = $derived(
+		profile.followersCount + (isFollowing === loadedFollowing ? 0 : isFollowing ? 1 : -1)
+	);
 
 	async function toggleFollow() {
 		if (!$session.data?.user) {
@@ -92,34 +94,14 @@
 			return;
 		}
 
-		if (followPending || !profile.id) return;
+		if (!profile.id || followStore.isPending(profile.id)) return;
 		const next = !isFollowing;
-		followOverride = next;
-		followersDelta += next ? 1 : -1;
-		followPending = true;
 		try {
-			const res = await fetch(`/api/users/${encodeURIComponent(profile.id)}/follow`, {
-				method: 'POST'
-			});
-			const body = (await res.json().catch(() => null)) as {
-				following?: boolean;
-				followersCount?: number;
-			} | null;
-			if (!res.ok || typeof body?.following !== 'boolean') {
-				throw new Error(readApiError(body, 'Could not update follow').message);
-			}
-			followOverride = body.following;
-			if (typeof body.followersCount === 'number') {
-				followersDelta = body.followersCount - profile.followersCount;
-			}
-			onFollowChange?.(body.following);
-			toast.show(body.following ? `Following ${profile.name}` : `Unfollowed ${profile.name}`);
+			await followStore.set(profile.id, next);
+			onFollowChange?.(next);
+			toast.show(next ? `Following ${profile.name}` : `Unfollowed ${profile.name}`);
 		} catch (err) {
-			followOverride = !next;
-			followersDelta += next ? -1 : 1;
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
-		} finally {
-			followPending = false;
 		}
 	}
 

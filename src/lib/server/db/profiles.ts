@@ -1,6 +1,7 @@
 import { and, desc, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '.';
-import { post, postLike, userFollow } from './schema';
+import { post, postLike, user } from './schema';
+import { isFollowing } from './follows';
 import { loadPostMedia, loadPostTags, notDeleted } from './posts';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
@@ -24,40 +25,34 @@ export const EMPTY_PROFILE_STATS: ProfileStats = {
 	isFollowing: false
 };
 
-const followersOf = (userId: string) =>
-	sql<number>`(select count(*) from ${userFollow} where ${userFollow.followingId} = ${userId})`;
-
-const followingOf = (userId: string) =>
-	sql<number>`(select count(*) from ${userFollow} where ${userFollow.followerId} = ${userId})`;
-
-/** Header stats for a profile in one round trip. */
+/** Header stats for a profile: live posts and their views, stored follow counters, viewer state. */
 export async function loadProfileStats(
 	db: Database,
 	userId: string,
 	viewerId?: string | null
 ): Promise<ProfileStats> {
-	const isFollowingSql =
-		viewerId && viewerId !== userId
-			? sql<number>`exists(select 1 from ${userFollow} where ${userFollow.followerId} = ${viewerId} and ${userFollow.followingId} = ${userId})`
-			: sql<number>`0`;
-
-	const [row] = await db
-		.select({
-			postsCount: sql<number>`count(*)`,
-			impressionsCount: sql<number>`coalesce(sum(${post.viewsCount}), 0)`,
-			followersCount: followersOf(userId),
-			followingCount: followingOf(userId),
-			isFollowing: isFollowingSql
-		})
-		.from(post)
-		.where(and(eq(post.userId, userId), notDeleted));
+	const [[postRow], [userRow], following] = await Promise.all([
+		db
+			.select({
+				postsCount: sql<number>`count(*)`,
+				impressionsCount: sql<number>`coalesce(sum(${post.viewsCount}), 0)`
+			})
+			.from(post)
+			.where(and(eq(post.userId, userId), notDeleted)),
+		db
+			.select({ followersCount: user.followersCount, followingCount: user.followingCount })
+			.from(user)
+			.where(eq(user.id, userId))
+			.limit(1),
+		viewerId && viewerId !== userId ? isFollowing(db, viewerId, userId) : Promise.resolve(false)
+	]);
 
 	return {
-		postsCount: Number(row?.postsCount ?? 0),
-		impressionsCount: Number(row?.impressionsCount ?? 0),
-		followersCount: Number(row?.followersCount ?? 0),
-		followingCount: Number(row?.followingCount ?? 0),
-		isFollowing: Boolean(row?.isFollowing)
+		postsCount: Number(postRow?.postsCount ?? 0),
+		impressionsCount: Number(postRow?.impressionsCount ?? 0),
+		followersCount: userRow?.followersCount ?? 0,
+		followingCount: userRow?.followingCount ?? 0,
+		isFollowing: following
 	};
 }
 

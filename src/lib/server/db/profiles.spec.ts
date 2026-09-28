@@ -4,8 +4,8 @@ import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
 import { post, postTag, user } from './schema';
 import { loadPostTags } from './posts';
 import { loadProfilePosts, loadProfileStats } from './profiles';
+import { setFollowing } from './follows';
 import { DELETE as deletePost, PATCH as editPost } from '../../../routes/api/posts/[id]/+server';
-import { POST as toggleFollow } from '../../../routes/api/users/[id]/follow/+server';
 
 type Db = Awaited<ReturnType<typeof createTestDb>>['db'];
 type Handler = (event: never) => Promise<Response>;
@@ -54,13 +54,11 @@ function call(
 }
 
 describe('profiles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
-	it('follow toggles and counts followers/following', async () => {
-		const followed = await call(toggleFollow as Handler, { id: 'alice', userId: 'bob' });
-		expect(await followed.json()).toEqual({ following: true, followersCount: 1 });
-		await call(toggleFollow as Handler, { id: 'alice', userId: 'carol' });
+	it('profile stats read the stored follow counters and viewer state', async () => {
+		await setFollowing(db, 'bob', 'alice', true);
+		await setFollowing(db, 'carol', 'alice', true);
 
-		const asBob = await loadProfileStats(db, 'alice', 'bob');
-		expect(asBob).toEqual({
+		expect(await loadProfileStats(db, 'alice', 'bob')).toEqual({
 			postsCount: 2,
 			followersCount: 2,
 			followingCount: 0,
@@ -69,18 +67,14 @@ describe('profiles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 			isFollowing: true
 		});
 		expect((await loadProfileStats(db, 'bob', null)).followingCount).toBe(1);
+		// Your own profile never shows "following yourself".
+		expect((await loadProfileStats(db, 'alice', 'alice')).isFollowing).toBe(false);
 
-		const unfollowed = await call(toggleFollow as Handler, { id: 'alice', userId: 'bob' });
-		expect(await unfollowed.json()).toEqual({ following: false, followersCount: 1 });
-		expect((await loadProfileStats(db, 'alice', 'bob')).isFollowing).toBe(false);
-	});
-
-	it('rejects following yourself, unknown users and anonymous callers', async () => {
-		expect((await call(toggleFollow as Handler, { id: 'alice', userId: 'alice' })).status).toBe(
-			400
-		);
-		expect((await call(toggleFollow as Handler, { id: 'nobody', userId: 'bob' })).status).toBe(404);
-		expect((await call(toggleFollow as Handler, { id: 'alice', userId: null })).status).toBe(401);
+		await setFollowing(db, 'bob', 'alice', false);
+		expect(await loadProfileStats(db, 'alice', 'bob')).toMatchObject({
+			followersCount: 1,
+			isFollowing: false
+		});
 	});
 
 	it('lists live posts in feed shape with the viewer like state', async () => {

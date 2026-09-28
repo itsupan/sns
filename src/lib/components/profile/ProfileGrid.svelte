@@ -435,7 +435,12 @@
 					{@const isLiked = likedItems[item.id] ?? false}
 					{@const isSaved = savedItems[item.id] ?? false}
 					{#if item.post}
-						<PostCard post={item.post} onDelete={handleDeleted} onUpdate={handleUpdated} />
+						<PostCard
+							post={item.post}
+							showFollow={false}
+							onDelete={handleDeleted}
+							onUpdate={handleUpdated}
+						/>
 					{:else}
 						<article
 							class="mb-2 lg:mb-6 mx-3 sm:mx-0 bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xs dark:shadow-none transition-colors"

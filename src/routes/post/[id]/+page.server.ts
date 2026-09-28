@@ -3,6 +3,7 @@ import { eq, desc, and, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 import { post, postLike, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
+import { loadFollowedIds } from '$lib/server/db/follows';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
@@ -137,6 +138,10 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 				const parsedTags = tagsByPost.get(r.post.id) ?? [];
 				const parsedMedia = mediaByPost.get(r.post.id) ?? [];
 
+				const followsAuthor = (await loadFollowedIds(locals.db, locals.user?.id, [r.user.id])).has(
+					r.user.id
+				);
+
 				let isLiked = false;
 				if (locals.user) {
 					const likes = await locals.db
@@ -183,7 +188,8 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 							: `@${r.user.name.toLowerCase().replace(/\s+/g, '')}`,
 						avatar: r.user.image || '',
 						location: r.post.location || r.user.location || undefined,
-						timeAgo: formatTimeAgo(r.post.createdAt)
+						timeAgo: formatTimeAgo(r.post.createdAt),
+						isFollowing: followsAuthor
 					},
 					title: r.post.title || '',
 					description: r.post.content,

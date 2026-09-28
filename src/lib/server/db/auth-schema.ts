@@ -22,6 +22,8 @@ export const user = sqliteTable("user", {
   website: text("website"),
   location: text("location"),
   cameraGear: text("camera_gear"),
+  followersCount: integer("followers_count").default(0).notNull(),
+  followingCount: integer("following_count").default(0).notNull(),
 });
 
 export const session = sqliteTable(
