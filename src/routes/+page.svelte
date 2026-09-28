@@ -188,7 +188,6 @@
 			<!-- Sentinel element positioned preemptively for seamless infinite scroll -->
 			<div
 				bind:this={sentinelEl}
-				data-testid="feed-sentinel"
 				class="h-8 w-full -mt-2 pointer-events-none"
 				aria-hidden="true"
 			></div>

@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 
 describe('home page', () => {
@@ -51,6 +51,25 @@ describe('home page', () => {
 	});
 
 	describe('infinite scroll', () => {
+		// Treat the sentinel as visible once observed, so the test doesn't depend on viewport size.
+		beforeEach(() => {
+			vi.stubGlobal(
+				'IntersectionObserver',
+				class {
+					constructor(private cb: IntersectionObserverCallback) {}
+					observe(target: Element) {
+						queueMicrotask(() =>
+							this.cb(
+								[{ isIntersecting: true, target } as IntersectionObserverEntry],
+								this as unknown as IntersectionObserver
+							)
+						);
+					}
+					disconnect() {}
+					unobserve() {}
+				}
+			);
+		});
 		afterEach(() => vi.unstubAllGlobals());
 
 		it('pages with nextCursor and stops when it is null', async () => {
@@ -62,8 +81,6 @@ describe('home page', () => {
 					data: { posts: [makePost('page-1')], hasMore: true, nextCursor: '1700_p1', pageSize: 1 }
 				}
 			});
-			await scrollUntilFetched(fetchMock);
-
 			await expect.element(screen.getByText('Title page-2')).toBeInTheDocument();
 			await expect.element(screen.getByText("You're all caught up")).toBeInTheDocument();
 			expect(fetchMock.calls).toEqual(['/api/posts?limit=1&cursor=1700_p1']);
@@ -81,8 +98,6 @@ describe('home page', () => {
 					data: { posts: [makePost('page-1')], hasMore: true, nextCursor: 'bad', pageSize: 1 }
 				}
 			});
-			await scrollUntilFetched(fetchMock);
-
 			await expect.element(screen.getByText('Invalid cursor')).toBeInTheDocument();
 			await expect.element(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 			await new Promise((r) => setTimeout(r, 300));
@@ -118,18 +133,4 @@ function mockFeedApi(respond: () => Response) {
 		})
 	);
 	return { calls };
-}
-
-// The sentinel sits below the stories bar, composer and first card, outside the test viewport,
-// and may mount after render, so keep scrolling it into view until the feed request fires.
-async function scrollUntilFetched(mock: { calls: string[] }) {
-	await expect
-		.poll(
-			() => {
-				document.querySelector('[data-testid="feed-sentinel"]')?.scrollIntoView();
-				return mock.calls.length;
-			},
-			{ timeout: 10_000 }
-		)
-		.toBeGreaterThan(0);
 }
