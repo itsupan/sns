@@ -30,7 +30,6 @@ describe('Individual Post +page.server.ts', () => {
 			aspectRatio: '4:5',
 			location: 'Copenhagen, Denmark',
 			cameraMeta: '35mm · ISO 200',
-			tags: JSON.stringify(['#MinimalArchitecture']),
 			likesCount: 15,
 			commentsCount: 2,
 			sharesCount: 1,
