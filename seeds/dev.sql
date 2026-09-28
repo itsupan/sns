@@ -5,14 +5,14 @@ VALUES
   ('usr_sophia_dev', 'Sophia Vane', 'sophia@kizuna.art', 1, 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&auto=format&fit=crop&q=80', 'vane.studio', 'Visual curator studying monolithic spaces and tactile interiors.', 'Stockholm, Sweden'),
   ('usr_lars_dev', 'Lars Lindqvist', 'lars@kizuna.art', 1, 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80', 'lindqvist.nord', 'Landscape & spatial archivist focusing on alpine mineral structures.', 'Oslo, Norway');
 
-INSERT OR REPLACE INTO `post` (`id`, `user_id`, `title`, `content`, `aspect_ratio`, `location`, `camera_meta`, `tags`, `post_type`, `likes_count`, `comments_count`, `shares_count`)
+INSERT OR REPLACE INTO `post` (`id`, `user_id`, `title`, `content`, `aspect_ratio`, `location`, `camera_meta`, `post_type`, `likes_count`, `comments_count`, `shares_count`)
 VALUES
-  ('post-1', 'usr_elena_dev', 'Quiet Brutalism: Concrete Light & Shadows', 'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.', '4:5', 'Fondazione Prada, Milano', '35mm · ISO 200', '["#MinimalArchitecture", "#LightAndSpace", "#DesignArchive"]', 'photo', 842, 46, 12),
-  ('post-2', 'usr_kai_dev', 'Wabi-Sabi Clay & Stoneware Forms', 'Hand-pinched Shigaraki stoneware fired in an anagama kiln over seven days. The ash melt creates an unrepeatable landscape of mineral hues and subtle texture.', '1:1', 'Kyoto, Japan', '50mm · ISO 400', '["#KyotoCeramics", "#WabiSabi", "#JapaneseCraft"]', 'photo', 618, 29, 8),
-  ('post-3', 'usr_sophia_dev', 'Nordic Monolith: Timber & Slate Textures', 'Tactile cedar and natural slate slabs balancing acoustic warmth with Nordic brutalist geometry.', '4:5', 'Stockholm, Sweden', '28mm · ISO 100', '["#NordicDesign", "#TimberArchitecture", "#TactileSpaces"]', 'photo', 512, 18, 5),
-  ('post-4', 'usr_lars_dev', 'Mineral Azimuth: Fjord Mist & Raw Stone', 'Dolomite rock formations reflected through dawn moisture along the Sognefjord mountain pass.', '1:1', 'Vestland, Norway', '80mm · ISO 200', '["#AlpineMinimalism", "#FjordLandscape", "#RawEarth"]', 'photo', 437, 22, 9),
-  ('post-5', 'usr_elena_dev', 'Spiral Concrete: Geometry in Rotation', 'Continuous spiral staircase forming a helical prism through the skylight atrium.', '4:5', 'Helsinki, Finland', '35mm · ISO 400', '["#HelicalForm", "#BrutalistStairs", "#DesignArchive"]', 'photo', 720, 35, 14),
-  ('post-6', 'usr_kai_dev', 'Charred Yakisugi Cedar: Fire & Longevity', 'Surface preservation through controlled combustion. The blackened timber absorbs dawn light with velvety depth.', '1:1', 'Nara, Japan', '50mm · ISO 160', '["#Yakisugi", "#KyotoCraft", "#JapaneseWoodwork"]', 'photo', 589, 27, 11);
+  ('post-1', 'usr_elena_dev', 'Quiet Brutalism: Concrete Light & Shadows', 'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.', '4:5', 'Fondazione Prada, Milano', '35mm · ISO 200', 'photo', 842, 46, 12),
+  ('post-2', 'usr_kai_dev', 'Wabi-Sabi Clay & Stoneware Forms', 'Hand-pinched Shigaraki stoneware fired in an anagama kiln over seven days. The ash melt creates an unrepeatable landscape of mineral hues and subtle texture.', '1:1', 'Kyoto, Japan', '50mm · ISO 400', 'photo', 618, 29, 8),
+  ('post-3', 'usr_sophia_dev', 'Nordic Monolith: Timber & Slate Textures', 'Tactile cedar and natural slate slabs balancing acoustic warmth with Nordic brutalist geometry.', '4:5', 'Stockholm, Sweden', '28mm · ISO 100', 'photo', 512, 18, 5),
+  ('post-4', 'usr_lars_dev', 'Mineral Azimuth: Fjord Mist & Raw Stone', 'Dolomite rock formations reflected through dawn moisture along the Sognefjord mountain pass.', '1:1', 'Vestland, Norway', '80mm · ISO 200', 'photo', 437, 22, 9),
+  ('post-5', 'usr_elena_dev', 'Spiral Concrete: Geometry in Rotation', 'Continuous spiral staircase forming a helical prism through the skylight atrium.', '4:5', 'Helsinki, Finland', '35mm · ISO 400', 'photo', 720, 35, 14),
+  ('post-6', 'usr_kai_dev', 'Charred Yakisugi Cedar: Fire & Longevity', 'Surface preservation through controlled combustion. The blackened timber absorbs dawn light with velvety depth.', '1:1', 'Nara, Japan', '50mm · ISO 160', 'photo', 589, 27, 11);
 
 -- Post media (#32).
 INSERT OR REPLACE INTO `post_media` (`id`, `post_id`, `url`, `type`, `position`)
@@ -27,7 +27,7 @@ VALUES
   ('media-post-5-0', 'post-5', 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80', 'image', 0),
   ('media-post-6-0', 'post-6', 'https://images.unsplash.com/photo-1579783902614-a3fb3927b675?w=1200&auto=format&fit=crop&q=80', 'image', 0);
 
--- Tags (#33). Seeds run after migrations, so the 0007 backfill never sees the JSON above.
+-- Tags (#33).
 -- #DesignArchive is shared by post-1 and post-5 (one tag row, two links).
 INSERT OR IGNORE INTO `tag` (`id`, `slug`, `name`)
 VALUES

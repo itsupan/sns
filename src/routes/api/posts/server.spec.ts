@@ -40,7 +40,6 @@ describe('GET /api/posts', () => {
 					title: 'Brutalist Concrete',
 					content: 'A study on dawn light.',
 					cameraMeta: '35mm',
-					tags: JSON.stringify(['#MinimalArchitecture']),
 					likesCount: 10,
 					commentsCount: 2,
 					sharesCount: 1,

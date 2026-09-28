@@ -23,8 +23,6 @@ export const post = sqliteTable(
 		aspectRatio: text('aspect_ratio').default('1:1'), // '1:1' | '4:5' | '16:9'
 		location: text('location'), // e.g. "Fondazione Prada, Milano"
 		cameraMeta: text('camera_meta'),
-		// Legacy JSON tags: superseded by tag/post_tag, still dual-written until the contract step.
-		tags: text('tags'),
 		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article'
 		likesCount: integer('likes_count').default(0).notNull(),
 		commentsCount: integer('comments_count').default(0).notNull(),

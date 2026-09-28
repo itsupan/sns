@@ -178,9 +178,6 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		body.postType === 'story' || body.postType === 'article' ? body.postType : 'photo';
 
 	const normalizedTags = normalizeTags(body.tags);
-	const tags = normalizedTags.map((t) => `#${t.name}`);
-	// Legacy JSON column, dual-written until the contract step of #33.
-	const tagsJson = Array.isArray(body.tags) ? JSON.stringify(tags) : null;
 
 	const newPostId = crypto.randomUUID();
 
@@ -192,7 +189,6 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		aspectRatio,
 		location,
 		cameraMeta,
-		tags: tagsJson,
 		postType,
 		likesCount: 0,
 		commentsCount: 0,
