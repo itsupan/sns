@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { asc } from 'drizzle-orm';
-import { createTestDb } from '$lib/server/testing/d1';
+import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
 import { postMedia } from './schema';
 import { loadPostMedia } from './posts';
 import { GET as listPosts, POST as createPost } from '../../../routes/api/posts/+server';
@@ -50,7 +50,7 @@ beforeAll(async () => {
 
 afterAll(() => t?.dispose());
 
-describe('post_media backfill (migration 0005)', () => {
+describe('post_media backfill (migration 0005)', { timeout: REAL_D1_TIMEOUT }, () => {
 	it('copies legacy media in order with contiguous positions', async () => {
 		const media = await loadPostMedia(
 			t.db,
@@ -77,7 +77,7 @@ describe('post_media backfill (migration 0005)', () => {
 	});
 });
 
-describe('posts API with post_media', () => {
+describe('posts API with post_media', { timeout: REAL_D1_TIMEOUT }, () => {
 	function call(handler: Handler, body?: unknown) {
 		const event = {
 			url: new URL('http://localhost/api/posts'),
