@@ -27,6 +27,8 @@ export const post = sqliteTable(
 		likesCount: integer('likes_count').default(0).notNull(),
 		commentsCount: integer('comments_count').default(0).notNull(),
 		sharesCount: integer('shares_count').default(0).notNull(),
+		// Times the post page was opened by someone other than the author; summed into profile impressions.
+		viewsCount: integer('views_count').default(0).notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
@@ -137,6 +139,27 @@ export const postComment = sqliteTable(
 		index('post_comment_postId_idx').on(table.postId),
 		index('post_comment_userId_idx').on(table.userId),
 		index('post_comment_createdAt_idx').on(table.createdAt)
+	]
+);
+
+export const userFollow = sqliteTable(
+	'user_follow',
+	{
+		followerId: text('follower_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		followingId: text('following_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// The PK serves "who does X follow" (WHERE follower_id = ?).
+		primaryKey({ columns: [table.followerId, table.followingId] }),
+		// Followers of a user: WHERE following_id = ?
+		index('user_follow_followingId_idx').on(table.followingId)
 	]
 );
 

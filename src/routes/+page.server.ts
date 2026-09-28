@@ -152,6 +152,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 				mediaType: parsedMedia[0]?.type || 'none',
 				mediaItems: parsedMedia,
 				aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
+				postType: r.post.postType as 'photo' | 'story' | 'article',
 				location: r.post.location || r.user.location || undefined,
 				cameraMeta: r.post.cameraMeta || undefined,
 				tags: parsedTags,

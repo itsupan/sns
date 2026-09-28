@@ -169,7 +169,7 @@ test('public profile page displays curator posts in curated grid', async ({ page
 
 	// Her real posts from the database should be visible in the Curated Grid
 	await expect(
-		page.getByRole('button', { name: /View photo Quiet Brutalism: Concrete Light & Shadows/i })
+		page.getByRole('button', { name: /View post Quiet Brutalism: Concrete Light & Shadows/i })
 	).toBeVisible();
 
 	// Verify SEO Open Graph & Twitter meta tags contain image

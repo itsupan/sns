@@ -6,28 +6,19 @@
 	import { OPEN_COMPOSER_EVENT } from '$lib/components/shared/nav-items';
 	import { asset } from '$app/paths';
 	import { authClient } from '$lib/auth-client';
-	import { uploadToR2 } from '$lib/utils/upload';
 	import { toast } from '$lib/utils/toast.svelte';
-	import {
-		MAX_MEDIA_PER_POST,
-		MAX_TAGS_PER_POST,
-		MAX_TAG_LENGTH
-	} from '$lib/constants/post-limits';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { PostData } from './PostCard.svelte';
+	import PostComposerFields from './PostComposerFields.svelte';
+	import {
+		ASPECT_RATIOS as ratios,
+		MAX_CONTENT_LENGTH,
+		POST_TYPES as types,
+		PostDraft
+	} from './post-draft.svelte';
 
-	export type PostType = 'photo' | 'story' | 'article';
-
-	export interface MediaPlate {
-		id: string;
-		url: string;
-		previewUrl: string;
-		type: 'image' | 'video';
-		file?: File;
-		uploading?: boolean;
-		progress?: number;
-	}
+	export type { PostType, MediaPlate } from './post-draft.svelte';
 
 	interface Props {
 		onPublish?: (post: PostData) => void;
@@ -38,41 +29,20 @@
 
 	const session = authClient.useSession();
 
-	let content = $state('');
-	let title = $state('');
-	let selectedType = $state<PostType>('photo');
-	let canvasRatio = $state<'1:1' | '4:5' | '16:9'>('1:1');
-	let location = $state('');
+	const draft = new PostDraft();
 
 	let sheetOpen = $state(false);
 	let studioModalOpen = $state(false);
 	let inlineInput = $state<HTMLTextAreaElement | null>(null);
 
-	let fileInputMobile = $state<HTMLInputElement | null>(null);
 	let fileInputDesktop = $state<HTMLInputElement | null>(null);
 	let fileInputStudio = $state<HTMLInputElement | null>(null);
 
-	let mediaPlates = $state<MediaPlate[]>([]);
-	let activePlateIndex = $state(0);
 	let isSubmitting = $state(false);
 	let isDragging = $state(false);
 
-	let tagInput = $state('');
-	let tags = $state<string[]>([]);
 	let showLocationInput = $state(false);
 	let showTagInput = $state(false);
-
-	const types: { id: PostType; label: string; icon: string }[] = [
-		{ id: 'photo', label: 'Photo', icon: 'picture' },
-		{ id: 'story', label: 'Story', icon: 'play-alt' },
-		{ id: 'article', label: 'Article', icon: 'document' }
-	];
-
-	const ratios: { id: '1:1' | '4:5' | '16:9'; label: string; sub: string }[] = [
-		{ id: '1:1', label: '1:1', sub: 'Square' },
-		{ id: '4:5', label: '4:5', sub: 'Gallery' },
-		{ id: '16:9', label: '16:9', sub: 'Cinema' }
-	];
 
 	let currentUser = $derived({
 		name: $session.data?.user?.name || '',
@@ -81,92 +51,32 @@
 
 	let avatarSrc = $derived(currentUser.image || asset('/brand/logo-64.png'));
 
-	const isUploadingAny = $derived(mediaPlates.some((p) => p.uploading));
-	const isPublishDisabled = $derived(
-		(!content.trim() && mediaPlates.length === 0) || isSubmitting || isUploadingAny
-	);
+	const isPublishDisabled = $derived(draft.isEmpty || isSubmitting || draft.isUploadingAny);
 
 	const ratioClass = $derived.by(() => {
-		if (canvasRatio === '1:1') return 'aspect-square';
-		if (canvasRatio === '16:9') return 'aspect-video';
+		if (draft.canvasRatio === '1:1') return 'aspect-square';
+		if (draft.canvasRatio === '16:9') return 'aspect-video';
 		return 'aspect-[4/5]';
 	});
 
-	const activePlate = $derived(mediaPlates[activePlateIndex] ?? mediaPlates[0] ?? null);
+	/** Sends signed-out users to login; returns whether the user may continue. */
+	function requireLogin(message: string): boolean {
+		if ($session.data?.user) return true;
+		toast.show(message);
+		const currentPath =
+			typeof window !== 'undefined'
+				? window.location.pathname + window.location.search
+				: resolve('/');
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		goto(`${resolve('/login')}?redirectTo=${encodeURIComponent(currentPath)}`).catch(() => {
+			// Router not mounted
+		});
+		return false;
+	}
 
-	async function processFiles(files: FileList | File[]) {
-		if (!$session.data?.user) {
-			toast.show('Please log in to upload media');
-			const currentPath =
-				typeof window !== 'undefined'
-					? window.location.pathname + window.location.search
-					: resolve('/');
-			try {
-				// eslint-disable-next-line svelte/no-navigation-without-resolve
-				await goto(`${resolve('/login')}?redirectTo=${encodeURIComponent(currentPath)}`);
-			} catch {
-				// Router not mounted
-			}
-			return;
-		}
-
-		const mediaFiles = Array.from(files).filter(
-			(f) => f.type.startsWith('image/') || f.type.startsWith('video/')
-		);
-		if (mediaFiles.length === 0) return;
-
-		const room = MAX_MEDIA_PER_POST - mediaPlates.length;
-		if (mediaFiles.length > room) {
-			toast.show(`A post can have at most ${MAX_MEDIA_PER_POST} photos or videos`);
-		}
-		const validFiles = mediaFiles.slice(0, Math.max(room, 0));
-		if (validFiles.length === 0) return;
-
-		for (const file of validFiles) {
-			const isVideo = file.type.startsWith('video/');
-			const plateId = crypto.randomUUID();
-			const previewUrl = URL.createObjectURL(file);
-
-			const newPlate: MediaPlate = {
-				id: plateId,
-				url: '',
-				previewUrl,
-				type: isVideo ? 'video' : 'image',
-				file,
-				uploading: true,
-				progress: 0
-			};
-
-			mediaPlates = [...mediaPlates, newPlate];
-			activePlateIndex = mediaPlates.length - 1;
-
-			// Upload asynchronously
-			uploadToR2(file, {
-				optimize: !isVideo,
-				onProgress: (pct) => {
-					mediaPlates = mediaPlates.map((p) => (p.id === plateId ? { ...p, progress: pct } : p));
-				}
-			})
-				.then((result) => {
-					mediaPlates = mediaPlates.map((p) =>
-						p.id === plateId
-							? {
-									...p,
-									url: result.publicUrl,
-									previewUrl: result.publicUrl,
-									uploading: false,
-									progress: 100
-								}
-							: p
-					);
-					toast.show(`${isVideo ? 'Video' : 'Photo'} uploaded`);
-				})
-				.catch((err) => {
-					const msg = err instanceof Error ? err.message : 'Media upload failed';
-					toast.show(msg);
-					removePlate(plateId);
-				});
-		}
+	function processFiles(files: FileList | File[]) {
+		if (!requireLogin('Please log in to upload media')) return;
+		draft.processFiles(files);
 	}
 
 	function handleFileSelect(e: Event) {
@@ -177,94 +87,16 @@
 		target.value = '';
 	}
 
-	function removePlate(id: string) {
-		const target = mediaPlates.find((p) => p.id === id);
-		if (target && target.previewUrl.startsWith('blob:')) {
-			URL.revokeObjectURL(target.previewUrl);
-		}
-		mediaPlates = mediaPlates.filter((p) => p.id !== id);
-		if (activePlateIndex >= mediaPlates.length) {
-			activePlateIndex = Math.max(0, mediaPlates.length - 1);
-		}
-	}
-
-	function removeAllMedia() {
-		for (const p of mediaPlates) {
-			if (p.previewUrl.startsWith('blob:')) {
-				URL.revokeObjectURL(p.previewUrl);
-			}
-		}
-		mediaPlates = [];
-		activePlateIndex = 0;
-	}
-
-	function addTag() {
-		const clean = tagInput.trim().replace(/^#+/, '').slice(0, MAX_TAG_LENGTH);
-		if (clean && tags.length >= MAX_TAGS_PER_POST) {
-			toast.show(`A post can have at most ${MAX_TAGS_PER_POST} tags`);
-			return;
-		}
-		if (clean && !tags.some((t) => t.toLowerCase() === `#${clean}`.toLowerCase())) {
-			tags = [...tags, `#${clean}`];
-			tagInput = '';
-		}
-	}
-
-	function removeTag(tag: string) {
-		tags = tags.filter((t) => t !== tag);
-	}
-
-	function handleTagKeydown(e: KeyboardEvent) {
-		if (e.key === 'Enter' || e.key === ',') {
-			e.preventDefault();
-			addTag();
-		}
-	}
-
 	async function publish() {
-		const trimmedContent = content.trim();
-		if ((!trimmedContent && mediaPlates.length === 0) || isSubmitting || isUploadingAny) return;
-
-		if (!$session.data?.user) {
-			toast.show('Please log in to publish a post');
-			const currentPath =
-				typeof window !== 'undefined'
-					? window.location.pathname + window.location.search
-					: resolve('/');
-			try {
-				// eslint-disable-next-line svelte/no-navigation-without-resolve
-				await goto(`${resolve('/login')}?redirectTo=${encodeURIComponent(currentPath)}`);
-			} catch {
-				// Router not mounted
-			}
-			return;
-		}
+		if (isPublishDisabled) return;
+		if (!requireLogin('Please log in to publish a post')) return;
 
 		isSubmitting = true;
 		try {
-			const mediaUrlsPayload = mediaPlates
-				.filter((p) => p.url)
-				.map((p) => ({ url: p.url, type: p.type }));
-
-			const primaryPlate = mediaUrlsPayload[0];
-
 			const res = await fetch('/api/posts', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({
-					content: trimmedContent || (selectedType === 'photo' ? 'Visual Exhibition' : 'Note'),
-					title:
-						title.trim() ||
-						(selectedType === 'article' ? trimmedContent.split('\n')[0].slice(0, 80) : null),
-					mediaUrl: primaryPlate?.url ?? null,
-					mediaType: primaryPlate?.type ?? 'none',
-					mediaUrls: mediaUrlsPayload,
-					aspectRatio: canvasRatio,
-					location: location.trim() || null,
-					postType: selectedType,
-					cameraMeta: null,
-					tags
-				})
+				body: JSON.stringify({ ...draft.toPayload(), cameraMeta: null })
 			});
 
 			if (!res.ok) {
@@ -276,14 +108,9 @@
 			onPublish?.(data.post);
 			toast.show('Post published successfully');
 
-			content = '';
-			title = '';
-			location = '';
-			tags = [];
-			tagInput = '';
+			draft.reset();
 			showLocationInput = false;
 			showTagInput = false;
-			removeAllMedia();
 			sheetOpen = false;
 			studioModalOpen = false;
 		} catch (err) {
@@ -344,14 +171,6 @@
 
 <!-- Hidden Multi-file Inputs -->
 <input
-	bind:this={fileInputMobile}
-	type="file"
-	multiple
-	accept="image/*,video/*"
-	class="hidden"
-	onchange={handleFileSelect}
-/>
-<input
 	bind:this={fileInputDesktop}
 	type="file"
 	multiple
@@ -386,7 +205,7 @@
 		class="size-11 rounded-full flex items-center justify-center text-slate-600 dark:text-dark-muted border-0 bg-transparent cursor-pointer active:scale-90 active:bg-slate-100 dark:active:bg-dark-hover transition"
 		aria-label="Add photo"
 		onclick={() => {
-			selectedType = 'photo';
+			draft.selectedType = 'photo';
 			sheetOpen = true;
 		}}
 	>
@@ -396,200 +215,12 @@
 
 <!-- 2. MOBILE BOTTOMSHEET COMPOSER (Matching Mockup 0) -->
 <BottomSheet bind:open={sheetOpen} title="Create post" showTitle>
-	<form id="mobile-composer" onsubmit={handleSubmit} class="flex flex-col gap-4 px-3 pb-3">
-		<!-- Mode Switcher Tabs (Photo / Essay / Motion) -->
-		<div
-			class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-dark-elevated rounded-2xl"
-			role="radiogroup"
-			aria-label="Post type"
-		>
-			{#each types as type (type.id)}
-				<button
-					type="button"
-					role="radio"
-					aria-checked={selectedType === type.id}
-					class="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition border-0 cursor-pointer {selectedType ===
-					type.id
-						? 'bg-white dark:bg-dark-card text-slate-950 dark:text-white shadow-xs'
-						: 'text-slate-600 dark:text-dark-muted'}"
-					onclick={() => (selectedType = type.id)}
-				>
-					<Icon name={type.icon} class="text-xs" />
-					<span>{type.label.split('/')[0].trim()}</span>
-				</button>
-			{/each}
-		</div>
-
-		<!-- Multiple Media Sequence Tray (Mockup 0) -->
-		{#if mediaPlates.length > 0}
-			<div class="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar">
-				{#each mediaPlates as plate, idx (plate.id)}
-					<div
-						class="relative shrink-0 w-28 aspect-[4/5] rounded-2xl overflow-hidden bg-slate-900 border-2 transition-all {idx ===
-						activePlateIndex
-							? 'border-slate-950 dark:border-white shadow-sm'
-							: 'border-transparent opacity-85'}"
-					>
-						<!-- Plate Thumbnail -->
-						{#if plate.type === 'video'}
-							<video
-								src={plate.previewUrl}
-								class="w-full h-full object-cover"
-								muted
-								playsinline
-								preload="metadata"
-							></video>
-						{:else}
-							<img src={plate.previewUrl} alt="Plate preview" class="w-full h-full object-cover" />
-						{/if}
-
-						<!-- Delete Button -->
-						<button
-							type="button"
-							onclick={() => removePlate(plate.id)}
-							class="absolute top-1.5 right-1.5 size-6 rounded-full bg-black/75 text-white flex items-center justify-center text-xs border-0 cursor-pointer shadow-sm active:scale-90"
-							aria-label="Remove plate"
-						>
-							✕
-						</button>
-
-						<!-- Plate Index Badge -->
-						<div
-							class="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-xs text-white text-[10px] font-semibold"
-						>
-							{idx === 0 ? `Primary · 1/${mediaPlates.length}` : `${idx + 1}/${mediaPlates.length}`}
-						</div>
-
-						<!-- Upload Progress Overlay -->
-						{#if plate.uploading}
-							<div
-								class="absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-[11px]"
-							>
-								<span>{plate.progress}%</span>
-							</div>
-						{/if}
-					</div>
-				{/each}
-
-				<!-- Add Plate Button -->
-				<button
-					type="button"
-					onclick={() => fileInputMobile?.click()}
-					class="shrink-0 w-24 aspect-[4/5] rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-border flex flex-col items-center justify-center gap-1 text-slate-500 dark:text-dark-muted bg-transparent cursor-pointer active:scale-95 transition"
-				>
-					<Icon name="plus" class="text-lg" />
-					<span class="text-[11px] font-medium">Add Plate</span>
-				</button>
-			</div>
-		{/if}
-
-		<!-- Canvas Ratio Selector (Only when media attached) -->
-		{#if mediaPlates.length > 0}
-			<div
-				class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-dark-elevated/60 rounded-2xl text-xs"
-			>
-				<div class="flex items-center gap-2 text-slate-600 dark:text-dark-muted font-medium">
-					<Icon name="crop" class="text-sm" />
-					<span>Canvas Ratio</span>
-				</div>
-				<div class="flex items-center gap-1">
-					{#each ratios as r (r.id)}
-						<button
-							type="button"
-							onclick={() => (canvasRatio = r.id)}
-							class="px-2.5 py-1 rounded-xl text-xs font-semibold transition border-0 cursor-pointer {canvasRatio ===
-							r.id
-								? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 shadow-xs'
-								: 'bg-white dark:bg-dark-card text-slate-600 dark:text-dark-muted'}"
-						>
-							{r.label}
-						</button>
-					{/each}
-				</div>
-			</div>
-		{/if}
-
-		{#if selectedType === 'article'}
-			<input
-				type="text"
-				bind:value={title}
-				placeholder="Article title..."
-				class="w-full text-base font-bold text-slate-950 dark:text-white bg-transparent border-b border-slate-200 dark:border-dark-border pb-2 focus:outline-none"
-			/>
-		{/if}
-
-		<!-- Caption & Intent Textarea with Character Counter -->
-		<div class="flex flex-col gap-1.5">
-			<div class="flex items-center justify-between text-xs text-slate-400">
-				<span class="font-medium text-slate-600 dark:text-dark-muted">Caption & Intent</span>
-				<span>{content.length} / 2,200</span>
-			</div>
-			<textarea
-				bind:value={content}
-				use:autogrow
-				rows="3"
-				maxlength="2200"
-				placeholder="Share an architectural observation, exhibition note..."
-				aria-label="Post content"
-				enterkeyhint="enter"
-				class="w-full min-h-24 max-h-[30dvh] resize-none bg-slate-50 dark:bg-dark-elevated/40 rounded-2xl p-3 text-sm leading-relaxed text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
-			></textarea>
-		</div>
-
-		<!-- Interactive Tags List -->
-		{#if tags.length > 0}
-			<div class="flex items-center gap-1.5 flex-wrap">
-				{#each tags as tag (tag)}
-					<span
-						class="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-800 dark:text-dark-text font-medium"
-					>
-						{tag}
-						<button
-							type="button"
-							onclick={() => removeTag(tag)}
-							class="text-slate-400 hover:text-slate-700 dark:hover:text-white border-0 bg-transparent cursor-pointer p-0"
-						>
-							×
-						</button>
-					</span>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- Spatial Location & Metadata Inputs -->
-		<div class="flex flex-col gap-2 pt-1 border-t border-slate-100 dark:border-dark-border">
-			<div
-				class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-dark-elevated/50 text-xs"
-			>
-				<Icon name="map-marker" class="text-sm text-slate-400" />
-				<input
-					type="text"
-					bind:value={location}
-					placeholder="Exhibition Space / Location (e.g. Fondazione Prada)"
-					class="flex-1 bg-transparent border-0 text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
-				/>
-			</div>
-
-			<div class="flex items-center gap-2">
-				<button
-					type="button"
-					onclick={() => fileInputMobile?.click()}
-					class="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-slate-100 dark:bg-dark-elevated text-xs font-semibold text-slate-700 dark:text-dark-text border-0 cursor-pointer active:scale-95 transition"
-				>
-					<Icon name="picture" class="text-sm text-blue-600 dark:text-kizuna-blue" />
-					<span>{mediaPlates.length > 0 ? 'Add more stills' : 'Attach Stills / Media'}</span>
-				</button>
-
-				<input
-					type="text"
-					bind:value={tagInput}
-					onkeydown={handleTagKeydown}
-					placeholder="#tag (Enter)"
-					class="w-32 h-10 px-3 text-xs bg-slate-100/70 dark:bg-dark-elevated text-slate-800 dark:text-dark-text placeholder:text-slate-400 rounded-xl border-0 focus:outline-none"
-				/>
-			</div>
-		</div>
-	</form>
+	<PostComposerFields
+		{draft}
+		id="mobile-composer"
+		onsubmit={publish}
+		beforeAddMedia={() => requireLogin('Please log in to upload media')}
+	/>
 
 	{#snippet footer()}
 		<div class="flex items-center gap-3 w-full">
@@ -626,10 +257,10 @@
 	aria-label="Create Post"
 >
 	<form onsubmit={handleSubmit} class="flex flex-col gap-3.5">
-		{#if selectedType === 'article'}
+		{#if draft.selectedType === 'article'}
 			<input
 				type="text"
-				bind:value={title}
+				bind:value={draft.title}
 				placeholder="Article title..."
 				class="w-full text-base sm:text-lg font-bold text-slate-950 dark:text-white bg-transparent border-b border-slate-100 dark:border-dark-border pb-2 focus:outline-none placeholder:text-slate-400"
 			/>
@@ -640,17 +271,17 @@
 			<div class="flex-1 flex flex-col gap-3">
 				<textarea
 					bind:this={inlineInput}
-					bind:value={content}
+					bind:value={draft.content}
 					use:autogrow
 					rows="2"
-					maxlength="2200"
+					maxlength={MAX_CONTENT_LENGTH}
 					placeholder="Share an architectural observation, exhibition note..."
 					aria-label="Post content"
 					class="w-full min-h-16 py-1 px-1 text-[15px] bg-transparent text-slate-900 dark:text-dark-text placeholder:text-slate-400 dark:placeholder:text-dark-subtle border-0 focus:outline-none transition-all duration-150 resize-none leading-relaxed"
 				></textarea>
 
 				<!-- Multiple Media Preview / Sequence Tray (Desktop) -->
-				{#if mediaPlates.length > 0}
+				{#if draft.mediaPlates.length > 0}
 					<div
 						class="flex flex-col gap-3 p-3.5 bg-slate-50 dark:bg-dark-elevated/40 rounded-2xl border border-slate-100 dark:border-dark-border"
 					>
@@ -669,8 +300,8 @@
 									{#each ratios as r (r.id)}
 										<button
 											type="button"
-											onclick={() => (canvasRatio = r.id)}
-											class="px-2.5 py-0.5 rounded-md font-medium transition cursor-pointer border-0 {canvasRatio ===
+											onclick={() => (draft.canvasRatio = r.id)}
+											class="px-2.5 py-0.5 rounded-md font-medium transition cursor-pointer border-0 {draft.canvasRatio ===
 											r.id
 												? 'bg-white dark:bg-dark-card text-slate-950 dark:text-white shadow-xs font-semibold'
 												: 'text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white'}"
@@ -684,11 +315,11 @@
 
 							<div class="flex items-center gap-3">
 								<span class="text-[11px] font-mono text-slate-400">
-									Plate {activePlateIndex + 1} of {mediaPlates.length}
+									Plate {draft.activePlateIndex + 1} of {draft.mediaPlates.length}
 								</span>
 								<button
 									type="button"
-									onclick={removeAllMedia}
+									onclick={() => draft.removeAllMedia()}
 									class="text-[11px] text-slate-400 hover:text-red-500 transition border-0 bg-transparent cursor-pointer"
 								>
 									Clear all
@@ -697,27 +328,27 @@
 						</div>
 
 						<!-- Active Plate Master Canvas Preview -->
-						{#if activePlate}
+						{#if draft.activePlate}
 							<div
 								class="relative w-full max-h-80 {ratioClass} rounded-2xl overflow-hidden bg-slate-950 mx-auto flex items-center justify-center shadow-inner"
 							>
-								{#if activePlate.type === 'video'}
+								{#if draft.activePlate.type === 'video'}
 									<video
-										src={activePlate.previewUrl}
+										src={draft.activePlate.previewUrl}
 										controls
 										playsinline
 										preload="metadata"
 										class="w-full h-full object-contain"
 									>
 										<source
-											src={activePlate.previewUrl}
-											type={activePlate.file?.type || 'video/mp4'}
+											src={draft.activePlate.previewUrl}
+											type={draft.activePlate.file?.type || 'video/mp4'}
 										/>
 										<track kind="captions" />
 									</video>
 								{:else}
 									<img
-										src={activePlate.previewUrl}
+										src={draft.activePlate.previewUrl}
 										alt="Active plate"
 										class="w-full h-full object-contain"
 									/>
@@ -727,15 +358,15 @@
 								<div
 									class="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-white text-[11px] font-mono tracking-wider shadow-xs"
 								>
-									PLATE {String(activePlateIndex + 1).padStart(2, '0')} OF {String(
-										mediaPlates.length
+									PLATE {String(draft.activePlateIndex + 1).padStart(2, '0')} OF {String(
+										draft.mediaPlates.length
 									).padStart(2, '0')}
 								</div>
 
 								<!-- Delete Active Plate Button -->
 								<button
 									type="button"
-									onclick={() => removePlate(activePlate.id)}
+									onclick={() => draft.removePlate(draft.activePlate.id)}
 									class="absolute top-3 right-3 size-8 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center text-sm transition cursor-pointer border-0 shadow-md active:scale-95"
 									aria-label="Remove media"
 								>
@@ -746,12 +377,12 @@
 
 						<!-- Sequence Thumbnails -->
 						<div class="flex items-center gap-2.5 overflow-x-auto pb-1 no-scrollbar">
-							{#each mediaPlates as plate, idx (plate.id)}
+							{#each draft.mediaPlates as plate, idx (plate.id)}
 								<button
 									type="button"
-									onclick={() => (activePlateIndex = idx)}
+									onclick={() => (draft.activePlateIndex = idx)}
 									class="group relative shrink-0 size-16 sm:size-20 rounded-xl overflow-hidden bg-slate-900 border-2 transition-all p-0 cursor-pointer {idx ===
-									activePlateIndex
+									draft.activePlateIndex
 										? 'border-slate-950 dark:border-white shadow-md'
 										: 'border-transparent opacity-75 hover:opacity-100'}"
 								>
@@ -812,21 +443,21 @@
 				{/if}
 
 				<!-- Optional Location Bar if active or has location -->
-				{#if showLocationInput || location}
+				{#if showLocationInput || draft.location}
 					<div
 						class="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-50 dark:bg-dark-elevated/40 border border-slate-100 dark:border-dark-border text-xs"
 					>
 						<Icon name="map-marker" class="text-xs text-slate-400 shrink-0" />
 						<input
 							type="text"
-							bind:value={location}
+							bind:value={draft.location}
 							placeholder="Exhibition space or location (e.g. Fondazione Prada, Milano)"
 							class="flex-1 bg-transparent border-0 text-xs text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
 						/>
 						<button
 							type="button"
 							onclick={() => {
-								location = '';
+								draft.location = '';
 								showLocationInput = false;
 							}}
 							class="text-slate-400 hover:text-slate-700 dark:hover:text-white border-0 bg-transparent cursor-pointer p-0 text-xs shrink-0"
@@ -838,16 +469,16 @@
 				{/if}
 
 				<!-- Optional Tag Bar if active or has tags -->
-				{#if showTagInput || tags.length > 0}
+				{#if showTagInput || draft.tags.length > 0}
 					<div class="flex items-center gap-1.5 flex-wrap text-xs pt-0.5">
-						{#each tags as tag (tag)}
+						{#each draft.tags as tag (tag)}
 							<span
 								class="inline-flex items-center gap-1 text-[11px] px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-text font-medium"
 							>
 								{tag}
 								<button
 									type="button"
-									onclick={() => removeTag(tag)}
+									onclick={() => draft.removeTag(tag)}
 									class="text-slate-400 hover:text-slate-700 dark:hover:text-white border-0 bg-transparent cursor-pointer p-0 text-xs leading-none"
 									aria-label={`Remove tag ${tag}`}
 								>
@@ -861,8 +492,8 @@
 							<span class="text-slate-400 text-xs">#</span>
 							<input
 								type="text"
-								bind:value={tagInput}
-								onkeydown={handleTagKeydown}
+								bind:value={draft.tagInput}
+								onkeydown={(e) => draft.handleTagKeydown(e)}
 								placeholder="tag (Enter)"
 								class="w-20 bg-transparent border-0 text-xs text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
 							/>
@@ -890,12 +521,12 @@
 						<button
 							type="button"
 							role="radio"
-							aria-checked={selectedType === type.id}
-							class="flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-full text-[11px] xl:text-xs font-medium transition cursor-pointer border-0 {selectedType ===
+							aria-checked={draft.selectedType === type.id}
+							class="flex items-center gap-1 px-2 xl:px-2.5 py-1 rounded-full text-[11px] xl:text-xs font-medium transition cursor-pointer border-0 {draft.selectedType ===
 							type.id
 								? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 shadow-xs font-semibold'
 								: 'text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white'}"
-							onclick={() => (selectedType = type.id)}
+							onclick={() => (draft.selectedType = type.id)}
 						>
 							<Icon name={type.icon} class="text-xs" />
 							<span>{type.label}</span>
@@ -919,7 +550,7 @@
 					type="button"
 					onclick={() => (showLocationInput = !showLocationInput)}
 					class="size-7 xl:size-8 rounded-full flex items-center justify-center transition border-0 cursor-pointer shrink-0 {showLocationInput ||
-					location
+					draft.location
 						? 'bg-slate-200 dark:bg-dark-elevated text-slate-900 dark:text-white'
 						: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-elevated bg-transparent'}"
 					title="Add spatial location"
@@ -933,7 +564,7 @@
 					type="button"
 					onclick={() => (showTagInput = !showTagInput)}
 					class="size-7 xl:size-8 rounded-full flex items-center justify-center transition border-0 cursor-pointer shrink-0 {showTagInput ||
-					tags.length > 0
+					draft.tags.length > 0
 						? 'bg-slate-200 dark:bg-dark-elevated text-slate-900 dark:text-white'
 						: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-elevated bg-transparent'}"
 					title="Add tags"
@@ -945,9 +576,9 @@
 
 			<!-- Right: Counter, Studio Suite & Publish Action -->
 			<div class="flex items-center gap-1.5 xl:gap-2 shrink-0">
-				{#if content.length > 0}
+				{#if draft.content.length > 0}
 					<span class="text-[11px] font-mono text-slate-400 dark:text-dark-subtle mr-1">
-						{content.length}/2200
+						{draft.content.length}/{MAX_CONTENT_LENGTH}
 					</span>
 				{/if}
 
@@ -1034,8 +665,8 @@
 							{#each ratios as r (r.id)}
 								<button
 									type="button"
-									onclick={() => (canvasRatio = r.id)}
-									class="px-3 py-1.5 rounded-xl font-semibold transition border-0 cursor-pointer {canvasRatio ===
+									onclick={() => (draft.canvasRatio = r.id)}
+									class="px-3 py-1.5 rounded-xl font-semibold transition border-0 cursor-pointer {draft.canvasRatio ===
 									r.id
 										? 'bg-white dark:bg-dark-card text-slate-950 dark:text-white shadow-xs'
 										: 'text-slate-600 dark:text-dark-muted'}"
@@ -1051,24 +682,24 @@
 					<div
 						class="relative w-full {ratioClass} max-h-[440px] rounded-3xl overflow-hidden bg-slate-950 flex items-center justify-center shadow-lg border border-slate-200 dark:border-dark-border"
 					>
-						{#if activePlate}
-							{#if activePlate.type === 'video'}
+						{#if draft.activePlate}
+							{#if draft.activePlate.type === 'video'}
 								<video
-									src={activePlate.previewUrl}
+									src={draft.activePlate.previewUrl}
 									controls
 									playsinline
 									preload="metadata"
 									class="w-full h-full object-contain"
 								>
 									<source
-										src={activePlate.previewUrl}
-										type={activePlate.file?.type || 'video/mp4'}
+										src={draft.activePlate.previewUrl}
+										type={draft.activePlate.file?.type || 'video/mp4'}
 									/>
 									<track kind="captions" />
 								</video>
 							{:else}
 								<img
-									src={activePlate.previewUrl}
+									src={draft.activePlate.previewUrl}
 									alt="Active exhibition plate"
 									class="w-full h-full object-contain"
 								/>
@@ -1077,14 +708,14 @@
 							<div
 								class="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-white text-[11px] font-mono tracking-wider shadow-sm"
 							>
-								PLATE {String(activePlateIndex + 1).padStart(2, '0')} OF {String(
-									mediaPlates.length
+								PLATE {String(draft.activePlateIndex + 1).padStart(2, '0')} OF {String(
+									draft.mediaPlates.length
 								).padStart(2, '0')}
 							</div>
 
 							<button
 								type="button"
-								onclick={() => removePlate(activePlate.id)}
+								onclick={() => draft.removePlate(draft.activePlate.id)}
 								class="absolute top-4 right-4 size-8 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center text-sm transition cursor-pointer border-0 shadow-md"
 								aria-label="Remove plate"
 							>
@@ -1113,18 +744,18 @@
 							class="flex items-center justify-between text-xs text-slate-500 dark:text-dark-muted"
 						>
 							<span class="font-semibold text-slate-800 dark:text-dark-text">
-								Exhibition Sequence ({mediaPlates.length} Plates)
+								Exhibition Sequence ({draft.mediaPlates.length} Plates)
 							</span>
 							<span class="text-[11px]">Click plate to inspect</span>
 						</div>
 
 						<div class="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
-							{#each mediaPlates as plate, idx (plate.id)}
+							{#each draft.mediaPlates as plate, idx (plate.id)}
 								<button
 									type="button"
-									onclick={() => (activePlateIndex = idx)}
+									onclick={() => (draft.activePlateIndex = idx)}
 									class="group relative shrink-0 size-20 rounded-2xl overflow-hidden bg-slate-900 border-2 transition-all p-0 cursor-pointer {idx ===
-									activePlateIndex
+									draft.activePlateIndex
 										? 'border-slate-950 dark:border-white shadow-md'
 										: 'border-transparent opacity-75 hover:opacity-100'}"
 								>
@@ -1186,7 +817,7 @@
 						<input
 							id="studio-title"
 							type="text"
-							bind:value={title}
+							bind:value={draft.title}
 							placeholder="Monoliths of Silence: Structural Brutalism..."
 							class="w-full px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-dark-elevated text-sm font-semibold text-slate-900 dark:text-dark-text border-0 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 						/>
@@ -1203,13 +834,13 @@
 							>
 								CURATORIAL NARRATIVE
 							</label>
-							<span>{content.length} / 2,200</span>
+							<span>{draft.content.length} / {MAX_CONTENT_LENGTH.toLocaleString()}</span>
 						</div>
 						<textarea
 							id="studio-narrative"
-							bind:value={content}
+							bind:value={draft.content}
 							rows="5"
-							maxlength="2200"
+							maxlength={MAX_CONTENT_LENGTH}
 							placeholder="Examining the monolithic concrete structures erected across during the late twentieth century..."
 							class="w-full resize-none rounded-2xl p-4 text-sm leading-relaxed bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text placeholder:text-slate-400 border-0 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 						></textarea>
@@ -1230,7 +861,7 @@
 							<input
 								id="studio-location"
 								type="text"
-								bind:value={location}
+								bind:value={draft.location}
 								placeholder="Fondazione Prada, Milano"
 								class="flex-1 bg-transparent border-0 text-sm focus:outline-none text-slate-900 dark:text-dark-text"
 							/>
@@ -1243,14 +874,14 @@
 							CURATED DESCRIPTORS & TAGS
 						</span>
 						<div class="flex items-center gap-1.5 flex-wrap">
-							{#each tags as tag (tag)}
+							{#each draft.tags as tag (tag)}
 								<span
 									class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold"
 								>
 									{tag}
 									<button
 										type="button"
-										onclick={() => removeTag(tag)}
+										onclick={() => draft.removeTag(tag)}
 										class="hover:opacity-75 border-0 bg-transparent text-white dark:text-slate-950 cursor-pointer p-0 ml-1"
 									>
 										✕
@@ -1261,14 +892,14 @@
 						<div class="flex items-center gap-2">
 							<input
 								type="text"
-								bind:value={tagInput}
-								onkeydown={handleTagKeydown}
+								bind:value={draft.tagInput}
+								onkeydown={(e) => draft.handleTagKeydown(e)}
 								placeholder="#add-tag and press Enter"
 								class="flex-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-dark-elevated text-xs text-slate-900 dark:text-dark-text border-0 focus:outline-none"
 							/>
 							<button
 								type="button"
-								onclick={addTag}
+								onclick={() => draft.addTag()}
 								class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-dark-hover text-xs font-semibold text-slate-800 dark:text-white border-0 cursor-pointer"
 							>
 								+ Add

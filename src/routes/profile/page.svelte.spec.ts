@@ -14,11 +14,15 @@ const testUser = {
 	location: 'Tokyo, Japan',
 	cameraGear: 'Leica M6 · Summicron 35mm',
 	badgeText: 'CURATOR',
-	isVerified: true,
+	isVerified: true
+};
+
+const testStats = {
 	postsCount: 5,
-	followersCount: '120',
+	followersCount: 120,
 	followingCount: 85,
-	impressionsCount: '1.2k'
+	impressionsCount: 1200,
+	isFollowing: false
 };
 
 const newRegisteredUser = {
@@ -31,11 +35,15 @@ const newRegisteredUser = {
 	bio: null,
 	website: null,
 	location: null,
-	cameraGear: null,
+	cameraGear: null
+};
+
+const emptyStats = {
 	postsCount: 0,
-	followersCount: '0',
+	followersCount: 0,
 	followingCount: 0,
-	impressionsCount: '0'
+	impressionsCount: 0,
+	isFollowing: false
 };
 
 describe('Profile Page', () => {
@@ -44,7 +52,8 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					user: testUser,
-					posts: []
+					posts: [],
+					stats: testStats
 				}
 			}
 		});
@@ -66,6 +75,8 @@ describe('Profile Page', () => {
 		await expect.element(screen.getByText('5').first()).toBeInTheDocument();
 		await expect.element(screen.getByText('120').first()).toBeInTheDocument();
 		await expect.element(screen.getByText('85').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('1.2K').first()).toBeInTheDocument();
+		await expect.element(screen.getByText('impressions').first()).toBeInTheDocument();
 
 		// Own profile action buttons (no duplication: Edit Profile button + Settings gear)
 		await expect.element(screen.getByText('Edit Profile').first()).toBeInTheDocument();
@@ -81,7 +92,8 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					user: newRegisteredUser,
-					posts: []
+					posts: [],
+					stats: emptyStats
 				}
 			}
 		});
@@ -108,7 +120,8 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					user: testUser,
-					posts: []
+					posts: [],
+					stats: testStats
 				}
 			}
 		});
@@ -123,7 +136,8 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					user: testUser,
-					posts: []
+					posts: [],
+					stats: testStats
 				}
 			}
 		});

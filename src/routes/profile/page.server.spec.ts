@@ -96,19 +96,16 @@ describe('Profile +page.server.ts', () => {
 			createdAt: new Date()
 		};
 
-		let callCount = 0;
+		// user lookup → .limit(); posts → .orderBy(); viewer likes / stats → awaited directly.
 		const mockDb = {
 			select: vi.fn(() => ({
 				from: vi.fn(() => ({
-					where: vi.fn(() => {
-						callCount++;
-						if (callCount === 1) {
-							return { limit: vi.fn(async () => [mockUser]) };
-						}
-						return {
+					where: vi.fn(() =>
+						Object.assign(Promise.resolve([{ postsCount: 1, impressionsCount: 7 }]), {
+							limit: vi.fn(async () => [mockUser]),
 							orderBy: vi.fn(async () => [mockPost])
-						};
-					})
+						})
+					)
 				}))
 			}))
 		};
@@ -128,5 +125,10 @@ describe('Profile +page.server.ts', () => {
 		expect(result.posts[0].id).toBe('p-1');
 		expect(result.posts[0].isCarousel).toBe(true);
 		expect(result.posts[0].likes).toBe(15);
+		// Full post for list view, same shape the feed uses.
+		expect(result.posts[0].post?.description).toBe('A study on clay');
+		expect(result.posts[0].post?.author.handle).toBe('@taroyamada');
+		expect(result.stats.postsCount).toBe(1);
+		expect(result.stats.impressionsCount).toBe(7);
 	});
 });

@@ -15,6 +15,7 @@ import {
 	loadFeedPage,
 	loadPostMedia,
 	loadPostTags,
+	normalizeMedia,
 	normalizeTags
 } from '$lib/server/db/posts';
 
@@ -105,6 +106,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 			mediaType: parsedMedia[0]?.type || 'none',
 			mediaItems: parsedMedia,
 			aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
+			postType: r.post.postType as 'photo' | 'story' | 'article',
 			location: r.post.location || r.user.location || undefined,
 			cameraMeta: r.post.cameraMeta || undefined,
 			tags: parsedTags,
@@ -141,23 +143,10 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 
 	const title = typeof body.title === 'string' ? body.title.trim() : null;
 
-	let mediaItems: Array<{ url: string; type: 'image' | 'video' }> = [];
-	if (Array.isArray(body.mediaUrls)) {
-		mediaItems = body.mediaUrls
-			.filter(
-				(m): m is { url: string; type?: string } =>
-					typeof m === 'object' &&
-					m !== null &&
-					typeof m.url === 'string' &&
-					m.url.trim().length > 0
-			)
-			.map((m) => {
-				const isVid = m.type === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(m.url);
-				return { url: m.url.trim(), type: isVid ? ('video' as const) : ('image' as const) };
-			});
-	} else if (typeof body.mediaUrl === 'string' && body.mediaUrl.trim().length > 0) {
-		const isVid = body.mediaType === 'video' || /\.(mp4|webm|mov)(\?.*)?$/i.test(body.mediaUrl);
-		mediaItems = [{ url: body.mediaUrl.trim(), type: isVid ? 'video' : 'image' }];
+	let mediaItems = normalizeMedia(body.mediaUrls);
+	if (!Array.isArray(body.mediaUrls) && typeof body.mediaUrl === 'string') {
+		// Legacy single-media payload.
+		mediaItems = normalizeMedia([{ url: body.mediaUrl, type: body.mediaType }]);
 	}
 
 	if (mediaItems.length > MAX_MEDIA_PER_POST) {
@@ -247,6 +236,7 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		mediaType,
 		mediaItems,
 		aspectRatio,
+		postType,
 		location: location || currentUser.location || undefined,
 		cameraMeta: cameraMeta || undefined,
 		tags: storedTags,
