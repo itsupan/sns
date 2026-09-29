@@ -138,14 +138,15 @@ export const POST = withApi(async ({ request, locals }) => {
 
 Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fixed window stored in the `KV` binding. Limits come from `RATE_LIMIT_*` vars (see [Configuration](#configuration)):
 
-| Name            | Var                         | Endpoint                           | Default  |
-| --------------- | --------------------------- | ---------------------------------- | -------- |
-| `createPost`    | `RATE_LIMIT_CREATE_POST`    | `POST /api/posts`                  | 10 / min |
-| `comment`       | `RATE_LIMIT_COMMENT`        | `POST /api/posts/:id/comments`     | 20 / min |
-| `reaction`      | `RATE_LIMIT_REACTION`       | `POST /api/comments/:id/reactions` | 60 / min |
-| `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`         | 60 / min |
-| `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)            | 30 / min |
-| `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`       | 20 / min |
+| Name            | Var                         | Endpoint                                                | Default  |
+| --------------- | --------------------------- | ------------------------------------------------------- | -------- |
+| `createPost`    | `RATE_LIMIT_CREATE_POST`    | `POST /api/posts`                                       | 10 / min |
+| `comment`       | `RATE_LIMIT_COMMENT`        | `POST /api/posts/:id/comments`                          | 20 / min |
+| `reaction`      | `RATE_LIMIT_REACTION`       | `POST /api/comments/:id/reactions`                      | 60 / min |
+| `search`        | `RATE_LIMIT_SEARCH`         | `GET /api/search` (per user, or per IP when signed out) | 60 / min |
+| `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`                              | 60 / min |
+| `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)                                 | 30 / min |
+| `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`                            | 20 / min |
 
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }`. KV has no atomic increment and is eventually consistent, so a burst can let a few extra requests through: treat this as abuse protection, not an exact quota. Without a `KV` binding (unit tests) requests are allowed.
 
@@ -162,6 +163,8 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `FEED_MAX_PAGE_SIZE`        | integer                       | `50`                              |
 | `COMMENTS_PAGE_SIZE`        | integer (≤ max)               | `20`                              |
 | `COMMENTS_MAX_PAGE_SIZE`    | integer                       | `50`                              |
+| `SEARCH_PAGE_SIZE`          | integer (≤ max)               | `5` (per section)                 |
+| `SEARCH_MAX_PAGE_SIZE`      | integer                       | `20`                              |
 | `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                 |
 | `SIGNUP_BLOCKED_EMAILS`     | comma-separated emails        | empty (nobody blocked)            |
 
@@ -206,6 +209,26 @@ regenerates the binding types too, so they can never drift from `wrangler.jsonc`
 
 Drizzle only generates SQL here; Wrangler owns applying it, so migration state is tracked
 in D1's `d1_migrations` table rather than by Drizzle.
+
+### Full-text search (hand-written migration)
+
+Search (`GET /api/search`) uses SQLite FTS5 tables `post_fts` and `user_fts`, created in
+`migrations/0012_search_fts.sql`. Drizzle cannot generate virtual tables or triggers, so that
+file was created with `pnpm exec drizzle-kit generate --custom --name search_fts` (which keeps
+Drizzle's journal in step) and written by hand. The tables are not in `schema.ts`.
+
+- **External content**: the FTS tables index `post` and `user` by rowid and store no copy of
+  the text. `AFTER INSERT/UPDATE/DELETE` triggers keep them in sync; the update triggers fire
+  only when the indexed columns change.
+- **Trigram tokenizer**: matches any substring of 3+ characters, so it works for prefixes and
+  for scripts written without spaces (Khmer, Thai, Chinese). Shorter input returns no results.
+  `bm25()` ranks; soft-deleted posts are filtered at query time.
+- **Rebuilding `post` or `user`**: if a future migration recreates either table (Drizzle's
+  `__new_*` copy), the triggers are dropped and rowids change. In that migration, recreate the
+  triggers from 0012 and run `INSERT INTO post_fts(post_fts) VALUES('rebuild')` (and the same
+  for `user_fts`). `search.spec.ts` runs FTS5 `integrity-check` after all migrations to catch it.
+- **Backups**: `wrangler d1 export` cannot export virtual tables. Use D1 Time Travel
+  (`wrangler d1 time-travel`) to restore instead.
 
 ## One-time setup
 

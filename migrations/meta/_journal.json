@@ -85,6 +85,13 @@
       "when": 1790666141124,
       "tag": "0011_comment_replies_reactions",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790666895994,
+      "tag": "0012_search_fts",
+      "breakpoints": true
     }
   ]
 }

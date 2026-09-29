@@ -3,16 +3,18 @@
 	import Icon from './Icon.svelte';
 	import Avatar from './Avatar.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
+	import SearchBox from './SearchBox.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 
 	interface Props {
-		searchQuery?: string;
-		onSearch?: (query: string) => void;
 		class?: string;
 	}
 
-	let { searchQuery = $bindable(''), onSearch, class: className = '' }: Props = $props();
+	let { class: className = '' }: Props = $props();
+
+	/** Full-screen search on phones, where the header has no room for the input. */
+	let mobileSearchOpen = $state(false);
 
 	const session = authClient.useSession();
 
@@ -50,12 +52,6 @@
 		return () => window.removeEventListener('scroll', onScroll);
 	});
 
-	function handleInput(e: Event) {
-		const target = e.target as HTMLInputElement;
-		searchQuery = target.value;
-		onSearch?.(target.value);
-	}
-
 	const iconButton =
 		'size-11 sm:size-9 rounded-full flex items-center justify-center text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-hover active:scale-95 active:bg-slate-100 dark:active:bg-dark-hover transition duration-150 cursor-pointer border-0 bg-transparent';
 </script>
@@ -87,20 +83,7 @@
 
 		<!-- Center: Search Bar (Tablet / Desktop) -->
 		<div class="hidden sm:flex flex-1 max-w-xl mx-2 sm:mx-6">
-			<div class="relative flex items-center w-full">
-				<Icon
-					name="search"
-					class="absolute left-3.5 text-slate-500 dark:text-dark-subtle text-sm pointer-events-none"
-				/>
-				<input
-					type="search"
-					value={searchQuery}
-					oninput={handleInput}
-					placeholder="Search creators, exhibitions, visuals..."
-					aria-label="Search creators, exhibitions, visuals"
-					class="w-full h-10 pl-10 pr-4 text-sm bg-slate-100/85 dark:bg-dark-elevated text-slate-900 dark:text-dark-text placeholder:text-slate-500 dark:placeholder:text-dark-subtle rounded-full border-0 focus:outline-none focus:ring-1.5 focus:ring-slate-900 dark:focus:ring-white transition-all duration-150"
-				/>
-			</div>
+			<SearchBox />
 		</div>
 
 		<!-- Right: Actions & User Info -->
@@ -109,7 +92,8 @@
 				type="button"
 				class="sm:hidden {iconButton}"
 				aria-label="Search"
-				onclick={() => toast.show('Search is coming soon')}
+				aria-haspopup="dialog"
+				onclick={() => (mobileSearchOpen = true)}
 			>
 				<Icon name="search" class="text-xl" />
 			</button>
@@ -167,3 +151,32 @@
 		</div>
 	</div>
 </header>
+
+{#if mobileSearchOpen}
+	<div
+		class="sm:hidden fixed inset-0 z-[60] bg-white dark:bg-dark-card pt-safe flex flex-col"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Search"
+	>
+		<div
+			class="flex items-center gap-2 px-2 h-14 border-b border-slate-200/80 dark:border-dark-border"
+		>
+			<button
+				type="button"
+				class={iconButton}
+				aria-label="Close search"
+				onclick={() => (mobileSearchOpen = false)}
+			>
+				<Icon name="angle-left" class="text-xl" />
+			</button>
+			<SearchBox autofocus onNavigate={() => (mobileSearchOpen = false)} class="flex-1" />
+		</div>
+	</div>
+{/if}
+
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key === 'Escape' && mobileSearchOpen) mobileSearchOpen = false;
+	}}
+/>
