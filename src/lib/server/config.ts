@@ -14,12 +14,19 @@ export interface RateLimitRule {
 }
 
 export type RateLimitName =
-	'createPost' | 'createStory' | 'comment' | 'like' | 'follow' | 'uploadPresign';
+	'createPost' | 'createStory' | 'comment' | 'reaction' | 'like' | 'follow' | 'uploadPresign';
+
+export interface PageSize {
+	defaultPageSize: number;
+	maxPageSize: number;
+}
 
 export interface AppConfig {
 	rateLimits: Record<RateLimitName, RateLimitRule>;
 	upload: { maxBytes: number; allowedMimeTypes: ReadonlySet<string> };
-	feed: { defaultPageSize: number; maxPageSize: number };
+	feed: PageSize;
+	/** Top-level comments and replies lists. */
+	comments: PageSize;
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
 	mediaUrlTtlSec: number;
 	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
@@ -33,6 +40,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		createPost: { limit: 10, windowSec: 60 },
 		createStory: { limit: 10, windowSec: 60 },
 		comment: { limit: 20, windowSec: 60 },
+		reaction: { limit: 60, windowSec: 60 },
 		like: { limit: 60, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 }
@@ -51,6 +59,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		])
 	},
 	feed: { defaultPageSize: 10, maxPageSize: 50 },
+	comments: { defaultPageSize: 20, maxPageSize: 50 },
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
 	auth: { blockedSignupEmails: new Set() }
 };
@@ -60,6 +69,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	createPost: 'RATE_LIMIT_CREATE_POST',
 	createStory: 'RATE_LIMIT_CREATE_STORY',
 	comment: 'RATE_LIMIT_COMMENT',
+	reaction: 'RATE_LIMIT_REACTION',
 	like: 'RATE_LIMIT_LIKE',
 	follow: 'RATE_LIMIT_FOLLOW',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN'
@@ -147,11 +157,15 @@ export function loadConfig(env: object | undefined): AppConfig {
 		])
 	) as AppConfig['rateLimits'];
 
-	const maxPageSize = read(vars, 'FEED_MAX_PAGE_SIZE', PositiveInt, d.feed.maxPageSize);
-	const defaultPageSize = Math.min(
-		read(vars, 'FEED_PAGE_SIZE', PositiveInt, d.feed.defaultPageSize),
-		maxPageSize
-	);
+	/** `<PREFIX>_PAGE_SIZE` clamped to `<PREFIX>_MAX_PAGE_SIZE`. */
+	const pageSize = (prefix: string, fallback: PageSize): PageSize => {
+		const maxPageSize = read(vars, `${prefix}_MAX_PAGE_SIZE`, PositiveInt, fallback.maxPageSize);
+		const defaultPageSize = Math.min(
+			read(vars, `${prefix}_PAGE_SIZE`, PositiveInt, fallback.defaultPageSize),
+			maxPageSize
+		);
+		return { defaultPageSize, maxPageSize };
+	};
 
 	return {
 		rateLimits,
@@ -159,7 +173,8 @@ export function loadConfig(env: object | undefined): AppConfig {
 			maxBytes: read(vars, 'UPLOAD_MAX_BYTES', PositiveInt, d.upload.maxBytes),
 			allowedMimeTypes: read(vars, 'UPLOAD_ALLOWED_MIME_TYPES', MimeList, d.upload.allowedMimeTypes)
 		},
-		feed: { defaultPageSize, maxPageSize },
+		feed: pageSize('FEED', d.feed),
+		comments: pageSize('COMMENTS', d.comments),
 		mediaUrlTtlSec: Math.min(
 			read(vars, 'MEDIA_URL_TTL_SECONDS', PositiveInt, d.mediaUrlTtlSec),
 			MAX_SIGV4_TTL_SEC

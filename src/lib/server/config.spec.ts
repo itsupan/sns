@@ -19,6 +19,10 @@ describe('loadConfig', () => {
 			MEDIA_URL_TTL_SECONDS: '3600'
 		});
 		expect(config.rateLimits.like).toEqual({ limit: 5, windowSec: 30 });
+		expect(loadConfig({ RATE_LIMIT_REACTION: '3/10' }).rateLimits.reaction).toEqual({
+			limit: 3,
+			windowSec: 10
+		});
 		expect(config.rateLimits.comment).toEqual(DEFAULT_CONFIG.rateLimits.comment);
 		expect(config.upload.maxBytes).toBe(1048576);
 		expect([...config.upload.allowedMimeTypes]).toEqual(['image/png', 'image/jpeg']);
@@ -47,6 +51,9 @@ describe('loadConfig', () => {
 			MEDIA_URL_TTL_SECONDS: '99999999'
 		});
 		expect(config.feed.defaultPageSize).toBe(30);
+		expect(loadConfig({ COMMENTS_PAGE_SIZE: '80', COMMENTS_MAX_PAGE_SIZE: '40' }).comments).toEqual(
+			{ defaultPageSize: 40, maxPageSize: 40 }
+		);
 		expect(config.mediaUrlTtlSec).toBe(7 * 24 * 3600);
 	});
 });

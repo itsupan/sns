@@ -78,6 +78,13 @@
       "when": 1790624664788,
       "tag": "0010_user_follow_counters",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1790666141124,
+      "tag": "0011_comment_replies_reactions",
+      "breakpoints": true
     }
   ]
 }

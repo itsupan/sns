@@ -1,5 +1,5 @@
 import { sql } from 'drizzle-orm';
-import { postComment, postLike, userFollow } from './schema';
+import { commentReaction, postComment, postLike, userFollow } from './schema';
 
 /*
  * Denormalized counters are recomputed from their rows inside the same `db.batch` as the
@@ -12,6 +12,14 @@ export const likesCountOf = (postId: string) =>
 
 export const commentsCountOf = (postId: string) =>
 	sql<number>`(select count(*) from ${postComment} where ${postComment.postId} = ${postId})`;
+
+/** Replies to a top-level comment. */
+export const repliesCountOf = (commentId: string) =>
+	sql<number>`(select count(*) from ${postComment} where ${postComment.parentCommentId} = ${commentId})`;
+
+/** All reactions on a comment, every type included. */
+export const reactionsCountOf = (commentId: string) =>
+	sql<number>`(select count(*) from ${commentReaction} where ${commentReaction.commentId} = ${commentId})`;
 
 export const followersCountOf = (userId: string) =>
 	sql<number>`(select count(*) from ${userFollow} where ${userFollow.followingId} = ${userId})`;

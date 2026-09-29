@@ -1,12 +1,10 @@
 import { json } from '@sveltejs/kit';
-import { eq, asc, and } from 'drizzle-orm';
-import type { RequestHandler } from './$types';
-import { post, postComment, user } from '$lib/server/db/schema';
 import * as v from 'valibot';
-import { formatTimeAgo } from '$lib/utils/format';
-import { apiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
-import { commentsCountOf } from '$lib/server/db/counters';
-import { notDeleted } from '$lib/server/db/posts';
+import type { RequestHandler } from './$types';
+import { enforceRateLimit, parseBody, parsePageQuery, requireUser, withApi } from '$lib/server/api';
+import { withFreshAvatars } from '$lib/server/api/comments';
+import { getConfig } from '$lib/server/config';
+import { createComment, listPostComments } from '$lib/server/db/comments';
 
 const CreateComment = v.object({
 	content: v.pipe(
@@ -14,102 +12,42 @@ const CreateComment = v.object({
 		v.trim(),
 		v.minLength(1, 'Comment content is required'),
 		v.maxLength(1000, 'Comment cannot exceed 1000 characters')
+	),
+	/** Reply to this top-level comment (replies are one level deep). */
+	parentCommentId: v.optional(
+		v.nullable(v.pipe(v.string('Invalid parent comment'), v.minLength(1, 'Invalid parent comment')))
 	)
 });
 
-export const GET: RequestHandler = withApi(async ({ params, locals }) => {
-	const postId = params.id;
-	if (!postId) {
-		return apiError(400, 'bad_request', 'Post ID is required');
-	}
-
-	const commentRows = await locals.db
-		.select({
-			id: postComment.id,
-			content: postComment.content,
-			createdAt: postComment.createdAt,
-			user: {
-				id: user.id,
-				name: user.name,
-				handle: user.handle,
-				image: user.image
-			}
-		})
-		.from(postComment)
-		.innerJoin(user, eq(postComment.userId, user.id))
-		.where(eq(postComment.postId, postId))
-		.orderBy(asc(postComment.createdAt));
-
-	const comments = commentRows.map((r) => ({
-		id: r.id,
-		content: r.content,
-		createdAt: r.createdAt,
-		timeAgo: formatTimeAgo(r.createdAt),
-		author: {
-			id: r.user.id,
-			name: r.user.name,
-			handle: r.user.handle
-				? `@${r.user.handle.replace(/^@/, '')}`
-				: `@${r.user.name.toLowerCase().replace(/\s+/g, '')}`,
-			avatar: r.user.image || ''
-		}
-	}));
-
-	return json({ comments });
+/** Top-level comments, oldest first, each with `repliesCount` and `reactions`. Query: `limit`, `cursor`. */
+export const GET: RequestHandler = withApi(async ({ params, url, locals, platform }) => {
+	const { limit, cursor } = await parsePageQuery(url, getConfig(platform?.env).comments);
+	const page = await listPostComments(locals.db, {
+		postId: params.id,
+		viewerId: locals.user?.id ?? null,
+		limit,
+		cursor
+	});
+	return json({
+		comments: await withFreshAvatars(page.comments, platform?.env),
+		hasMore: page.hasMore,
+		nextCursor: page.nextCursor
+	});
 });
 
+/** Adds a comment, or a reply when `parentCommentId` is set. */
 export const POST: RequestHandler = withApi(async ({ params, request, locals, platform }) => {
 	const currentUser = requireUser(locals);
 	await enforceRateLimit(platform, 'comment', currentUser.id);
+	const { content, parentCommentId } = await parseBody(request, CreateComment);
 
-	const postId = params.id;
-	if (!postId) {
-		return apiError(400, 'bad_request', 'Post ID is required');
-	}
-
-	const { content } = await parseBody(request, CreateComment);
-
-	const postRows = await locals.db
-		.select({ id: post.id })
-		.from(post)
-		.where(and(eq(post.id, postId), notDeleted))
-		.limit(1);
-
-	if (postRows.length === 0) {
-		return apiError(404, 'not_found', 'Post not found');
-	}
-
-	const commentId = crypto.randomUUID();
-
-	const [, updated] = await locals.db.batch([
-		locals.db.insert(postComment).values({
-			id: commentId,
-			postId,
-			userId: currentUser.id,
-			content
-		}),
-		locals.db
-			.update(post)
-			.set({ commentsCount: commentsCountOf(postId), updatedAt: new Date() })
-			.where(eq(post.id, postId))
-			.returning({ commentsCount: post.commentsCount })
-	]);
-	const nextCommentsCount = updated[0]?.commentsCount ?? 0;
-
-	const createdComment = {
-		id: commentId,
+	const result = await createComment(locals.db, {
+		postId: params.id,
+		author: currentUser,
 		content,
-		createdAt: new Date(),
-		timeAgo: 'Just now',
-		author: {
-			id: currentUser.id,
-			name: currentUser.name,
-			handle: currentUser.handle
-				? `@${currentUser.handle.replace(/^@/, '')}`
-				: `@${currentUser.name.toLowerCase().replace(/\s+/g, '')}`,
-			avatar: currentUser.image || ''
-		}
-	};
+		parentCommentId
+	});
+	const [comment] = await withFreshAvatars([result.comment], platform?.env);
 
-	return json({ comment: createdComment, commentsCount: nextCommentsCount }, { status: 201 });
+	return json({ ...result, comment }, { status: 201 });
 });

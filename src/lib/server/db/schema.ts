@@ -1,5 +1,6 @@
 import { relations, sql } from 'drizzle-orm';
 import {
+	type AnySQLiteColumn,
 	sqliteTable,
 	text,
 	integer,
@@ -128,6 +129,12 @@ export const postComment = sqliteTable(
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
 		content: text('content').notNull(),
+		// Replies are one level deep: a reply's parent is always a top-level comment.
+		parentCommentId: text('parent_comment_id').references((): AnySQLiteColumn => postComment.id, {
+			onDelete: 'cascade'
+		}),
+		repliesCount: integer('replies_count').default(0).notNull(),
+		reactionsCount: integer('reactions_count').default(0).notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
@@ -136,9 +143,38 @@ export const postComment = sqliteTable(
 			.notNull()
 	},
 	(table) => [
+		// Top-level comments (parent IS NULL) or one comment's replies, oldest first, keyset on (created_at, id).
+		index('post_comment_postId_parent_createdAt_idx').on(
+			table.postId,
+			table.parentCommentId,
+			table.createdAt,
+			table.id
+		),
 		index('post_comment_postId_idx').on(table.postId),
 		index('post_comment_userId_idx').on(table.userId),
 		index('post_comment_createdAt_idx').on(table.createdAt)
+	]
+);
+
+export const commentReaction = sqliteTable(
+	'comment_reaction',
+	{
+		commentId: text('comment_id')
+			.notNull()
+			.references(() => postComment.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		// One of COMMENT_REACTIONS ($lib/reactions); validated at the API layer.
+		reactionType: text('reaction_type').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// At most one of each reaction type per user per comment.
+		primaryKey({ columns: [table.commentId, table.userId, table.reactionType] }),
+		index('comment_reaction_commentId_idx').on(table.commentId)
 	]
 );
 

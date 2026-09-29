@@ -39,3 +39,8 @@ export function formatTimeAgo(date: Date | number | string): string {
 	if (diffWeeks < 4) return `${diffWeeks}w ago`;
 	return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
+
+/** `@handle` for display; users without a handle get one derived from their name. */
+export function displayHandle(handle: string | null | undefined, name: string): string {
+	return handle ? `@${handle.replace(/^@/, '')}` : `@${name.toLowerCase().replace(/\s+/g, '')}`;
+}
