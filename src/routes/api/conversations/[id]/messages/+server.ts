@@ -15,6 +15,8 @@ import { broadcastLater } from '$lib/server/chat/rooms';
 import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
 
 const SendMessage = v.object({
+	/** Client-generated, so a retried send is stored once (see sendMessage). */
+	id: v.optional(v.pipe(v.string('Invalid message id'), v.uuid('Invalid message id'))),
 	content: v.pipe(
 		v.string('Message is required'),
 		v.trim(),
@@ -35,18 +37,20 @@ export const GET: RequestHandler = withApi(async ({ params, url, locals, platfor
 	return json(await listMessages(locals.db, { conversationId: params.id, limit, cursor, after }));
 });
 
-/** Stores a message, then pushes it to the conversation's open sockets. */
+/** Stores a message (201), or returns it again for a retried `id` (200), then pushes it live. */
 export const POST: RequestHandler = withApi(async ({ params, request, locals, platform }) => {
 	const viewer = requireUser(locals);
 	await enforceRateLimit(platform, 'chatMessage', viewer.id);
-	const { content } = await parseBody(request, SendMessage);
+	const { id, content } = await parseBody(request, SendMessage);
 	await requireMembership(locals.db, params.id, viewer.id);
 
-	const message = await sendMessage(locals.db, {
+	const { message, created } = await sendMessage(locals.db, {
+		id,
 		conversationId: params.id,
 		senderId: viewer.id,
 		content
 	});
-	broadcastLater(platform, params.id, { type: 'message', message });
-	return json({ message }, { status: 201 });
+	// A replayed send was already broadcast the first time.
+	if (created) broadcastLater(platform, params.id, { type: 'message', message });
+	return json({ message }, { status: created ? 201 : 200 });
 });

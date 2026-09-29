@@ -135,6 +135,70 @@ describe('direct conversations on real D1', { timeout: REAL_D1_TIMEOUT }, () => 
 	});
 });
 
+describe('idempotent sends on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
+	const clientId = '6f1c1d7e-2b8a-4f3e-9a51-0c2d4e6f8a10';
+
+	it('stores a retried send once and returns the original message', async () => {
+		const id = await dm('alice', 'bob');
+		const first = await call(send, {
+			userId: 'alice',
+			id,
+			body: { id: clientId, content: 'once' }
+		});
+		expect(first.status).toBe(201);
+		expect(first.body.message.id).toBe(clientId);
+
+		const retry = await call(send, {
+			userId: 'alice',
+			id,
+			body: { id: clientId, content: 'once' }
+		});
+		expect(retry.status).toBe(200);
+		expect(retry.body.message).toEqual(first.body.message);
+		expect(await db.select().from(message).where(eq(message.conversationId, id))).toHaveLength(1);
+	});
+
+	it('rejects an id already used by another sender or conversation', async () => {
+		const withBob = await dm('alice', 'bob');
+		const withEve = await dm('alice', 'eve');
+		await call(send, { userId: 'alice', id: withBob, body: { id: clientId, content: 'mine' } });
+
+		const hijack = await call(send, {
+			userId: 'bob',
+			id: withBob,
+			body: { id: clientId, content: 'x' }
+		});
+		expect(hijack.status).toBe(409);
+		const elsewhere = await call(send, {
+			userId: 'alice',
+			id: withEve,
+			body: { id: clientId, content: 'x' }
+		});
+		expect(elsewhere.status).toBe(409);
+		// The failed attempts changed nothing in the other conversation.
+		expect((await call(inbox, { userId: 'eve' })).body.conversations).toEqual([]);
+	});
+
+	it('a late replay never rewinds read or activity markers', async () => {
+		const id = await dm('alice', 'bob');
+		await call(send, { userId: 'alice', id, body: { id: clientId, content: 'old' } });
+		const newer = await say('bob', id, 'newer');
+		await call(read, { userId: 'alice', id, body: {} });
+
+		await call(send, { userId: 'alice', id, body: { id: clientId, content: 'old' } });
+		const [row] = await db.select().from(conversation).where(eq(conversation.id, id));
+		expect(row.lastMessageAt?.getTime()).toBe(newer.createdAt);
+		expect(await countUnread(db, 'alice')).toBe(0);
+	});
+
+	it('rejects a malformed id', async () => {
+		const id = await dm('alice', 'bob');
+		expect(
+			(await call(send, { userId: 'alice', id, body: { id: 'nope', content: 'x' } })).status
+		).toBe(400);
+	});
+});
+
 describe('history and catch-up on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 	it('pages older history oldest-first with no gaps or repeats', async () => {
 		const id = await dm('alice', 'bob');

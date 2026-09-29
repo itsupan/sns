@@ -104,19 +104,26 @@ describe('ConversationView', () => {
 		expect(posted.some((p) => p.url.endsWith('/c1/read'))).toBe(true);
 	});
 
+	/** The server echoes the client-generated id; this builds that echo from a posted body. */
+	const echo = (body: { id: string; content: string }, createdAt = 5000) =>
+		msg(body.id, 'alice', body.content, createdAt);
+	const postedMessage = () =>
+		posted.find((p) => p.url.endsWith('/c1/messages'))?.body as { id: string; content: string };
+
 	it('sends with Enter, shows the message at once and reconciles with the server copy', async () => {
 		let release!: () => void;
 		const gate = new Promise<void>((r) => (release = r));
 		respond = (url, method) =>
 			method === 'POST' && url.endsWith('/messages')
-				? { status: 201, body: { message: msg('srv-1', 'alice', 'hello bob', 5000) } }
+				? { status: 201, body: { message: echo(postedMessage()) } }
 				: { body: { ok: true } };
 		const fetchMock = globalThis.fetch;
 		vi.stubGlobal(
 			'fetch',
 			vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+				const res = fetchMock(input, init);
 				if (init?.method === 'POST' && String(input).endsWith('/messages')) await gate;
-				return fetchMock(input, init);
+				return res;
 			})
 		);
 		const screen = renderView();
@@ -128,23 +135,50 @@ describe('ConversationView', () => {
 		await expect.element(screen.getByText('Sending…')).toBeVisible();
 		await expect.element(box).toHaveValue('');
 
+		const sent = postedMessage();
+		expect(sent.content).toBe('hello bob');
+		expect(sent.id).toMatch(/^[0-9a-f-]{36}$/);
+
 		// The WebSocket echo can arrive before the POST response: still one bubble.
-		sockets[0].push({ type: 'message', message: msg('srv-1', 'alice', 'hello bob', 5000) });
+		sockets[0].push({ type: 'message', message: echo(sent) });
 		release();
 		await expect.element(screen.getByText('Sending…')).not.toBeInTheDocument();
 		expect(screen.getByText('hello bob').elements()).toHaveLength(1);
-		expect(posted.find((p) => p.url.endsWith('/c1/messages'))?.body).toEqual({
-			content: 'hello bob'
-		});
 	});
 
-	it('keeps a failed message with Retry', async () => {
+	it('treats a lost response as sent when the echo confirms it', async () => {
+		respond = () => ({ body: { ok: true } });
+		const fetchMock = globalThis.fetch;
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+				if (init?.method === 'POST' && String(input).endsWith('/messages')) {
+					await fetchMock(input, init);
+					// The server stored it and broadcast it, then the connection dropped.
+					sockets[0].push({ type: 'message', message: echo(postedMessage()) });
+					throw new TypeError('Failed to fetch');
+				}
+				return fetchMock(input, init);
+			})
+		);
+		const screen = renderView();
+		sockets[0].open();
+		await screen.getByRole('textbox').fill('made it');
+		await screen.getByRole('button', { name: 'Send' }).click();
+
+		await expect.element(screen.getByText('made it')).toBeVisible();
+		await expect.element(screen.getByText('Sending…')).not.toBeInTheDocument();
+		expect(screen.getByText('Not sent').elements()).toHaveLength(0);
+		expect(screen.getByText('made it').elements()).toHaveLength(1);
+	});
+
+	it('keeps a failed message with Retry, which resends the same id', async () => {
 		let fail = true;
 		respond = (url, method) =>
 			method === 'POST' && url.endsWith('/messages')
 				? fail
 					? { status: 429, body: { error: { code: 'rate_limited', message: 'Slow down' } } }
-					: { status: 201, body: { message: msg('srv-2', 'alice', 'retry me', 6000) } }
+					: { status: 201, body: { message: echo(postedMessage(), 6000) } }
 				: { body: { ok: true } };
 		const screen = renderView();
 		await screen.getByRole('textbox').fill('retry me');
@@ -155,6 +189,9 @@ describe('ConversationView', () => {
 		await screen.getByRole('button', { name: 'Retry' }).click();
 		await expect.element(screen.getByText('Not sent')).not.toBeInTheDocument();
 		expect(screen.getByText('retry me').elements()).toHaveLength(1);
+		const sends = posted.filter((p) => p.url.endsWith('/c1/messages'));
+		expect(sends).toHaveLength(2);
+		expect((sends[1].body as { id: string }).id).toBe((sends[0].body as { id: string }).id);
 	});
 
 	it('says Connecting… before the first open and nothing once live', async () => {

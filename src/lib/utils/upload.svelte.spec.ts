@@ -10,9 +10,15 @@ async function photo(width: number, height: number): Promise<File> {
 	canvas.height = height;
 	const ctx = canvas.getContext('2d')!;
 	const data = ctx.createImageData(width, height);
-	// 32-bit integer hash per byte (plain multiplication would lose precision past 2^53).
-	for (let i = 0; i < data.data.length; i++) {
-		data.data[i] = i % 4 === 3 ? 255 : Math.imul(i ^ (i >>> 13), 0x5bd1e995) >>> 24;
+	// One xorshift32 step per pixel, written as a whole RGBA word with alpha forced opaque:
+	// 4x fewer iterations than per-byte noise, which kept this spec near its timeout under load.
+	const pixels = new Uint32Array(data.data.buffer);
+	let state = 0x9e3779b9;
+	for (let i = 0; i < pixels.length; i++) {
+		state ^= state << 13;
+		state ^= state >>> 17;
+		state ^= state << 5;
+		pixels[i] = state | 0xff000000;
 	}
 	ctx.putImageData(data, 0, 0);
 	const blob = await new Promise<Blob>((r) => canvas.toBlob((b) => r(b!), 'image/png'));
@@ -29,15 +35,16 @@ async function optimized(file: File, folder: keyof typeof IMAGE_PRESETS) {
 	return optimizeImage(file, maxDimension, quality);
 }
 
-describe('image upload quality', () => {
+// Real canvas encodes of multi-megapixel images: allow for a busy CI machine.
+describe('image upload quality', { timeout: 30_000 }, () => {
 	it('keeps post photos sharp: long edge up to 2048px, not the 512px avatar size', async () => {
-		const out = await optimized(await photo(4000, 3000), 'posts');
+		const out = await optimized(await photo(2560, 1920), 'posts');
 		expect(await dimensions(out)).toEqual({ width: 2048, height: 1536 });
 		expect(out.type).toBe('image/webp');
 	});
 
 	it('sizes stories for a full phone screen (1080x1920)', async () => {
-		const out = await optimized(await photo(2160, 3840), 'stories');
+		const out = await optimized(await photo(1350, 2400), 'stories');
 		expect(await dimensions(out)).toEqual({ width: 1080, height: 1920 });
 	});
 

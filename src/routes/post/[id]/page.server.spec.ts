@@ -20,6 +20,27 @@ vi.mock('$lib/server/db/posts', async (importOriginal) => {
 
 type LoadEvent = Parameters<typeof load>[0];
 
+/**
+ * A drizzle-shaped mock: every select resolves to `rows` (the post query and the viewer's like
+ * lookup), comment previews resolve empty, and `update(...)` (the view counter) is recorded.
+ */
+function postDb(rows: unknown[]) {
+	const viewCount = vi.fn(async () => undefined);
+	const query: Record<string, unknown> = {};
+	Object.assign(query, {
+		from: () => query,
+		innerJoin: () => query,
+		where: () => query,
+		limit: async () => rows,
+		orderBy: () => ({ limit: async () => [] })
+	});
+	const db = {
+		select: vi.fn(() => query),
+		update: vi.fn(() => ({ set: () => ({ where: viewCount }) }))
+	};
+	return { db, viewCount };
+}
+
 describe('Individual Post +page.server.ts', () => {
 	it('loads post from database with author info and media', async () => {
 		const mockPost = {
@@ -44,20 +65,7 @@ describe('Individual Post +page.server.ts', () => {
 			location: 'Copenhagen, Denmark'
 		};
 
-		const mockDb = {
-			select: vi.fn(() => ({
-				from: vi.fn(() => ({
-					innerJoin: vi.fn(() => ({
-						where: vi.fn(() => ({
-							limit: vi.fn(async () => [{ post: mockPost, user: mockUser }]),
-							orderBy: vi.fn(() => ({
-								limit: vi.fn(async () => [])
-							}))
-						}))
-					}))
-				}))
-			}))
-		};
+		const { db: mockDb, viewCount } = postDb([{ post: mockPost, user: mockUser }]);
 
 		const mockEvent = {
 			params: { id: 'post-100' },
@@ -76,6 +84,24 @@ describe('Individual Post +page.server.ts', () => {
 		expect(result.post.author.name).toBe('Elena Rostova');
 		expect(result.post.author.handle).toBe('@elena.rostova');
 		expect(result.postUrl).toBe('http://localhost:5173/post/post-100');
+		// A visitor's open counts as a view.
+		expect(viewCount).toHaveBeenCalledTimes(1);
+	});
+
+	it('does not count the author opening their own post as a view', async () => {
+		const { db, viewCount } = postDb([
+			{
+				post: { id: 'post-100', userId: 'usr_elena_dev', content: 'x', createdAt: new Date() },
+				user: { id: 'usr_elena_dev', name: 'Elena Rostova', handle: null, image: null }
+			}
+		]);
+		const result = await load({
+			params: { id: 'post-100' },
+			url: new URL('http://localhost:5173/post/post-100'),
+			locals: { user: { id: 'usr_elena_dev' }, db }
+		} as unknown as LoadEvent);
+		expect(result?.post.id).toBe('post-100');
+		expect(viewCount).not.toHaveBeenCalled();
 	});
 
 	it('falls back to default curated posts if not found in db', async () => {
