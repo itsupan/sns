@@ -30,9 +30,10 @@ async function applyMigrations(d1: D1Database, files: string[]) {
  * then call `migrateRest()` to run the remaining ones (e.g. to test a backfill).
  */
 export async function createTestDb(options: { stopBefore?: string } = {}) {
-	// Tests only need D1/KV. Keep Wrangler's config warnings out of test output (missing
-	// secrets, and the ChatRoom binding whose class lives in worker.ts rather than `main`);
-	// errors are still printed.
+	// Tests only need D1/KV: keep Wrangler's config warnings (e.g. missing secrets) out of test
+	// output; errors still print. workerd itself may still warn that the ChatRoom class is not
+	// exported, because it lives in worker.ts rather than `main`. That is expected and harmless:
+	// tests never use the CHAT_ROOM binding (routes fall back when it is unavailable).
 	process.env.WRANGLER_LOG ??= 'error';
 	const proxy = await getPlatformProxy<Env>({ persist: false });
 	const d1 = proxy.env.DB;
