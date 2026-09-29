@@ -37,6 +37,8 @@ describe('PostCard component', () => {
 	});
 
 	it('toggles like button on click', async () => {
+		const like = vi.fn(async () => Response.json({ liked: true, likesCount: 843 }));
+		vi.stubGlobal('fetch', like);
 		const screen = render(PostCard);
 
 		const likeButton = screen.getByRole('button', { name: 'Like post' });
@@ -45,6 +47,19 @@ describe('PostCard component', () => {
 
 		await likeButton.click();
 		await expect.element(screen.getByText('843')).toBeInTheDocument();
+		expect(like).toHaveBeenCalledWith('/api/posts/post-1/like', { method: 'POST' });
+	});
+
+	it('rolls the like back when the server rejects it', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => Response.json({ error: { code: 'rate_limited' } }, { status: 429 }))
+		);
+		const screen = render(PostCard);
+
+		await screen.getByRole('button', { name: 'Like post' }).click();
+		await expect.element(screen.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
+		await expect.element(screen.getByText('842')).toBeInTheDocument();
 	});
 
 	it('renders multi-image carousel counter and navigates slides', async () => {

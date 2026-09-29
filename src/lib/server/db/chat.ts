@@ -1,4 +1,5 @@
 import { and, asc, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
+import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Database } from '.';
 import { conversation, conversationMember, message, user } from './schema';
 import { encodeCursor, type FeedCursor } from './posts';
@@ -251,30 +252,43 @@ export async function listMessages(
  * Stores a message and, in the same D1 batch (one transaction), bumps the conversation's and
  * every member's `last_message_at` and marks it read for the sender. `created_at` comes from
  * D1 so all messages share one clock.
+ *
+ * Idempotent on `id`: the client generates it, so retrying a send whose response was lost
+ * returns the stored message (`created: false`) instead of posting it twice. An id that belongs
+ * to a different conversation or sender is a 409. The timestamp updates only move forward, so a
+ * late replay can never rewind a read marker.
  */
 export async function sendMessage(
 	db: Database,
 	{
+		id = crypto.randomUUID(),
 		conversationId,
 		senderId,
 		content
-	}: { conversationId: string; senderId: string; content: string }
-): Promise<ChatMessage> {
-	const id = crypto.randomUUID();
-	const sentAt = sql`(select ${message.createdAt} from ${message} where ${message.id} = ${id})`;
+	}: { id?: string; conversationId: string; senderId: string; content: string }
+): Promise<{ message: ChatMessage; created: boolean }> {
+	// NULL when `id` is someone else's message, which leaves every column below unchanged.
+	const sentAt = sql`(select ${message.createdAt} from ${message} where ${message.id} = ${id} and ${message.conversationId} = ${conversationId} and ${message.senderId} = ${senderId})`;
+	const later = (column: SQLiteColumn) =>
+		sql`coalesce(max(${column}, ${sentAt}), ${column}, ${sentAt})`;
+
 	const [inserted] = await db.batch([
-		db.insert(message).values({ id, conversationId, senderId, content }).returning(),
+		db
+			.insert(message)
+			.values({ id, conversationId, senderId, content })
+			.onConflictDoNothing()
+			.returning(),
 		db
 			.update(conversation)
-			.set({ lastMessageAt: sentAt })
+			.set({ lastMessageAt: later(conversation.lastMessageAt) })
 			.where(eq(conversation.id, conversationId)),
 		db
 			.update(conversationMember)
-			.set({ lastMessageAt: sentAt })
+			.set({ lastMessageAt: later(conversationMember.lastMessageAt) })
 			.where(eq(conversationMember.conversationId, conversationId)),
 		db
 			.update(conversationMember)
-			.set({ lastReadAt: sentAt })
+			.set({ lastReadAt: later(conversationMember.lastReadAt) })
 			.where(
 				and(
 					eq(conversationMember.conversationId, conversationId),
@@ -282,7 +296,13 @@ export async function sendMessage(
 				)
 			)
 	]);
-	return toMessage(inserted[0]);
+	if (inserted[0]) return { message: toMessage(inserted[0]), created: true };
+
+	const [existing] = await db.select().from(message).where(eq(message.id, id)).limit(1);
+	if (!existing || existing.conversationId !== conversationId || existing.senderId !== senderId) {
+		throw new ApiError(409, 'conflict', 'That message id is already in use');
+	}
+	return { message: toMessage(existing), created: false };
 }
 
 /** Marks everything up to the conversation's latest message as read for `userId`. */

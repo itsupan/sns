@@ -191,21 +191,27 @@
 		}
 	}
 
-	async function deliver(tempId: string, content: string) {
-		byId[tempId] = { ...byId[tempId], pending: 'sending' };
+	/**
+	 * Posts a pending message. The id is generated here and sent along, so the server stores a
+	 * retried send once, and its copy (or the WebSocket echo) replaces the pending entry in place.
+	 */
+	async function deliver(id: string, content: string) {
+		if (!byId[id]?.pending) return;
+		byId[id] = { ...byId[id], pending: 'sending' };
 		try {
 			const res = await fetch(api('/messages'), {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ content })
+				body: JSON.stringify({ id, content })
 			});
 			const body = await res.json().catch(() => null);
 			if (!res.ok) throw new Error(readApiError(body, 'Message not sent').message);
-			const { message } = body as { message: ChatMessage };
-			delete byId[tempId];
-			merge([message]);
+			merge([(body as { message: ChatMessage }).message]);
 		} catch (err) {
-			if (byId[tempId]) byId[tempId] = { ...byId[tempId], pending: 'failed' };
+			// The response can be lost after the server stored it; if the echo already
+			// confirmed the message, it was sent.
+			if (!byId[id]?.pending) return;
+			byId[id] = { ...byId[id], pending: 'failed' };
 			toast.show(err instanceof Error ? err.message : 'Message not sent');
 		}
 	}
@@ -218,10 +224,10 @@
 			toast.show(`Messages can be up to ${MAX_MESSAGE_LENGTH} characters`);
 			return;
 		}
-		const tempId = `pending-${crypto.randomUUID()}`;
+		const id = crypto.randomUUID();
 		const newest = messages.at(-1);
-		byId[tempId] = {
-			id: tempId,
+		byId[id] = {
+			id,
 			conversationId,
 			senderId: viewerId,
 			content,
@@ -231,7 +237,7 @@
 		};
 		draft = '';
 		scrollToBottom();
-		deliver(tempId, content);
+		deliver(id, content);
 	}
 
 	function retry(m: ViewMessage) {
