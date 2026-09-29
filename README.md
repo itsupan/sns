@@ -144,11 +144,40 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fix
 | `comment`       | `RATE_LIMIT_COMMENT`        | `POST /api/posts/:id/comments`                          | 20 / min |
 | `reaction`      | `RATE_LIMIT_REACTION`       | `POST /api/comments/:id/reactions`                      | 60 / min |
 | `search`        | `RATE_LIMIT_SEARCH`         | `GET /api/search` (per user, or per IP when signed out) | 60 / min |
+| `chatStart`     | `RATE_LIMIT_CHAT_START`     | `POST /api/conversations`                               | 10 / min |
+| `chatMessage`   | `RATE_LIMIT_CHAT_MESSAGE`   | `POST /api/conversations/:id/messages`                  | 30 / min |
 | `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`                              | 60 / min |
 | `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)                                 | 30 / min |
 | `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`                            | 20 / min |
 
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }`. KV has no atomic increment and is eventually consistent, so a burst can let a few extra requests through: treat this as abuse protection, not an exact quota. Without a `KV` binding (unit tests) requests are allowed.
+
+## Real-time chat
+
+Direct messages (`/messages`) store every message in D1 and use a Durable Object only to push
+live events:
+
+1. `POST /api/conversations/:id/messages` checks membership and writes the message in one D1
+   batch (message, `last_message_at`, the sender's `last_read_at`). Once the client gets `201`,
+   the message is stored.
+2. It then calls `broadcast()` on the conversation's `ChatRoom` Durable Object
+   (`src/lib/server/chat/chat-room.ts`, one per conversation) in `waitUntil`.
+3. Browsers hold a WebSocket to `GET /api/chat/ws?conversationId=`, which checks the session and
+   membership before handing the upgrade to the room. The room uses the Hibernation API, answers
+   `ping` with `pong` without waking, and relays throttled `typing` signals to the other member.
+4. The client (`src/lib/chat/socket.svelte.ts`) reconnects with exponential backoff and jitter,
+   recycles a connection that stops answering pings, and after every reconnect fetches
+   `?after=<last message id>`, so nothing sent while it was offline is lost. While the socket
+   is down it also polls every 5 s.
+
+**Worker entry.** adapter-cloudflare writes its worker to wrangler's `main` and cannot export
+extra classes, so `worker.ts` at the repo root re-exports SvelteKit's worker plus `ChatRoom`.
+`pnpm preview` and `pnpm deploy:production` pass it to Wrangler explicitly; run `pnpm build`
+first. The `ChatRoom` class is registered by the `migrations` entry in `wrangler.jsonc`: add a
+new tag there (never edit `v1`) if a Durable Object class is renamed or removed.
+
+**Local development.** `pnpm dev` (Vite) cannot run Durable Objects, so `/api/chat/ws` returns
+`503` there and chat falls back to polling. Use `pnpm preview` to test live delivery and typing.
 
 ## Configuration
 
@@ -165,6 +194,10 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `COMMENTS_MAX_PAGE_SIZE`    | integer                       | `50`                              |
 | `SEARCH_PAGE_SIZE`          | integer (≤ max)               | `5` (per section)                 |
 | `SEARCH_MAX_PAGE_SIZE`      | integer                       | `20`                              |
+| `CHAT_PAGE_SIZE`            | integer (≤ max)               | `30` (messages per history page)  |
+| `CHAT_MAX_PAGE_SIZE`        | integer                       | `100`                             |
+| `INBOX_PAGE_SIZE`           | integer (≤ max)               | `20`                              |
+| `INBOX_MAX_PAGE_SIZE`       | integer                       | `50`                              |
 | `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                 |
 | `SIGNUP_BLOCKED_EMAILS`     | comma-separated emails        | empty (nobody blocked)            |
 
@@ -185,7 +218,7 @@ regenerates the binding types too, so they can never drift from `wrangler.jsonc`
 | ---------------------------- | --------------------------------------------------------------------- |
 | `pnpm dev`                   | Vite dev server with emulated Cloudflare bindings                     |
 | `pnpm build`                 | Typecheck bindings and build the Worker into `.svelte-kit/cloudflare` |
-| `pnpm preview`               | Serve the built Worker with `wrangler dev` (real workerd)             |
+| `pnpm preview`               | Serve the built Worker (`worker.ts`) with `wrangler dev`, incl. chat  |
 | `pnpm check`                 | `svelte-check` + verify `worker-configuration.d.ts` is current        |
 | `pnpm lint` / `pnpm format`  | ESLint / Prettier (`pnpm format:check` for a read-only check)         |
 | `pnpm test:unit`             | Vitest (append `--run` for a single pass)                             |

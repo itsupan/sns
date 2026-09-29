@@ -10,7 +10,7 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173 --var BETTER_AUTH_URL:http://localhost:4173",
+		"preview": "wrangler dev worker.ts --port 4173 --var BETTER_AUTH_URL:http://localhost:4173",
 		"prepare": "wrangler types && svelte-kit sync || echo ''",
 		"check": "wrangler types && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -30,7 +30,7 @@
 		"db:setup:local": "pnpm run db:migrate:local && pnpm run db:seed:local",
 		"db:migrate:production": "wrangler d1 migrations apply DB --env production --remote",
 		"db:studio": "drizzle-kit studio",
-		"deploy:production": "wrangler deploy --env production"
+		"deploy:production": "wrangler deploy worker.ts --env production"
 	},
 	"dependencies": {
 		"@better-auth/drizzle-adapter": "^1.7.5",

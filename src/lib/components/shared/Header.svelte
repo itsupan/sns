@@ -4,6 +4,8 @@
 	import Avatar from './Avatar.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import SearchBox from './SearchBox.svelte';
+	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 
@@ -22,6 +24,32 @@
 		name: $session.data?.user?.name || '',
 		handle: $session.data?.user?.email ? `@${$session.data.user.email.split('@')[0]}` : '',
 		image: $session.data?.user?.image || null
+	});
+
+	/** Unread direct messages, refreshed on navigation and when the tab becomes visible. */
+	let unread = $state(0);
+	let signedIn = $derived(!!$session.data?.user);
+
+	async function refreshUnread() {
+		try {
+			const res = await fetch('/api/conversations/unread');
+			if (res.ok) unread = ((await res.json()) as { unread: number }).unread;
+		} catch {
+			// Keep the last known count.
+		}
+	}
+
+	$effect(() => {
+		// Re-run on every navigation (e.g. after reading a conversation).
+		void page.url.pathname;
+		if (!signedIn) {
+			unread = 0;
+			return;
+		}
+		untrack(refreshUnread);
+		const onVisible = () => document.visibilityState === 'visible' && refreshUnread();
+		document.addEventListener('visibilitychange', onVisible);
+		return () => document.removeEventListener('visibilitychange', onVisible);
 	});
 
 	// Mobile app-bar behaviour: slide away while scrolling down, reappear on scroll up.
@@ -98,15 +126,20 @@
 				<Icon name="search" class="text-xl" />
 			</button>
 
-			<button
-				type="button"
-				class={iconButton}
-				aria-label="Direct messages"
+			<a
+				href={resolve('/messages')}
+				class="relative {iconButton}"
+				aria-label={unread > 0 ? `Direct messages, ${unread} unread` : 'Direct messages'}
 				title="Direct messages"
-				onclick={() => toast.show('Messages are coming soon')}
 			>
 				<Icon name="beacon" class="text-xl sm:text-base" />
-			</button>
+				{#if unread > 0}
+					<span
+						class="absolute top-1.5 right-1.5 sm:top-0 sm:right-0 min-w-4 h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold leading-4 text-center"
+						aria-hidden="true">{unread > 99 ? '99+' : unread}</span
+					>
+				{/if}
+			</a>
 
 			<button
 				type="button"

@@ -96,3 +96,18 @@ VALUES
 -- (SQLite skips them unless recursive_triggers is on), so re-index after seeding.
 INSERT INTO `post_fts`(`post_fts`) VALUES ('rebuild');
 INSERT INTO `user_fts`(`user_fts`) VALUES ('rebuild');
+
+-- Chat (#37): one DM between Elena and Kai with a short history; Elena has one unread.
+INSERT OR IGNORE INTO `conversation` (`id`, `dm_key`, `created_at`, `last_message_at`)
+VALUES ('conv-elena-kai', 'usr_elena_dev:usr_kai_dev', 1790600000000, 1790600300000);
+
+INSERT OR IGNORE INTO `conversation_member` (`conversation_id`, `user_id`, `last_read_at`, `last_message_at`)
+VALUES
+  ('conv-elena-kai', 'usr_elena_dev', 1790600200000, 1790600300000),
+  ('conv-elena-kai', 'usr_kai_dev', 1790600300000, 1790600300000);
+
+INSERT OR IGNORE INTO `message` (`id`, `conversation_id`, `sender_id`, `content`, `created_at`)
+VALUES
+  ('msg-1', 'conv-elena-kai', 'usr_elena_dev', 'Your Shigaraki series is stunning. Which kiln?', 1790600100000),
+  ('msg-2', 'conv-elena-kai', 'usr_kai_dev', 'Thank you! A five-day anagama firing in Iga.', 1790600200000),
+  ('msg-3', 'conv-elena-kai', 'usr_kai_dev', 'Come visit next spring, I will show you around.', 1790600300000);

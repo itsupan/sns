@@ -8,6 +8,7 @@
 	import ShareProfileModal from './ShareProfileModal.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { readApiError } from '$lib/utils/api-error';
 	import { formatCount } from '$lib/utils/format';
 	import { followStore } from '$lib/utils/follow.svelte';
 
@@ -105,6 +106,9 @@
 		}
 	}
 
+	let openingChat = $state(false);
+
+	/** Opens (or starts) the direct conversation with this profile. */
 	async function handleMessage() {
 		if (!$session.data?.user) {
 			toast.show('Please log in to send messages');
@@ -121,7 +125,23 @@
 			return;
 		}
 
-		toast.show(`Direct messaging with ${profile.name} is coming soon`);
+		if (!profile.id || openingChat) return;
+		openingChat = true;
+		try {
+			const res = await fetch('/api/conversations', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ userId: profile.id })
+			});
+			const data = await res.json().catch(() => null);
+			if (!res.ok) throw new Error(readApiError(data, 'Could not open the conversation').message);
+			const { conversation } = data as { conversation: { id: string } };
+			await goto(resolve('/messages/[id]', { id: conversation.id }));
+		} catch (err) {
+			toast.show(err instanceof Error ? err.message : 'Could not open the conversation');
+		} finally {
+			openingChat = false;
+		}
 	}
 
 	function toggleSettings() {
@@ -448,6 +468,8 @@
 						type="button"
 						class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text sm:bg-slate-950 sm:text-white sm:dark:bg-white sm:dark:text-slate-950 hover:bg-slate-200 dark:hover:bg-dark-hover sm:hover:bg-slate-800 sm:dark:hover:bg-slate-100 flex items-center justify-center gap-1.5 font-semibold text-xs transition-colors duration-150 cursor-pointer border-0 shadow-xs"
 						onclick={handleMessage}
+						disabled={openingChat}
+						aria-busy={openingChat}
 					>
 						<Icon name="envelope" class="hidden sm:inline-block text-sm" />
 						<span class="sm:hidden">Message</span>

@@ -263,3 +263,66 @@ export const postCommentRelations = relations(postComment, ({ one }) => ({
 		references: [user.id]
 	})
 }));
+
+export const conversation = sqliteTable('conversation', {
+	id: text('id').primaryKey(),
+	// Direct messages: the two member ids sorted and joined with ':'. Unique, so starting a DM
+	// twice (even concurrently) always lands in the same conversation.
+	dmKey: text('dm_key').notNull().unique(),
+	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+		.notNull(),
+	// Inbox order; null until the first message.
+	lastMessageAt: integer('last_message_at', { mode: 'timestamp_ms' })
+});
+
+export const conversationMember = sqliteTable(
+	'conversation_member',
+	{
+		conversationId: text('conversation_id')
+			.notNull()
+			.references(() => conversation.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		// Messages after this are unread for the member; null means nothing read yet.
+		lastReadAt: integer('last_read_at', { mode: 'timestamp_ms' }),
+		// Copy of conversation.last_message_at so a member's inbox is one index range scan.
+		lastMessageAt: integer('last_message_at', { mode: 'timestamp_ms' })
+	},
+	(table) => [
+		primaryKey({ columns: [table.conversationId, table.userId] }),
+		// Inbox: WHERE user_id = ? ORDER BY last_message_at DESC, conversation_id DESC.
+		index('conversation_member_userId_lastMessageAt_idx').on(
+			table.userId,
+			table.lastMessageAt,
+			table.conversationId
+		)
+	]
+);
+
+export const message = sqliteTable(
+	'message',
+	{
+		id: text('id').primaryKey(),
+		conversationId: text('conversation_id')
+			.notNull()
+			.references(() => conversation.id, { onDelete: 'cascade' }),
+		senderId: text('sender_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		content: text('content').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		deletedAt: integer('deleted_at', { mode: 'timestamp_ms' })
+	},
+	(table) => [
+		// History keyset pagination: WHERE conversation_id = ? ORDER BY created_at, id.
+		index('message_conversationId_createdAt_idx').on(
+			table.conversationId,
+			table.createdAt,
+			table.id
+		)
+	]
+);

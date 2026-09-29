@@ -19,6 +19,8 @@ export type RateLimitName =
 	| 'comment'
 	| 'reaction'
 	| 'search'
+	| 'chatStart'
+	| 'chatMessage'
 	| 'like'
 	| 'follow'
 	| 'uploadPresign';
@@ -36,6 +38,8 @@ export interface AppConfig {
 	comments: PageSize;
 	/** Results per section (users, posts) of GET /api/search. */
 	search: PageSize;
+	/** Chat history pages and the conversations inbox. */
+	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
 	mediaUrlTtlSec: number;
 	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
@@ -51,6 +55,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 		comment: { limit: 20, windowSec: 60 },
 		reaction: { limit: 60, windowSec: 60 },
 		search: { limit: 60, windowSec: 60 },
+		chatStart: { limit: 10, windowSec: 60 },
+		chatMessage: { limit: 30, windowSec: 60 },
 		like: { limit: 60, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 }
@@ -71,6 +77,10 @@ export const DEFAULT_CONFIG: AppConfig = {
 	feed: { defaultPageSize: 10, maxPageSize: 50 },
 	comments: { defaultPageSize: 20, maxPageSize: 50 },
 	search: { defaultPageSize: 5, maxPageSize: 20 },
+	chat: {
+		messages: { defaultPageSize: 30, maxPageSize: 100 },
+		inbox: { defaultPageSize: 20, maxPageSize: 50 }
+	},
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
 	auth: { blockedSignupEmails: new Set() }
 };
@@ -82,6 +92,8 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	comment: 'RATE_LIMIT_COMMENT',
 	reaction: 'RATE_LIMIT_REACTION',
 	search: 'RATE_LIMIT_SEARCH',
+	chatStart: 'RATE_LIMIT_CHAT_START',
+	chatMessage: 'RATE_LIMIT_CHAT_MESSAGE',
 	like: 'RATE_LIMIT_LIKE',
 	follow: 'RATE_LIMIT_FOLLOW',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN'
@@ -188,6 +200,10 @@ export function loadConfig(env: object | undefined): AppConfig {
 		feed: pageSize('FEED', d.feed),
 		comments: pageSize('COMMENTS', d.comments),
 		search: pageSize('SEARCH', d.search),
+		chat: {
+			messages: pageSize('CHAT', d.chat.messages),
+			inbox: pageSize('INBOX', d.chat.inbox)
+		},
 		mediaUrlTtlSec: Math.min(
 			read(vars, 'MEDIA_URL_TTL_SECONDS', PositiveInt, d.mediaUrlTtlSec),
 			MAX_SIGV4_TTL_SEC
