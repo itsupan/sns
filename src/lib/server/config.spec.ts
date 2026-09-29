@@ -54,6 +54,10 @@ describe('loadConfig', () => {
 		expect(loadConfig({ COMMENTS_PAGE_SIZE: '80', COMMENTS_MAX_PAGE_SIZE: '40' }).comments).toEqual(
 			{ defaultPageSize: 40, maxPageSize: 40 }
 		);
+		expect(loadConfig({ CHAT_PAGE_SIZE: '500', INBOX_MAX_PAGE_SIZE: '10' }).chat).toEqual({
+			messages: { defaultPageSize: 100, maxPageSize: 100 },
+			inbox: { defaultPageSize: 10, maxPageSize: 10 }
+		});
 		expect(loadConfig({ SEARCH_PAGE_SIZE: '8' }).search).toEqual({
 			defaultPageSize: 8,
 			maxPageSize: 20

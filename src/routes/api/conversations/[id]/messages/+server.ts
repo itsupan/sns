@@ -1,0 +1,52 @@
+import { json } from '@sveltejs/kit';
+import * as v from 'valibot';
+import type { RequestHandler } from './$types';
+import {
+	enforceRateLimit,
+	parseBody,
+	parsePageQuery,
+	parseQuery,
+	requireUser,
+	withApi
+} from '$lib/server/api';
+import { getConfig } from '$lib/server/config';
+import { listMessages, requireMembership, sendMessage } from '$lib/server/db/chat';
+import { broadcastLater } from '$lib/server/chat/rooms';
+import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
+
+const SendMessage = v.object({
+	content: v.pipe(
+		v.string('Message is required'),
+		v.trim(),
+		v.minLength(1, 'Message is required'),
+		v.maxLength(MAX_MESSAGE_LENGTH, `Message cannot exceed ${MAX_MESSAGE_LENGTH} characters`)
+	)
+});
+
+/**
+ * History, oldest first. Query: `limit`, `cursor` (older page), or `after` (message id) to
+ * catch up after a reconnect.
+ */
+export const GET: RequestHandler = withApi(async ({ params, url, locals, platform }) => {
+	const viewer = requireUser(locals);
+	await requireMembership(locals.db, params.id, viewer.id);
+	const { limit, cursor } = await parsePageQuery(url, getConfig(platform?.env).chat.messages);
+	const { after } = await parseQuery(url, v.object({ after: v.optional(v.string()) }));
+	return json(await listMessages(locals.db, { conversationId: params.id, limit, cursor, after }));
+});
+
+/** Stores a message, then pushes it to the conversation's open sockets. */
+export const POST: RequestHandler = withApi(async ({ params, request, locals, platform }) => {
+	const viewer = requireUser(locals);
+	await enforceRateLimit(platform, 'chatMessage', viewer.id);
+	const { content } = await parseBody(request, SendMessage);
+	await requireMembership(locals.db, params.id, viewer.id);
+
+	const message = await sendMessage(locals.db, {
+		conversationId: params.id,
+		senderId: viewer.id,
+		content
+	});
+	broadcastLater(platform, params.id, { type: 'message', message });
+	return json({ message }, { status: 201 });
+});
