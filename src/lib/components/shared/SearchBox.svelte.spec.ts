@@ -104,6 +104,8 @@ describe('SearchBox', () => {
 		const input = screen.getByRole('combobox');
 		await input.fill('kai');
 		await expect.element(screen.getByRole('option').first()).toBeVisible();
+		// Results appearing under a resting mouse must not steal the keyboard selection.
+		await expect.element(input).not.toHaveAttribute('aria-activedescendant');
 
 		await userEvent.keyboard('{ArrowDown}');
 		const [userOption, postOption] = screen.getByRole('option').elements();
