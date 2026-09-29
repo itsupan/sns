@@ -157,6 +157,13 @@ describe('ConversationView', () => {
 		expect(screen.getByText('retry me').elements()).toHaveLength(1);
 	});
 
+	it('says Connecting… before the first open and nothing once live', async () => {
+		const screen = renderView();
+		await expect.element(screen.getByText('Connecting…')).toBeVisible();
+		sockets[0].open();
+		await expect.element(screen.getByRole('status')).not.toBeInTheDocument();
+	});
+
 	it('shows the typing indicator from the other member only', async () => {
 		const screen = renderView();
 		sockets[0].open();

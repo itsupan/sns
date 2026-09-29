@@ -150,6 +150,13 @@
 		};
 	});
 
+	// Messages that arrived while the tab was hidden become read when the user returns.
+	$effect(() => {
+		const onVisible = () => document.visibilityState === 'visible' && markRead();
+		document.addEventListener('visibilitychange', onVisible);
+		return () => document.removeEventListener('visibilitychange', onVisible);
+	});
+
 	// Fallback while the socket is down (bad network, or `vite dev` without Durable Objects).
 	$effect(() => {
 		if (online) return;
@@ -293,7 +300,7 @@
 				role="status"
 			>
 				<span class="size-1.5 rounded-full bg-amber-500"></span>
-				Reconnecting…
+				{socket.status === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
 			</span>
 		{/if}
 	</header>
