@@ -138,13 +138,14 @@ export const POST = withApi(async ({ request, locals }) => {
 
 Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fixed window stored in the `KV` binding. Limits come from `RATE_LIMIT_*` vars (see [Configuration](#configuration)):
 
-| Name            | Var                         | Endpoint                       | Default  |
-| --------------- | --------------------------- | ------------------------------ | -------- |
-| `createPost`    | `RATE_LIMIT_CREATE_POST`    | `POST /api/posts`              | 10 / min |
-| `comment`       | `RATE_LIMIT_COMMENT`        | `POST /api/posts/:id/comments` | 20 / min |
-| `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`     | 60 / min |
-| `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)        | 30 / min |
-| `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`   | 20 / min |
+| Name            | Var                         | Endpoint                           | Default  |
+| --------------- | --------------------------- | ---------------------------------- | -------- |
+| `createPost`    | `RATE_LIMIT_CREATE_POST`    | `POST /api/posts`                  | 10 / min |
+| `comment`       | `RATE_LIMIT_COMMENT`        | `POST /api/posts/:id/comments`     | 20 / min |
+| `reaction`      | `RATE_LIMIT_REACTION`       | `POST /api/comments/:id/reactions` | 60 / min |
+| `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`         | 60 / min |
+| `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)            | 30 / min |
+| `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`       | 20 / min |
 
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }`. KV has no atomic increment and is eventually consistent, so a burst can let a few extra requests through: treat this as abuse protection, not an exact quota. Without a `KV` binding (unit tests) requests are allowed.
 
@@ -159,6 +160,8 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `UPLOAD_ALLOWED_MIME_TYPES` | comma-separated MIME types    | common image + mp4/webm/mov types |
 | `FEED_PAGE_SIZE`            | integer (≤ max)               | `10`                              |
 | `FEED_MAX_PAGE_SIZE`        | integer                       | `50`                              |
+| `COMMENTS_PAGE_SIZE`        | integer (≤ max)               | `20`                              |
+| `COMMENTS_MAX_PAGE_SIZE`    | integer                       | `50`                              |
 | `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                 |
 | `SIGNUP_BLOCKED_EMAILS`     | comma-separated emails        | empty (nobody blocked)            |
 

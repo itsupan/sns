@@ -349,6 +349,11 @@
 		latestCommentPreview = comment;
 	}
 
+	function handleCommentDeleted(commentId: string, newCount: number) {
+		commentsDelta = newCount - post.commentsCount;
+		if (latestCommentPreview?.id === commentId) latestCommentPreview = undefined;
+	}
+
 	function postUrl() {
 		return `${window.location.origin}/post/${post.id}`;
 	}
@@ -831,4 +836,9 @@
 {/if}
 
 <SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
-<PostCommentsModal bind:open={commentsOpen} {post} onCommentAdded={handleCommentAdded} />
+<PostCommentsModal
+	bind:open={commentsOpen}
+	{post}
+	onCommentAdded={handleCommentAdded}
+	onCommentDeleted={handleCommentDeleted}
+/>

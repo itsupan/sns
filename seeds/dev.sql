@@ -68,6 +68,25 @@ VALUES
   ('cmt-2', 'post-2', 'usr_elena_dev', 'The natural wood ash glaze turned out breathtaking.'),
   ('cmt-3', 'post-3', 'usr_lars_dev', 'The timber grain balances the cold slate impeccably.');
 
+-- Replies (#35) and reactions (#36); counters are recomputed below so re-seeding stays exact.
+INSERT OR IGNORE INTO `post_comment` (`id`, `post_id`, `user_id`, `content`, `parent_comment_id`)
+VALUES
+  ('cmt-1-r1', 'post-1', 'usr_elena_dev', 'Agreed, the late-afternoon light does all the work.', 'cmt-1'),
+  ('cmt-1-r2', 'post-1', 'usr_lars_dev', '@elena.rostova it reminds me of Ando''s chapels.', 'cmt-1');
+
+INSERT OR IGNORE INTO `comment_reaction` (`comment_id`, `user_id`, `reaction_type`)
+VALUES
+  ('cmt-1', 'usr_elena_dev', 'love'),
+  ('cmt-1', 'usr_lars_dev', 'fire'),
+  ('cmt-1-r1', 'usr_kai_dev', 'like'),
+  ('cmt-2', 'usr_kai_dev', 'wow');
+
+UPDATE `post_comment` SET
+  `replies_count` = (SELECT count(*) FROM `post_comment` r WHERE r.`parent_comment_id` = `post_comment`.`id`),
+  `reactions_count` = (SELECT count(*) FROM `comment_reaction` cr WHERE cr.`comment_id` = `post_comment`.`id`);
+UPDATE `post` SET `comments_count` = (SELECT count(*) FROM `post_comment` c WHERE c.`post_id` = `post`.`id`)
+WHERE `id` IN ('post-1', 'post-2', 'post-3');
+
 -- Soft-deleted post (#31): must never appear in feed, profile or /post/[id].
 INSERT OR REPLACE INTO `post` (`id`, `user_id`, `title`, `content`, `aspect_ratio`, `post_type`, `deleted_at`)
 VALUES
