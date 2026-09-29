@@ -91,3 +91,8 @@ WHERE `id` IN ('post-1', 'post-2', 'post-3');
 INSERT OR REPLACE INTO `post` (`id`, `user_id`, `title`, `content`, `aspect_ratio`, `post_type`, `deleted_at`)
 VALUES
   ('post-deleted', 'usr_elena_dev', 'Deleted draft', 'This post was deleted and should stay hidden.', '1:1', 'photo', cast(unixepoch('subsecond') * 1000 as integer));
+
+-- Search (#38): `INSERT OR REPLACE` above deletes without firing the FTS delete triggers
+-- (SQLite skips them unless recursive_triggers is on), so re-index after seeding.
+INSERT INTO `post_fts`(`post_fts`) VALUES ('rebuild');
+INSERT INTO `user_fts`(`user_fts`) VALUES ('rebuild');

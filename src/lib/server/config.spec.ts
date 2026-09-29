@@ -54,6 +54,10 @@ describe('loadConfig', () => {
 		expect(loadConfig({ COMMENTS_PAGE_SIZE: '80', COMMENTS_MAX_PAGE_SIZE: '40' }).comments).toEqual(
 			{ defaultPageSize: 40, maxPageSize: 40 }
 		);
+		expect(loadConfig({ SEARCH_PAGE_SIZE: '8' }).search).toEqual({
+			defaultPageSize: 8,
+			maxPageSize: 20
+		});
 		expect(config.mediaUrlTtlSec).toBe(7 * 24 * 3600);
 	});
 });

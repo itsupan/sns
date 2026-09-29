@@ -14,7 +14,14 @@ export interface RateLimitRule {
 }
 
 export type RateLimitName =
-	'createPost' | 'createStory' | 'comment' | 'reaction' | 'like' | 'follow' | 'uploadPresign';
+	| 'createPost'
+	| 'createStory'
+	| 'comment'
+	| 'reaction'
+	| 'search'
+	| 'like'
+	| 'follow'
+	| 'uploadPresign';
 
 export interface PageSize {
 	defaultPageSize: number;
@@ -27,6 +34,8 @@ export interface AppConfig {
 	feed: PageSize;
 	/** Top-level comments and replies lists. */
 	comments: PageSize;
+	/** Results per section (users, posts) of GET /api/search. */
+	search: PageSize;
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
 	mediaUrlTtlSec: number;
 	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
@@ -41,6 +50,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		createStory: { limit: 10, windowSec: 60 },
 		comment: { limit: 20, windowSec: 60 },
 		reaction: { limit: 60, windowSec: 60 },
+		search: { limit: 60, windowSec: 60 },
 		like: { limit: 60, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 }
@@ -60,6 +70,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	},
 	feed: { defaultPageSize: 10, maxPageSize: 50 },
 	comments: { defaultPageSize: 20, maxPageSize: 50 },
+	search: { defaultPageSize: 5, maxPageSize: 20 },
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
 	auth: { blockedSignupEmails: new Set() }
 };
@@ -70,6 +81,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	createStory: 'RATE_LIMIT_CREATE_STORY',
 	comment: 'RATE_LIMIT_COMMENT',
 	reaction: 'RATE_LIMIT_REACTION',
+	search: 'RATE_LIMIT_SEARCH',
 	like: 'RATE_LIMIT_LIKE',
 	follow: 'RATE_LIMIT_FOLLOW',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN'
@@ -175,6 +187,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 		},
 		feed: pageSize('FEED', d.feed),
 		comments: pageSize('COMMENTS', d.comments),
+		search: pageSize('SEARCH', d.search),
 		mediaUrlTtlSec: Math.min(
 			read(vars, 'MEDIA_URL_TTL_SECONDS', PositiveInt, d.mediaUrlTtlSec),
 			MAX_SIGV4_TTL_SEC
