@@ -11,7 +11,14 @@ import {
 	normalizeTags
 } from '$lib/server/db/posts';
 import { extractR2Key, refreshPostMediaUrls } from '$lib/server/services/storage';
-import { MAX_MEDIA_PER_POST, MAX_TAGS_PER_POST, MAX_TAG_LENGTH } from '$lib/constants/post-limits';
+import {
+	MAX_MEDIA_PER_POST,
+	MAX_POST_CONTENT_LENGTH,
+	MAX_POST_LOCATION_LENGTH,
+	MAX_POST_TITLE_LENGTH,
+	MAX_TAGS_PER_POST,
+	MAX_TAG_LENGTH
+} from '$lib/constants/post-limits';
 
 /** Same fields as the create composer; anything omitted is left unchanged. */
 const UpdatePostBody = v.object(
@@ -20,7 +27,10 @@ const UpdatePostBody = v.object(
 			v.pipe(
 				v.nullable(v.string('Title must be a string or null')),
 				v.transform((value) => value?.trim() || null),
-				v.check((value) => value === null || value.length <= 200, 'Title is too long')
+				v.check(
+					(value) => value === null || value.length <= MAX_POST_TITLE_LENGTH,
+					'Title is too long'
+				)
 			)
 		),
 		content: v.optional(
@@ -28,14 +38,17 @@ const UpdatePostBody = v.object(
 				v.string('Content must be a string'),
 				v.trim(),
 				v.minLength(1, 'Post content is required'),
-				v.maxLength(5000, 'Post content is too long')
+				v.maxLength(MAX_POST_CONTENT_LENGTH, 'Post content is too long')
 			)
 		),
 		location: v.optional(
 			v.pipe(
 				v.nullable(v.string('Location must be a string or null')),
 				v.transform((value) => value?.trim() || null),
-				v.check((value) => value === null || value.length <= 100, 'Location is too long')
+				v.check(
+					(value) => value === null || value.length <= MAX_POST_LOCATION_LENGTH,
+					'Location is too long'
+				)
 			)
 		),
 		tags: v.optional(v.array(v.string('Tags must be strings'), 'Tags must be an array')),

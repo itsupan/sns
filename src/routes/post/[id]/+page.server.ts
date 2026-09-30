@@ -4,6 +4,7 @@ import type { PageServerLoad } from './$types';
 import { post, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import { loadFollowedIds } from '$lib/server/db/follows';
+import { loadSuggestions } from '$lib/server/explore';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
@@ -229,6 +230,8 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	return {
 		post: refreshedPost,
 		postUrl: `${origin}/post/${refreshedPost.id}`,
-		origin
+		origin,
+		// The sidebar is optional: a failure here must not take the post down.
+		suggestions: await loadSuggestions(locals.db, locals.user?.id, platform?.env).catch(() => [])
 	};
 };

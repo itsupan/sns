@@ -28,7 +28,8 @@ describe('Post Page Component', () => {
 				data: {
 					post: mockPost,
 					postUrl: 'https://sns.ecoapsara.com/post/post-test-42',
-					origin: 'https://sns.ecoapsara.com'
+					origin: 'https://sns.ecoapsara.com',
+					suggestions: []
 				}
 			}
 		});

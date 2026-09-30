@@ -10,13 +10,20 @@ describe('home page', () => {
 			.element(screen.getByRole('heading', { level: 1 }))
 			.toHaveTextContent('Kizuna home feed');
 		await expect.element(screen.getByText('Your story')).toBeInTheDocument();
-		await expect.element(screen.getByText('Curators to Follow')).toBeInTheDocument();
+		await expect.element(screen.getByText('Curated Topics')).toBeInTheDocument();
 	});
 
 	it('shows an empty state instead of demo posts when the feed is empty', async () => {
 		const screen = render(Page, {
 			props: {
-				data: { posts: [], hasMore: false, nextCursor: null, pageSize: 10, loadFailed: false }
+				data: {
+					posts: [],
+					hasMore: false,
+					nextCursor: null,
+					pageSize: 10,
+					loadFailed: false,
+					suggestions: []
+				}
 			}
 		});
 
@@ -30,7 +37,14 @@ describe('home page', () => {
 	it('shows an error with a retry when the feed failed to load', async () => {
 		const screen = render(Page, {
 			props: {
-				data: { posts: [], hasMore: false, nextCursor: null, pageSize: 10, loadFailed: true }
+				data: {
+					posts: [],
+					hasMore: false,
+					nextCursor: null,
+					pageSize: 10,
+					loadFailed: true,
+					suggestions: []
+				}
 			}
 		});
 
@@ -62,7 +76,8 @@ describe('home page', () => {
 					hasMore: false,
 					nextCursor: null,
 					pageSize: 10,
-					loadFailed: false
+					loadFailed: false,
+					suggestions: []
 				}
 			}
 		});
@@ -106,7 +121,8 @@ describe('home page', () => {
 						hasMore: true,
 						nextCursor: '1700_p1',
 						pageSize: 1,
-						loadFailed: false
+						loadFailed: false,
+						suggestions: []
 					}
 				}
 			});
@@ -129,7 +145,8 @@ describe('home page', () => {
 						hasMore: true,
 						nextCursor: 'bad',
 						pageSize: 1,
-						loadFailed: false
+						loadFailed: false,
+						suggestions: []
 					}
 				}
 			});

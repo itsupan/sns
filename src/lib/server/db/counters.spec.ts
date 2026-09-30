@@ -112,7 +112,7 @@ describe('counters on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 
 	it('does not lose parallel shares', async () => {
 		const before = (await counters()).row.sharesCount;
-		await Promise.all(USERS.map(() => call(sharePost as Handler, null)));
+		await Promise.all(USERS.map((id) => call(sharePost as Handler, id)));
 		expect((await counters()).row.sharesCount).toBe(before + USERS.length);
 	});
 });

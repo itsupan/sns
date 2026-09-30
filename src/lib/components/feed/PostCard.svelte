@@ -403,12 +403,17 @@
 		shareOpen = true;
 	}
 
+	// Shares are counted per signed-in user on the server; the count shown is the server's.
 	async function handleShared() {
-		sharesDelta++;
+		if (!$session.data?.user) return;
 		try {
-			await fetch(`/api/posts/${post.id}/share`, { method: 'POST' });
+			const res = await fetch(`/api/posts/${post.id}/share`, { method: 'POST' });
+			const body = (await res.json().catch(() => null)) as { sharesCount?: number } | null;
+			if (res.ok && typeof body?.sharesCount === 'number') {
+				sharesDelta = body.sharesCount - post.repostsCount;
+			}
 		} catch {
-			// ignore
+			// The share itself already happened; only the counter is left unchanged.
 		}
 	}
 

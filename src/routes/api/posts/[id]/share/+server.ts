@@ -2,10 +2,13 @@ import { json } from '@sveltejs/kit';
 import { eq, sql, and } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post } from '$lib/server/db/schema';
-import { apiError, withApi } from '$lib/server/api';
+import { apiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 import { notDeleted } from '$lib/server/db/posts';
 
-export const POST: RequestHandler = withApi(async ({ params, locals }) => {
+export const POST: RequestHandler = withApi(async ({ params, locals, platform }) => {
+	const currentUser = requireUser(locals);
+	await enforceRateLimit(platform, 'share', currentUser.id);
+
 	const postId = params.id;
 	if (!postId) {
 		return apiError(400, 'bad_request', 'Post ID is required');
