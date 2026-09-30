@@ -231,3 +231,15 @@ test('Create in the mobile nav opens the composer from another page', async ({ p
 	await expect(page).toHaveURL(/\/$/);
 	await expect(page.getByRole('dialog', { name: 'Create post' })).toBeVisible();
 });
+
+test('Explore opens from the nav and shows the discovery grid signed out', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/');
+	await page
+		.getByRole('navigation', { name: 'Mobile Navigation' })
+		.getByRole('link', { name: 'Explore' })
+		.click();
+
+	await expect(page).toHaveURL(/\/explore$/);
+	await expect(page.getByRole('heading', { name: 'Explore', level: 1 })).toBeVisible();
+});

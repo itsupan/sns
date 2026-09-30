@@ -769,13 +769,12 @@
 					class="flex items-center gap-2 mb-3 lg:mb-4.5 overflow-x-auto no-scrollbar lg:flex-wrap -mx-4 px-4 lg:mx-0 lg:px-0"
 				>
 					{#each post.tags as tag (tag)}
-						<button
-							type="button"
-							class="shrink-0 text-xs font-medium px-3 h-8 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted hover:bg-slate-200 dark:hover:bg-dark-hover hover:text-slate-900 dark:hover:text-dark-text active:scale-95 transition border-0 cursor-pointer"
-							onclick={() => toast.show('Tag pages are coming soon')}
+						<a
+							href={resolve('/explore/tags/[tag]', { tag: tag.replace(/^#+/, '').toLowerCase() })}
+							class="shrink-0 inline-flex items-center text-xs font-medium px-3 h-8 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted hover:bg-slate-200 dark:hover:bg-dark-hover hover:text-slate-900 dark:hover:text-dark-text active:scale-95 transition no-underline"
 						>
 							{tag}
-						</button>
+						</a>
 					{/each}
 				</div>
 			{/if}
