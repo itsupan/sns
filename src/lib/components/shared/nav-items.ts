@@ -15,7 +15,7 @@ export interface NavItem {
 
 export const navItems: NavItem[] = [
 	{ id: 'home', label: 'Home', icon: 'home', href: resolve('/'), ready: true },
-	{ id: 'explore', label: 'Explore', icon: 'compass-alt', href: resolve('/'), ready: false },
+	{ id: 'explore', label: 'Explore', icon: 'compass-alt', href: resolve('/explore'), ready: true },
 	{ id: 'create', label: 'Create', icon: 'plus', href: resolve('/'), ready: true },
 	{ id: 'activity', label: 'Activity', icon: 'heart', href: resolve('/activity'), ready: true },
 	{ id: 'saved', label: 'Saved', icon: 'bookmark', href: resolve('/saved'), ready: true },
@@ -26,6 +26,7 @@ export function activeNavId(pathname: string): NavId | null {
 	if (pathname === '/') return 'home';
 	if (pathname.startsWith('/profile')) return 'profile';
 	if (pathname === '/saved') return 'saved';
+	if (pathname === '/explore' || pathname.startsWith('/explore/')) return 'explore';
 	if (pathname === '/activity') return 'activity';
 	return null;
 }
