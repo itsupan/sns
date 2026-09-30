@@ -7,6 +7,7 @@
 	import ThemeToggle from '$lib/components/shared/ThemeToggle.svelte';
 	import ShareProfileModal from './ShareProfileModal.svelte';
 	import BlockButton from './BlockButton.svelte';
+	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
@@ -146,6 +147,27 @@
 		} finally {
 			openingChat = false;
 		}
+	}
+
+	let reportOpen = $state(false);
+
+	/** Opens the report sheet for this profile; signed-out viewers go to log in first. */
+	async function openReport() {
+		if (!$session.data?.user) {
+			toast.show('Please log in to report accounts');
+			const currentPath =
+				typeof window !== 'undefined'
+					? window.location.pathname + window.location.search
+					: resolve('/profile');
+			try {
+				// eslint-disable-next-line svelte/no-navigation-without-resolve
+				await goto(`${resolve('/login')}?redirectTo=${encodeURIComponent(currentPath)}`);
+			} catch {
+				// Router not mounted in test environment
+			}
+			return;
+		}
+		reportOpen = true;
 	}
 
 	function toggleSettings() {
@@ -508,6 +530,19 @@
 						<Icon name="share" class="text-sm" />
 					</button>
 
+					<!-- Report Profile Button -->
+					{#if profile.id}
+						<button
+							type="button"
+							class="size-11 sm:size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-200 dark:hover:bg-dark-hover flex items-center justify-center transition-colors duration-150 cursor-pointer border-0 shrink-0 shadow-xs"
+							onclick={openReport}
+							aria-label="Report profile"
+							title="Report profile"
+						>
+							<Icon name="flag" class="text-sm" />
+						</button>
+					{/if}
+
 					{#if $session.data?.user && profile.id}
 						<BlockButton
 							userId={profile.id}
@@ -548,6 +583,10 @@
 {/if}
 
 <ShareProfileModal bind:open={shareModalOpen} {profile} />
+
+{#if !profile.isOwnProfile && profile.id}
+	<ReportSheet bind:open={reportOpen} targetType="user" targetId={profile.id} />
+{/if}
 
 <style>
 	.profile-grid {

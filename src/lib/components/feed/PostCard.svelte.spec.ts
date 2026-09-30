@@ -173,6 +173,13 @@ describe('PostCard component', () => {
 		expect(screen.getByText('Delete post').query()).toBeNull();
 	});
 
+	it('opens the report sheet for the post from its options', async () => {
+		const screen = render(PostCard);
+		await screen.getByRole('button', { name: 'Post options' }).click();
+		await screen.getByText('Report').click();
+		await expect.element(screen.getByRole('dialog', { name: 'Report post' })).toBeInTheDocument();
+	});
+
 	it('opens the same composer fields to edit, pre-filled, and saves in place', async () => {
 		const fetchMock = vi.fn(async () =>
 			Response.json({

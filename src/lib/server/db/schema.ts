@@ -411,3 +411,54 @@ export const notificationRead = sqliteTable('notification_read', {
 		.references(() => user.id, { onDelete: 'cascade' }),
 	readAt: integer('read_at', { mode: 'timestamp_ms' }).notNull()
 });
+
+export const REPORT_TARGET_TYPES = ['post', 'comment', 'user', 'message'] as const;
+export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
+
+export const REPORT_REASONS = [
+	'spam',
+	'harassment',
+	'hate',
+	'nudity',
+	'violence',
+	'self_harm',
+	'copyright',
+	'impersonation',
+	'other'
+] as const;
+export type ReportReason = (typeof REPORT_REASONS)[number];
+
+export const REPORT_STATUSES = ['open', 'resolved', 'dismissed'] as const;
+
+/** Max length of a report's optional free-text details. */
+export const REPORT_DETAILS_MAX = 500;
+
+/**
+ * A user's report of a post, comment, user or message for moderator review. `target_id` is not a
+ * foreign key: the report stays on record even after its target is removed.
+ */
+export const report = sqliteTable(
+	'report',
+	{
+		id: text('id').primaryKey(),
+		reporterId: text('reporter_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		targetType: text('target_type', { enum: REPORT_TARGET_TYPES }).notNull(),
+		targetId: text('target_id').notNull(),
+		reason: text('reason', { enum: REPORT_REASONS }).notNull(),
+		details: text('details'),
+		status: text('status', { enum: REPORT_STATUSES }).default('open').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// Moderation: all reports about one target.
+		index('report_target_idx').on(table.targetType, table.targetId),
+		// One open report per reporter per target; reporting again after it is closed is allowed.
+		uniqueIndex('report_reporter_target_open_unique')
+			.on(table.reporterId, table.targetType, table.targetId)
+			.where(sql`status = 'open'`)
+	]
+);
