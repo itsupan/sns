@@ -148,6 +148,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fix
 | `chatMessage`   | `RATE_LIMIT_CHAT_MESSAGE`   | `POST /api/conversations/:id/messages`                  | 30 / min |
 | `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`                              | 60 / min |
 | `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)                                 | 30 / min |
+| `share`         | `RATE_LIMIT_SHARE`          | `POST /api/posts/:id/share`                             | 30 / min |
 | `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`                            | 20 / min |
 
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }`. KV has no atomic increment and is eventually consistent, so a burst can let a few extra requests through: treat this as abuse protection, not an exact quota. Without a `KV` binding (unit tests) requests are allowed.

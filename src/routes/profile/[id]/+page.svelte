@@ -21,6 +21,12 @@
 
 	let activeTab = $state<TabId>('grid');
 	let viewMode = $state<ViewMode>('grid');
+	// SvelteKit reuses this component between profiles; start each one on the default tab.
+	$effect.pre(() => {
+		void data.targetUser.id;
+		activeTab = 'grid';
+		viewMode = 'grid';
+	});
 
 	const currentProfile = $derived.by(() => {
 		return resolveProfile(data.targetUser, null, {

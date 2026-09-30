@@ -199,5 +199,5 @@
 	</main>
 
 	<!-- Right Sidebar Column (Desktop & Tablet Landscape) -->
-	<RightSidebar class="hidden lg:flex" />
+	<RightSidebar class="hidden lg:flex" suggestions={data?.suggestions} />
 </div>

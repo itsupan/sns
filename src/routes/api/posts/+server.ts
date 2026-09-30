@@ -5,7 +5,15 @@ import { post, postMedia } from '$lib/server/db/schema';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
-import { MAX_MEDIA_PER_POST, MAX_TAGS_PER_POST, MAX_TAG_LENGTH } from '$lib/constants/post-limits';
+import {
+	MAX_CAMERA_META_LENGTH,
+	MAX_MEDIA_PER_POST,
+	MAX_POST_CONTENT_LENGTH,
+	MAX_POST_LOCATION_LENGTH,
+	MAX_POST_TITLE_LENGTH,
+	MAX_TAGS_PER_POST,
+	MAX_TAG_LENGTH
+} from '$lib/constants/post-limits';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
 	attachTagsStatements,
@@ -86,6 +94,19 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 	const location = typeof body.location === 'string' ? body.location.trim() || null : null;
 
 	const cameraMeta = typeof body.cameraMeta === 'string' ? body.cameraMeta.trim() : null;
+
+	const tooLong = (
+		[
+			['content', content, MAX_POST_CONTENT_LENGTH, 'Post content is too long'],
+			['title', title, MAX_POST_TITLE_LENGTH, 'Title is too long'],
+			['location', location, MAX_POST_LOCATION_LENGTH, 'Location is too long'],
+			['cameraMeta', cameraMeta, MAX_CAMERA_META_LENGTH, 'Camera details are too long']
+		] as const
+	).find(([, value, max]) => (value?.length ?? 0) > max);
+	if (tooLong) {
+		throw new ApiError(400, 'validation_failed', tooLong[3], { [tooLong[0]]: tooLong[3] });
+	}
+
 	const postType: 'photo' | 'story' | 'article' =
 		body.postType === 'story' || body.postType === 'article' ? body.postType : 'photo';
 

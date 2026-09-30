@@ -23,6 +23,7 @@ export type RateLimitName =
 	| 'chatMessage'
 	| 'like'
 	| 'save'
+	| 'share'
 	| 'follow'
 	| 'uploadPresign';
 
@@ -66,6 +67,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		chatMessage: { limit: 30, windowSec: 60 },
 		like: { limit: 60, windowSec: 60 },
 		save: { limit: 60, windowSec: 60 },
+		share: { limit: 30, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 }
 	},
@@ -107,6 +109,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	chatMessage: 'RATE_LIMIT_CHAT_MESSAGE',
 	like: 'RATE_LIMIT_LIKE',
 	save: 'RATE_LIMIT_SAVE',
+	share: 'RATE_LIMIT_SHARE',
 	follow: 'RATE_LIMIT_FOLLOW',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN'
 };

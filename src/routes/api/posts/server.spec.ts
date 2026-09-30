@@ -155,6 +155,23 @@ describe('POST /api/posts', () => {
 		expect(data.error.message).toBe('Post content is required');
 	});
 
+	it.each([
+		['content', { content: 'x'.repeat(5001) }, 'Post content is too long'],
+		['title', { content: 'ok', title: 'x'.repeat(201) }, 'Title is too long'],
+		['location', { content: 'ok', location: 'x'.repeat(101) }, 'Location is too long'],
+		['cameraMeta', { content: 'ok', cameraMeta: 'x'.repeat(101) }, 'Camera details are too long']
+	])('returns 400 when %s is over its length limit', async (field, body, message) => {
+		const event = {
+			request: { json: async () => body },
+			locals: { user: { id: 'u-1', name: 'Kai' } }
+		} as unknown as RequestEvent;
+
+		const res = await POST(event);
+		expect(res.status).toBe(400);
+		const data = (await res.json()) as ApiErrorBody;
+		expect(data.error.fields).toEqual({ [field]: message });
+	});
+
 	it('creates a new post with text and media successfully', async () => {
 		let insertedRow: Record<string, unknown> | null = null;
 		const db = {

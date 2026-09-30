@@ -6,3 +6,9 @@
 export const MAX_MEDIA_PER_POST = 10;
 export const MAX_TAGS_PER_POST = 20;
 export const MAX_TAG_LENGTH = 50;
+
+/** Text caps enforced by POST and PATCH /api/posts (the composer's own cap is lower). */
+export const MAX_POST_CONTENT_LENGTH = 5000;
+export const MAX_POST_TITLE_LENGTH = 200;
+export const MAX_POST_LOCATION_LENGTH = 100;
+export const MAX_CAMERA_META_LENGTH = 100;
