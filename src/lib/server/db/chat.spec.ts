@@ -239,6 +239,29 @@ describe('history and catch-up on real D1', { timeout: REAL_D1_TIMEOUT }, () => 
 		expect(contents).toContain('three');
 		expect((await call(history, { userId: 'bob', id, search: '?after=bogus' })).status).toBe(400);
 	});
+
+	it('pages a burst inside the overlap window to the end instead of repeating a page', async () => {
+		const id = await dm('alice', 'bob');
+		const sent: string[] = [];
+		for (let i = 0; i < 7; i++) sent.push((await say('alice', id, `burst ${i}`)).id);
+
+		// All seven were sent within the overlap window, so an overlapping page never moves on.
+		const seen = new Set<string>();
+		let after = sent[0];
+		let strict = '';
+		for (let requests = 0, more = true; more; requests++, strict = '&strict=1') {
+			expect(requests).toBeLessThan(10);
+			const { body } = await call(history, {
+				userId: 'bob',
+				id,
+				search: `?limit=2&after=${after}${strict}`
+			});
+			for (const m of body.messages) seen.add(m.id);
+			more = body.hasMore && body.messages.length > 0;
+			after = body.messages.at(-1)?.id ?? after;
+		}
+		expect([...seen].sort()).toEqual([...sent].sort());
+	});
 });
 
 describe('inbox and unread on real D1', { timeout: REAL_D1_TIMEOUT }, () => {

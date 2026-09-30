@@ -1,14 +1,8 @@
 <script lang="ts">
 	import ProfileHeader from '$lib/components/profile/ProfileHeader.svelte';
-	import ProfileHighlights from '$lib/components/profile/ProfileHighlights.svelte';
 	import ProfileTabs from '$lib/components/profile/ProfileTabs.svelte';
 	import ProfileGrid from '$lib/components/profile/ProfileGrid.svelte';
-	import type { Highlight } from '$lib/components/profile/ProfileHighlights.svelte';
-	import type {
-		GridItem,
-		EssayItem,
-		PinnedCollection
-	} from '$lib/components/profile/ProfileGrid.svelte';
+	import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 	import type { TabId, ViewMode } from '$lib/components/profile/ProfileTabs.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { profileStore, resolveProfile } from '$lib/utils/profile.svelte';
@@ -41,10 +35,7 @@
 	});
 
 	// In Kizuna, a user's profile displays their actual collections and posts (empty for new accounts)
-	const userHighlights = $derived<Highlight[]>([]);
 	const userPosts = $derived<GridItem[]>(data?.posts ?? []);
-	const userEssays = $derived<EssayItem[]>([]);
-	const userCollections = $derived<PinnedCollection[]>([]);
 
 	const pageTitle = $derived(
 		currentProfile.name
@@ -85,9 +76,6 @@
 		<!-- Profile Header (Responsive: Mobile Profile Bar / Desktop Master Curator Card) -->
 		<ProfileHeader user={data?.user} profile={data?.stats} />
 
-		<!-- Story Collections / Highlights -->
-		<ProfileHighlights highlights={userHighlights} />
-
 		<!-- Tabs Bar (Responsive: Mobile Icon Tabs / Desktop Filter Pills) -->
 		<ProfileTabs bind:activeTab bind:viewMode showSaved />
 
@@ -97,8 +85,6 @@
 			savedPosts={data?.saved ?? []}
 			{viewMode}
 			items={userPosts}
-			essays={userEssays}
-			collections={userCollections}
 			user={{
 				name: currentProfile.name,
 				handle: currentProfile.handle,

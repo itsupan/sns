@@ -27,14 +27,25 @@ const SendMessage = v.object({
 
 /**
  * History, oldest first. Query: `limit`, `cursor` (older page), or `after` (message id) to
- * catch up after a reconnect.
+ * catch up after a reconnect; add `strict=1` for the following pages of a catch-up.
  */
 export const GET: RequestHandler = withApi(async ({ params, url, locals, platform }) => {
 	const viewer = requireUser(locals);
 	await requireMembership(locals.db, params.id, viewer.id);
 	const { limit, cursor } = await parsePageQuery(url, getConfig(platform?.env).chat.messages);
-	const { after } = await parseQuery(url, v.object({ after: v.optional(v.string()) }));
-	return json(await listMessages(locals.db, { conversationId: params.id, limit, cursor, after }));
+	const { after, strict } = await parseQuery(
+		url,
+		v.object({ after: v.optional(v.string()), strict: v.optional(v.string()) })
+	);
+	return json(
+		await listMessages(locals.db, {
+			conversationId: params.id,
+			limit,
+			cursor,
+			after,
+			strict: strict === '1'
+		})
+	);
 });
 
 /** Stores a message (201), or returns it again for a retried `id` (200), then pushes it live. */

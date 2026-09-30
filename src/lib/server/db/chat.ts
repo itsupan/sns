@@ -191,7 +191,9 @@ export async function listInbox(
 /**
  * A page of history. Without `after`: the newest `limit` messages before `cursor` (older
  * pages as the user scrolls up). With `after` (a message id): messages since that one,
- * for catching up after a reconnect, overlapping by CATCH_UP_OVERLAP_MS. Always oldest first.
+ * for catching up after a reconnect, overlapping by CATCH_UP_OVERLAP_MS. With `strict` too:
+ * only messages strictly after it, so paging forward always makes progress even when a whole
+ * page falls inside the overlap window. Always oldest first.
  */
 export async function listMessages(
 	db: Database,
@@ -199,8 +201,15 @@ export async function listMessages(
 		conversationId,
 		limit,
 		cursor,
-		after
-	}: { conversationId: string; limit: number; cursor?: FeedCursor | null; after?: string | null }
+		after,
+		strict
+	}: {
+		conversationId: string;
+		limit: number;
+		cursor?: FeedCursor | null;
+		after?: string | null;
+		strict?: boolean;
+	}
 ): Promise<{ messages: ChatMessage[]; hasMore: boolean; nextCursor: string | null }> {
 	const live = and(eq(message.conversationId, conversationId), isNull(message.deletedAt));
 
@@ -216,7 +225,12 @@ export async function listMessages(
 			.select()
 			.from(message)
 			.where(
-				and(live, sql`${message.createdAt} >= ${anchor.createdAt.getTime() - CATCH_UP_OVERLAP_MS}`)
+				and(
+					live,
+					strict
+						? sql`(${message.createdAt}, ${message.id}) > (${anchor.createdAt.getTime()}, ${after})`
+						: sql`${message.createdAt} >= ${anchor.createdAt.getTime() - CATCH_UP_OVERLAP_MS}`
+				)
 			)
 			.orderBy(asc(message.createdAt), asc(message.id))
 			.limit(limit + 1);
