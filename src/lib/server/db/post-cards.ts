@@ -3,7 +3,7 @@ import type { Database } from '.';
 import { post, postComment, postLike, postSave, user } from './schema';
 import { loadFollowedIds } from './follows';
 import { loadPostMedia, loadPostTags } from './posts';
-import { formatTimeAgo } from '$lib/utils/format';
+import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 
 /** A post joined with its author, as the feed, saved and explore queries select it. */
@@ -48,12 +48,6 @@ export async function loadViewerPostState(
 		liked: new Set(likes.map((l) => l.postId)),
 		saved: new Set(saves.map((s) => s.postId))
 	};
-}
-
-export function displayHandle(author: { name: string; handle: string | null }): string {
-	return author.handle
-		? `@${author.handle.replace(/^@/, '')}`
-		: `@${author.name.toLowerCase().replace(/\s+/g, '')}`;
 }
 
 /**
@@ -108,7 +102,7 @@ export async function toPostCards(
 			author: {
 				id: r.user.id,
 				name: r.user.name,
-				handle: displayHandle(r.user),
+				handle: displayHandle(r.user.handle, r.user.name),
 				avatar: r.user.image || '',
 				location,
 				timeAgo: formatTimeAgo(r.post.createdAt),

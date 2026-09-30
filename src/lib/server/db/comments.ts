@@ -3,6 +3,7 @@ import type { Database } from '.';
 import { commentReaction, post, postComment, user } from './schema';
 import { commentsCountOf, reactionsCountOf, repliesCountOf } from './counters';
 import { encodeCursor, notDeleted, type FeedCursor } from './posts';
+import { notifyStatement, unnotifyReactionStatement } from './notifications';
 import { ApiError } from '$lib/server/api/errors';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import {
@@ -222,11 +223,16 @@ export async function createComment(
 		parentCommentId?: string | null;
 	}
 ): Promise<{ comment: CommentDto; commentsCount: number; repliesCount: number | null }> {
-	await requireLivePost(db, postId);
+	const livePost = await requireLivePost(db, postId);
 
+	let parentAuthorId: string | null = null;
 	if (parentCommentId) {
 		const [parent] = await db
-			.select({ postId: postComment.postId, parentCommentId: postComment.parentCommentId })
+			.select({
+				postId: postComment.postId,
+				parentCommentId: postComment.parentCommentId,
+				userId: postComment.userId
+			})
 			.from(postComment)
 			.where(eq(postComment.id, parentCommentId))
 			.limit(1);
@@ -236,6 +242,7 @@ export async function createComment(
 		if (parent.parentCommentId) {
 			throw new ApiError(400, 'invalid_parent', 'Replies can only be added to top-level comments');
 		}
+		parentAuthorId = parent.userId;
 	}
 
 	const id = crypto.randomUUID();
@@ -255,12 +262,30 @@ export async function createComment(
 		updatedAt: createdAt
 	});
 
+	// A reply notifies the comment's author; the post's author hears about every comment unless
+	// they wrote it or are already notified as the one being replied to.
+	const notifyPostAuthor = notifyStatement(db, {
+		type: 'comment',
+		actorId: author.id,
+		recipientId: parentAuthorId === livePost.userId ? author.id : livePost.userId,
+		postId,
+		commentId: id
+	});
+
 	let commentsCount: number;
 	let repliesCount: number | null = null;
 	try {
-		if (parentCommentId) {
-			const [, updatedPost, updatedParent] = await db.batch([
+		if (parentCommentId && parentAuthorId) {
+			const [, , , updatedPost, updatedParent] = await db.batch([
 				insert,
+				notifyPostAuthor,
+				notifyStatement(db, {
+					type: 'reply',
+					actorId: author.id,
+					recipientId: parentAuthorId,
+					postId,
+					commentId: id
+				}),
 				updatePost,
 				db
 					.update(postComment)
@@ -271,7 +296,7 @@ export async function createComment(
 			commentsCount = updatedPost[0]?.commentsCount ?? 0;
 			repliesCount = updatedParent[0]?.repliesCount ?? 0;
 		} else {
-			const [, updatedPost] = await db.batch([insert, updatePost]);
+			const [, , updatedPost] = await db.batch([insert, notifyPostAuthor, updatePost]);
 			commentsCount = updatedPost[0]?.commentsCount ?? 0;
 		}
 	} catch (err) {
@@ -359,7 +384,8 @@ export async function toggleReaction(
 	db: Database,
 	{ commentId, userId, type }: { commentId: string; userId: string; type: CommentReaction }
 ): Promise<{ reacted: boolean; reactions: ReactionSummary }> {
-	await requireComment(db, commentId);
+	const target = await requireComment(db, commentId);
+	const notice = { actorId: userId, recipientId: target.userId, postId: target.postId, commentId };
 
 	const recount = db
 		.update(postComment)
@@ -374,7 +400,8 @@ export async function toggleReaction(
 				.values({ commentId, userId, reactionType: type })
 				.onConflictDoNothing()
 				.returning({ commentId: commentReaction.commentId }),
-			recount
+			recount,
+			notifyStatement(db, { ...notice, type: 'reaction' })
 		]);
 		reacted = inserted.length > 0;
 	} catch (err) {
@@ -393,7 +420,8 @@ export async function toggleReaction(
 						eq(commentReaction.reactionType, type)
 					)
 				),
-			recount
+			recount,
+			unnotifyReactionStatement(db, notice)
 		]);
 	}
 

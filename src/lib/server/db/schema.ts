@@ -347,3 +347,45 @@ export const message = sqliteTable(
 		)
 	]
 );
+
+export const NOTIFICATION_TYPES = ['like', 'comment', 'reply', 'reaction', 'follow'] as const;
+export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
+
+/**
+ * Activity addressed to `recipient_id`, written in the same batch as the action that causes it and
+ * removed when that action is undone. Comment, reply and reaction notifications cascade away with
+ * their comment; notifications about a soft-deleted post are filtered out on read.
+ */
+export const notification = sqliteTable(
+	'notification',
+	{
+		id: text('id').primaryKey(),
+		recipientId: text('recipient_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		actorId: text('actor_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		type: text('type', { enum: NOTIFICATION_TYPES }).notNull(),
+		postId: text('post_id').references(() => post.id, { onDelete: 'cascade' }),
+		commentId: text('comment_id').references(() => postComment.id, { onDelete: 'cascade' }),
+		// Identifies the action (e.g. `like:<actor>:<post>`), so repeats and undo hit one row.
+		dedupeKey: text('dedupe_key').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		uniqueIndex('notification_dedupeKey_unique').on(table.dedupeKey),
+		// Activity list and unread count: WHERE recipient_id = ? ORDER BY created_at DESC, id DESC.
+		index('notification_recipientId_createdAt_idx').on(table.recipientId, table.createdAt, table.id)
+	]
+);
+
+/** When each user last opened Activity; notifications created after it are unread. */
+export const notificationRead = sqliteTable('notification_read', {
+	userId: text('user_id')
+		.primaryKey()
+		.references(() => user.id, { onDelete: 'cascade' }),
+	readAt: integer('read_at', { mode: 'timestamp_ms' }).notNull()
+});

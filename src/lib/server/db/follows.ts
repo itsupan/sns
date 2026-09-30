@@ -3,6 +3,7 @@ import type { Database } from '.';
 import { user, userFollow } from './schema';
 import { followersCountOf, followingCountOf } from './counters';
 import { encodeCursor, type FeedCursor } from './posts';
+import { notifyStatement, unnotifyStatement } from './notifications';
 
 export const FOLLOW_PAGE_SIZE = 20;
 export const FOLLOW_MAX_PAGE_SIZE = 50;
@@ -25,8 +26,10 @@ export async function setFollowing(
 		? db.insert(userFollow).values({ followerId, followingId }).onConflictDoNothing()
 		: db.delete(userFollow).where(pair(followerId, followingId));
 
-	const [, target, self] = await db.batch([
+	const notice = { type: 'follow', actorId: followerId, recipientId: followingId } as const;
+	const [, , target, self] = await db.batch([
 		edge,
+		follow ? notifyStatement(db, notice) : unnotifyStatement(db, notice),
 		db
 			.update(user)
 			.set({ followersCount: followersCountOf(followingId) })

@@ -4,6 +4,7 @@
 	import Icon from './Icon.svelte';
 	import { navItems, activeNavId, openComposer, type NavItem } from './nav-items';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { badges } from '$lib/utils/badges.svelte';
 
 	interface Props {
 		class?: string;
@@ -42,11 +43,19 @@
 					: 'text-slate-700 dark:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated'}"
 				aria-current={isActive ? 'page' : undefined}
 			>
-				<Icon
-					name={item.icon}
-					type={isActive ? 'sr' : 'rr'}
-					class="text-xl xl:text-[17px] shrink-0"
-				/>
+				<span class="relative flex">
+					<Icon
+						name={item.icon}
+						type={isActive ? 'sr' : 'rr'}
+						class="text-xl xl:text-[17px] shrink-0"
+					/>
+					{#if item.id === 'activity' && badges.activity > 0}
+						<span
+							class="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-rose-600 ring-2 ring-white dark:ring-dark-canvas"
+						></span>
+						<span class="sr-only">, {badges.activity} new</span>
+					{/if}
+				</span>
 				<span class="hidden xl:inline">{item.label}</span>
 			</a>
 		{/each}
