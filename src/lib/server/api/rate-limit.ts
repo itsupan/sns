@@ -43,7 +43,8 @@ export async function rateLimit(
 
 /**
  * Throws a 429 `ApiError` with `Retry-After` when `userId` exceeds the named limit.
- * Allows the request when the KV binding is missing (unit tests, misconfigured local dev).
+ * Allows the request when the KV binding is missing (unit tests, misconfigured local dev) or
+ * when KV errors, e.g. once the daily write quota is exhausted.
  */
 export async function enforceRateLimit(
 	platform: App.Platform | undefined,
@@ -53,11 +54,19 @@ export async function enforceRateLimit(
 	const kv = platform?.env?.KV;
 	if (!kv) return;
 
-	const retryAfter = await rateLimit(
-		kv,
-		`${name}:${userId}`,
-		getConfig(platform?.env).rateLimits[name]
-	);
+	let retryAfter: number | null;
+	try {
+		retryAfter = await rateLimit(
+			kv,
+			`${name}:${userId}`,
+			getConfig(platform?.env).rateLimits[name]
+		);
+	} catch (err) {
+		// KV failing (e.g. the Free plan's daily write quota is used up) must not take the action
+		// down with it: allow the request and stop rate limiting until KV recovers.
+		console.warn(`[rate-limit] KV unavailable, allowing ${name}:`, err);
+		return;
+	}
 	if (retryAfter !== null) {
 		throw new ApiError(
 			429,
