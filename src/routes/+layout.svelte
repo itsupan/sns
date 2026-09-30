@@ -7,6 +7,7 @@
 	import Header from '$lib/components/shared/Header.svelte';
 	import MobileNav from '$lib/components/shared/MobileNav.svelte';
 	import Toast from '$lib/components/shared/Toast.svelte';
+	import CookieNotice from '$lib/components/shared/CookieNotice.svelte';
 
 	let { children } = $props();
 
@@ -38,4 +39,5 @@
 	{/if}
 
 	<Toast />
+	<CookieNotice />
 </div>
