@@ -62,6 +62,42 @@ describe('PostCard component', () => {
 		await expect.element(screen.getByText('842')).toBeInTheDocument();
 	});
 
+	it('saves and unsaves through the API, sending only the final state after fast taps', async () => {
+		let release!: () => void;
+		const gate = new Promise<void>((r) => (release = r));
+		const calls: string[] = [];
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string, init?: RequestInit) => {
+				calls.push(`${init?.method} ${url}`);
+				if (calls.length === 1) await gate;
+				return Response.json({ saved: init?.method === 'PUT' });
+			})
+		);
+		const screen = render(PostCard);
+
+		await screen.getByRole('button', { name: 'Save bookmark' }).click();
+		// While the save is in flight: unsave, then save again.
+		await screen.getByRole('button', { name: 'Remove bookmark' }).click();
+		await screen.getByRole('button', { name: 'Save bookmark' }).click();
+		release();
+
+		await expect.element(screen.getByRole('button', { name: 'Remove bookmark' })).toBeVisible();
+		await vi.waitFor(() => expect(calls).toEqual(['PUT /api/posts/post-1/save']));
+	});
+
+	it('rolls the save back when the server rejects it', async () => {
+		const save = vi.fn(async () =>
+			Response.json({ error: { code: 'not_found', message: 'Post not found' } }, { status: 404 })
+		);
+		vi.stubGlobal('fetch', save);
+		const screen = render(PostCard);
+
+		await screen.getByRole('button', { name: 'Save bookmark' }).click();
+		await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
+		await expect.element(screen.getByRole('button', { name: 'Save bookmark' })).toBeVisible();
+	});
+
 	it('renders multi-image carousel counter and navigates slides', async () => {
 		const screen = render(PostCard);
 

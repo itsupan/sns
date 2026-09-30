@@ -114,11 +114,12 @@
 		<ProfileHighlights highlights={userHighlights} />
 
 		<!-- Tabs Bar -->
-		<ProfileTabs bind:activeTab bind:viewMode />
+		<ProfileTabs bind:activeTab bind:viewMode showSaved={data.isOwnProfile} />
 
 		<!-- Curated Grid Gallery / List / Essays -->
 		<ProfileGrid
 			{activeTab}
+			savedPosts={data.saved}
 			{viewMode}
 			items={userPosts}
 			essays={userEssays}

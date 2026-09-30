@@ -1,9 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Icon from './Icon.svelte';
-	import { navItems, activeNavId, OPEN_COMPOSER_EVENT, type NavItem } from './nav-items';
+	import { navItems, activeNavId, openComposer, type NavItem } from './nav-items';
 	import { toast } from '$lib/utils/toast.svelte';
 
 	interface Props {
@@ -17,8 +16,7 @@
 	async function handleItem(event: MouseEvent, item: NavItem) {
 		if (item.id === 'create') {
 			event.preventDefault();
-			if (page.url.pathname !== '/') await goto(resolve('/'));
-			window.dispatchEvent(new CustomEvent(OPEN_COMPOSER_EVENT));
+			await openComposer(page.url.pathname);
 		} else if (!item.ready) {
 			event.preventDefault();
 			toast.show(`${item.label} is coming soon`);

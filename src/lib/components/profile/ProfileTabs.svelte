@@ -8,6 +8,8 @@
 		activeTab?: TabId;
 		viewMode?: ViewMode;
 		class?: string;
+		/** The Saved tab is private: only shown on your own profile. */
+		showSaved?: boolean;
 		onTabChange?: (tab: TabId) => void;
 		onViewChange?: (view: ViewMode) => void;
 	}
@@ -16,6 +18,7 @@
 		activeTab = $bindable('grid'),
 		viewMode = $bindable('grid'),
 		class: className = '',
+		showSaved = true,
 		onTabChange,
 		onViewChange
 	}: Props = $props();
@@ -27,13 +30,15 @@
 		desktopOnly?: boolean;
 	}
 
-	const tabs: TabDef[] = [
+	const allTabs: TabDef[] = [
 		{ id: 'grid', label: 'Curated Grid', icon: 'apps' },
 		{ id: 'essays', label: 'Editorial Essays / Series', icon: 'document' },
 		{ id: 'pinned', label: 'Pinned Collections', icon: 'bookmark', desktopOnly: true },
 		{ id: 'critiques', label: 'Critiques', icon: 'document-signed', desktopOnly: true },
 		{ id: 'saved', label: 'Saved', icon: 'bookmark' }
 	];
+	let tabs = $derived(allTabs.filter((t) => showSaved || t.id !== 'saved'));
+	let mobileTabCount = $derived(tabs.filter((t) => !t.desktopOnly).length);
 
 	const viewModes: { id: ViewMode; label: string; icon: string }[] = [
 		{ id: 'grid', label: 'Grid layout', icon: 'apps' },
@@ -57,7 +62,11 @@
 >
 	<div class="flex items-center justify-between sm:py-4">
 		<!-- Tabs Bar (Mobile: 3 Icon Tabs / Desktop: Filter Pills) -->
-		<div class="w-full sm:w-auto grid grid-cols-3 sm:flex sm:items-center gap-0 sm:gap-2">
+		<div
+			class="w-full sm:w-auto grid {mobileTabCount === 3
+				? 'grid-cols-3'
+				: 'grid-cols-2'} sm:flex sm:items-center gap-0 sm:gap-2"
+		>
 			{#each tabs as tab (tab.id)}
 				{@const isActive = activeTab === tab.id}
 				<button

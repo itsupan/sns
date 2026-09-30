@@ -57,6 +57,8 @@
 			image?: string | null;
 		};
 		isOwnProfile?: boolean;
+		/** The viewer's most recently saved posts (own profile only); "See all" opens /saved. */
+		savedPosts?: GridItem[];
 	}
 
 	const defaultItems: GridItem[] = [
@@ -249,7 +251,8 @@
 		class: className = '',
 		onSelectItem,
 		user,
-		isOwnProfile = true
+		isOwnProfile = true,
+		savedPosts = []
 	}: Props = $props();
 
 	let activeModalItem = $state<GridItem | null>(null);
@@ -778,7 +781,7 @@
 
 		<!-- 5. SAVED TAB -->
 	{:else if activeTab === 'saved'}
-		{#if items.length === 0}
+		{#if savedPosts.length === 0}
 			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
 				<div
 					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
@@ -792,7 +795,7 @@
 			</div>
 		{:else}
 			<div class="grid grid-cols-3 gap-0.5 sm:gap-1 py-0.5 sm:py-1">
-				{#each items.slice(0, 6) as item (item.id)}
+				{#each savedPosts as item (item.id)}
 					<button
 						type="button"
 						class="group relative w-full aspect-square overflow-hidden bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
@@ -811,6 +814,12 @@
 					</button>
 				{/each}
 			</div>
+			<a
+				href={resolve('/saved')}
+				class="block text-center py-4 text-xs font-semibold text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white no-underline"
+			>
+				See all saved posts
+			</a>
 		{/if}
 	{/if}
 

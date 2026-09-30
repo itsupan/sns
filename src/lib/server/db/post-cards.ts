@@ -1,0 +1,136 @@
+import { and, desc, eq, inArray } from 'drizzle-orm';
+import type { Database } from '.';
+import { post, postComment, postLike, postSave, user } from './schema';
+import { loadFollowedIds } from './follows';
+import { loadPostMedia, loadPostTags } from './posts';
+import { formatTimeAgo } from '$lib/utils/format';
+import type { PostData } from '$lib/components/feed/PostCard.svelte';
+
+/** A post joined with its author, as the feed, saved and explore queries select it. */
+export interface PostRow {
+	post: typeof post.$inferSelect;
+	user: {
+		id: string;
+		name: string;
+		handle: string | null;
+		image: string | null;
+		location: string | null;
+	};
+}
+
+/** The author columns every `PostRow` query selects. */
+export const postRowAuthor = {
+	id: user.id,
+	name: user.name,
+	handle: user.handle,
+	image: user.image,
+	location: user.location
+};
+
+/** Which of `postIds` the viewer has liked and saved (two indexed lookups, scoped to the page). */
+export async function loadViewerPostState(
+	db: Database,
+	viewerId: string | null | undefined,
+	postIds: string[]
+): Promise<{ liked: Set<string>; saved: Set<string> }> {
+	if (!viewerId || postIds.length === 0) return { liked: new Set(), saved: new Set() };
+	const [likes, saves] = await Promise.all([
+		db
+			.select({ postId: postLike.postId })
+			.from(postLike)
+			.where(and(eq(postLike.userId, viewerId), inArray(postLike.postId, postIds))),
+		db
+			.select({ postId: postSave.postId })
+			.from(postSave)
+			.where(and(eq(postSave.userId, viewerId), inArray(postSave.postId, postIds)))
+	]);
+	return {
+		liked: new Set(likes.map((l) => l.postId)),
+		saved: new Set(saves.map((s) => s.postId))
+	};
+}
+
+export function displayHandle(author: { name: string; handle: string | null }): string {
+	return author.handle
+		? `@${author.handle.replace(/^@/, '')}`
+		: `@${author.name.toLowerCase().replace(/\s+/g, '')}`;
+}
+
+/**
+ * Turns post rows into the `PostCard` shape: media, tags, follow state, the viewer's likes and
+ * saves, and the latest comment as a preview. Media URLs are not refreshed here.
+ */
+export async function toPostCards(
+	db: Database,
+	rows: PostRow[],
+	viewerId: string | null | undefined
+): Promise<PostData[]> {
+	if (rows.length === 0) return [];
+	const postIds = rows.map((r) => r.post.id);
+
+	const [mediaByPost, tagsByPost, followedAuthors, viewer, recentComments] = await Promise.all([
+		loadPostMedia(db, postIds),
+		loadPostTags(db, postIds),
+		loadFollowedIds(
+			db,
+			viewerId,
+			rows.map((r) => r.user.id)
+		),
+		loadViewerPostState(db, viewerId, postIds),
+		db
+			.select({
+				postId: postComment.postId,
+				content: postComment.content,
+				authorName: user.name,
+				authorHandle: user.handle
+			})
+			.from(postComment)
+			.innerJoin(user, eq(postComment.userId, user.id))
+			.where(inArray(postComment.postId, postIds))
+			.orderBy(desc(postComment.createdAt))
+	]);
+
+	const commentPreview = new Map<string, { author: string; content: string }>();
+	for (const c of recentComments) {
+		if (!commentPreview.has(c.postId)) {
+			commentPreview.set(c.postId, {
+				author: c.authorHandle ? `@${c.authorHandle}` : c.authorName,
+				content: c.content
+			});
+		}
+	}
+
+	return rows.map((r) => {
+		const media = mediaByPost.get(r.post.id) ?? [];
+		const location = r.post.location || r.user.location || undefined;
+		return {
+			id: r.post.id,
+			author: {
+				id: r.user.id,
+				name: r.user.name,
+				handle: displayHandle(r.user),
+				avatar: r.user.image || '',
+				location,
+				timeAgo: formatTimeAgo(r.post.createdAt),
+				isFollowing: followedAuthors.has(r.user.id)
+			},
+			title: r.post.title || '',
+			description: r.post.content,
+			image: media[0]?.url || '',
+			mediaUrl: media[0]?.url || undefined,
+			mediaType: media[0]?.type || 'none',
+			mediaItems: media,
+			aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
+			postType: r.post.postType as 'photo' | 'story' | 'article',
+			location,
+			cameraMeta: r.post.cameraMeta || undefined,
+			tags: tagsByPost.get(r.post.id) ?? [],
+			likes: r.post.likesCount,
+			commentsCount: r.post.commentsCount,
+			repostsCount: r.post.sharesCount,
+			liked: viewer.liked.has(r.post.id),
+			saved: viewer.saved.has(r.post.id),
+			commentPreview: commentPreview.get(r.post.id)
+		};
+	});
+}

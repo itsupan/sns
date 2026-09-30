@@ -307,12 +307,48 @@
 		}
 	}
 
-	function toggleSave() {
+	// Server state of the save, and whether a request is in flight. Taps while one is in flight
+	// only change `savedOverride`; `syncSave` then sends the latest intent, so fast toggling
+	// ends in the state the user last chose.
+	let savedOnServer: boolean | null = null;
+	let saveInFlight = false;
+
+	async function syncSave() {
+		if (saveInFlight) return;
+		saveInFlight = true;
+		try {
+			savedOnServer ??= post.saved ?? false;
+			while (savedOverride !== null && savedOverride !== savedOnServer) {
+				const want: boolean = savedOverride;
+				const res = await fetch(`/api/posts/${post.id}/save`, {
+					method: want ? 'PUT' : 'DELETE'
+				});
+				if (!res.ok) throw new Error(readApiError(await res.json().catch(() => null), '').message);
+				savedOnServer = want;
+			}
+		} catch (err) {
+			savedOverride = savedOnServer;
+			const message = err instanceof Error && err.message ? err.message : '';
+			toast.show(message || 'Could not update saved posts');
+		} finally {
+			saveInFlight = false;
+		}
+	}
+
+	async function toggleSave() {
+		if (!$session.data?.user) {
+			toast.show('Please log in to save posts');
+			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
+			return;
+		}
 		const next = !isSaved;
 		savedOverride = next;
 		haptic();
 		toast.show(next ? 'Saved to your collection' : 'Removed from saved');
 		onSave?.(next);
+		await syncSave();
 	}
 
 	// Double-tap the photo to like (never un-likes, same as native apps).
