@@ -4,3 +4,6 @@ allowBuilds:
 overrides:
   sharp: 0.35.4
   kysely: 0.29.5
+  # Security patches for dev-only tooling (wrangler/miniflare, eslint); drop once upstream ships them.
+  'undici@>=7.0.0 <7.29.1': ^7.29.1
+  'brace-expansion@>=4.0.0 <5.0.11': ^5.0.11
