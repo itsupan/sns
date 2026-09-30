@@ -29,7 +29,8 @@ export type RateLimitName =
 	| 'uploadPresign'
 	| 'mediaRefresh'
 	| 'accountExport'
-	| 'report';
+	| 'report'
+	| 'accountDelete';
 
 export interface PageSize {
 	defaultPageSize: number;
@@ -77,7 +78,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 		uploadPresign: { limit: 20, windowSec: 60 },
 		mediaRefresh: { limit: 60, windowSec: 60 },
 		accountExport: { limit: 5, windowSec: 3600 },
-		report: { limit: 10, windowSec: 3600 }
+		report: { limit: 10, windowSec: 3600 },
+		accountDelete: { limit: 5, windowSec: 3600 }
 	},
 	upload: {
 		maxBytes: 50 * 1024 * 1024,
@@ -123,7 +125,8 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN',
 	mediaRefresh: 'RATE_LIMIT_MEDIA_REFRESH',
 	accountExport: 'RATE_LIMIT_ACCOUNT_EXPORT',
-	report: 'RATE_LIMIT_REPORT'
+	report: 'RATE_LIMIT_REPORT',
+	accountDelete: 'RATE_LIMIT_ACCOUNT_DELETE'
 };
 
 const PositiveInt = v.pipe(v.string(), v.trim(), v.regex(/^\d+$/), v.toNumber(), v.minValue(1));

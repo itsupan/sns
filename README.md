@@ -154,6 +154,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fix
 | `mediaRefresh`  | `RATE_LIMIT_MEDIA_REFRESH`  | `POST /api/media/refresh` (per user, or per IP)         | 60 / min  |
 | `accountExport` | `RATE_LIMIT_ACCOUNT_EXPORT` | `GET /api/account/export` (per user)                    | 5 / hour  |
 | `report`        | `RATE_LIMIT_REPORT`         | `POST /api/reports`                                     | 10 / hour |
+| `accountDelete` | `RATE_LIMIT_ACCOUNT_DELETE` | `DELETE /api/account`                                   | 5 / hour  |
 
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }`. KV has no atomic increment and is eventually consistent, so a burst can let a few extra requests through: treat this as abuse protection, not an exact quota. Without a `KV` binding (unit tests) requests are allowed.
 

@@ -1,5 +1,6 @@
 import { AwsClient } from 'aws4fetch';
 import { getConfig } from '$lib/server/config';
+import { mockStorage } from './media-storage';
 
 export interface PresignedUrlOptions {
 	filename: string;
@@ -331,4 +332,81 @@ export async function generatePresignedUploadUrl(
 		publicUrl: mockUrl,
 		key
 	};
+}
+
+/** The native R2 binding, under whichever name the media proxy also accepts. */
+function r2Binding(
+	env: Partial<Env> | undefined
+): { delete: (keys: string[]) => Promise<void> } | null {
+	const bindings = env as Record<string, unknown> | undefined;
+	const r2 = bindings?.R2_BUCKET || bindings?.MEDIA_BUCKET || bindings?.BUCKET;
+	return r2 && typeof (r2 as { delete?: unknown }).delete === 'function'
+		? (r2 as { delete: (keys: string[]) => Promise<void> })
+		: null;
+}
+
+/**
+ * Deletes objects from our bucket: through the R2 binding, else the S3 API when credentials are
+ * configured, else the local mock store. Returns the keys that could not be deleted; never throws.
+ */
+export async function deleteR2Objects(
+	env: Partial<Env> | undefined,
+	keys: string[]
+): Promise<string[]> {
+	const unique = [...new Set(keys)];
+	if (unique.length === 0) return [];
+
+	const binding = r2Binding(env);
+	if (binding) {
+		const failed: string[] = [];
+		// R2 deletes at most 1000 keys per call.
+		for (let i = 0; i < unique.length; i += 1000) {
+			const batch = unique.slice(i, i + 1000);
+			try {
+				await binding.delete(batch);
+			} catch (err) {
+				console.error('R2 delete failed', err);
+				failed.push(...batch);
+			}
+		}
+		return failed;
+	}
+
+	const accountId = env?.R2_ACCOUNT_ID;
+	const accessKeyId = env?.R2_ACCESS_KEY_ID;
+	const secretAccessKey = env?.R2_SECRET_ACCESS_KEY;
+	const bucketName = env?.R2_BUCKET_NAME;
+	if (
+		accountId &&
+		accessKeyId &&
+		secretAccessKey &&
+		bucketName &&
+		isValidCredential(accountId) &&
+		isValidCredential(accessKeyId) &&
+		isValidCredential(secretAccessKey) &&
+		isValidCredential(bucketName)
+	) {
+		const aws = new AwsClient({ accessKeyId, secretAccessKey, service: 's3', region: 'auto' });
+		const results = await Promise.all(
+			unique.map(async (key) => {
+				const path = key.split('/').map(encodeURIComponent).join('/');
+				try {
+					const res = await aws.fetch(
+						`https://${accountId}.r2.cloudflarestorage.com/${bucketName}/${path}`,
+						{ method: 'DELETE' }
+					);
+					// S3 answers 204 for deleted and for already-missing keys.
+					if (res.ok || res.status === 404) return null;
+					console.error(`R2 delete of ${key} failed: HTTP ${res.status}`);
+				} catch (err) {
+					console.error(`R2 delete of ${key} failed`, err);
+				}
+				return key;
+			})
+		);
+		return results.filter((k): k is string => k !== null);
+	}
+
+	for (const key of unique) mockStorage.delete(key);
+	return [];
 }
