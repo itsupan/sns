@@ -5,6 +5,7 @@ import { post, postLike } from '$lib/server/db/schema';
 import { apiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 import { likesCountOf } from '$lib/server/db/counters';
 import { notDeleted } from '$lib/server/db/posts';
+import { notifyStatement, unnotifyStatement } from '$lib/server/db/notifications';
 
 export const POST: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const currentUser = requireUser(locals);
@@ -16,7 +17,7 @@ export const POST: RequestHandler = withApi(async ({ params, locals, platform })
 	}
 
 	const postRows = await locals.db
-		.select({ id: post.id })
+		.select({ id: post.id, authorId: post.userId })
 		.from(post)
 		.where(and(eq(post.id, postId), notDeleted))
 		.limit(1);
@@ -40,8 +41,15 @@ export const POST: RequestHandler = withApi(async ({ params, locals, platform })
 				.onConflictDoNothing()
 		: locals.db.delete(postLike).where(ownLike);
 
-	const [, updated] = await locals.db.batch([
+	const target = {
+		type: 'like',
+		actorId: currentUser.id,
+		recipientId: postRows[0].authorId,
+		postId
+	} as const;
+	const [, , updated] = await locals.db.batch([
 		toggle,
+		liked ? notifyStatement(locals.db, target) : unnotifyStatement(locals.db, target),
 		locals.db
 			.update(post)
 			.set({ likesCount: likesCountOf(postId), updatedAt: new Date() })

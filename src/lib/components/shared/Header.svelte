@@ -7,7 +7,7 @@
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
-	import { toast } from '$lib/utils/toast.svelte';
+	import { badges } from '$lib/utils/badges.svelte';
 
 	interface Props {
 		class?: string;
@@ -26,28 +26,20 @@
 		image: $session.data?.user?.image || null
 	});
 
-	/** Unread direct messages, refreshed on navigation and when the tab becomes visible. */
-	let unread = $state(0);
+	/** Unread messages and activity, refreshed on navigation and when the tab becomes visible. */
 	let signedIn = $derived(!!$session.data?.user);
-
-	async function refreshUnread() {
-		try {
-			const res = await fetch('/api/conversations/unread');
-			if (res.ok) unread = ((await res.json()) as { unread: number }).unread;
-		} catch {
-			// Keep the last known count.
-		}
-	}
+	let unread = $derived(badges.messages);
+	let unreadActivity = $derived(badges.activity);
 
 	$effect(() => {
-		// Re-run on every navigation (e.g. after reading a conversation).
+		// Re-run on every navigation (e.g. after reading a conversation or opening Activity).
 		void page.url.pathname;
 		if (!signedIn) {
-			unread = 0;
+			badges.clear();
 			return;
 		}
-		untrack(refreshUnread);
-		const onVisible = () => document.visibilityState === 'visible' && refreshUnread();
+		untrack(() => badges.refresh());
+		const onVisible = () => document.visibilityState === 'visible' && badges.refresh();
 		document.addEventListener('visibilitychange', onVisible);
 		return () => document.removeEventListener('visibilitychange', onVisible);
 	});
@@ -141,15 +133,20 @@
 				{/if}
 			</a>
 
-			<button
-				type="button"
-				class="hidden sm:flex {iconButton}"
-				aria-label="Notifications"
-				title="Notifications"
-				onclick={() => toast.show('Notifications are coming soon')}
+			<a
+				href={resolve('/activity')}
+				class="hidden sm:flex relative {iconButton}"
+				aria-label={unreadActivity > 0 ? `Activity, ${unreadActivity} new` : 'Activity'}
+				title="Activity"
 			>
 				<Icon name="bell" class="text-base" />
-			</button>
+				{#if unreadActivity > 0}
+					<span
+						class="absolute top-0 right-0 min-w-4 h-4 px-1 rounded-full bg-rose-600 text-white text-[10px] font-bold leading-4 text-center"
+						aria-hidden="true">{unreadActivity > 99 ? '99+' : unreadActivity}</span
+					>
+				{/if}
+			</a>
 
 			<!-- Theme toggle lives in Profile settings on mobile to keep the app bar clean -->
 			<div class="hidden sm:block">

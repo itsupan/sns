@@ -3,6 +3,7 @@
 	import Icon from './Icon.svelte';
 	import { navItems, activeNavId, openComposer, type NavItem } from './nav-items';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { badges } from '$lib/utils/badges.svelte';
 
 	interface Props {
 		class?: string;
@@ -65,7 +66,15 @@
 						aria-current={isActive ? 'page' : undefined}
 						onclick={(e) => handleTab(e, item)}
 					>
-						<Icon name={item.icon} type={isActive ? 'sr' : 'rr'} class="text-[22px]" />
+						<span class="relative">
+							<Icon name={item.icon} type={isActive ? 'sr' : 'rr'} class="text-[22px]" />
+							{#if item.id === 'activity' && badges.activity > 0}
+								<span
+									class="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-rose-600 ring-2 ring-white dark:ring-dark-card"
+								></span>
+								<span class="sr-only">, {badges.activity} new</span>
+							{/if}
+						</span>
 						<span class="text-[11px] leading-none {isActive ? 'font-semibold' : 'font-medium'}">
 							{item.label}
 						</span>

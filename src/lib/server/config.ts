@@ -41,6 +41,8 @@ export interface AppConfig {
 	search: PageSize;
 	/** The viewer's saved posts list. */
 	saved: PageSize;
+	/** The Activity (notifications) list. */
+	activity: PageSize;
 	/** Chat history pages and the conversations inbox. */
 	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
@@ -82,6 +84,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	comments: { defaultPageSize: 20, maxPageSize: 50 },
 	search: { defaultPageSize: 5, maxPageSize: 20 },
 	saved: { defaultPageSize: 12, maxPageSize: 50 },
+	activity: { defaultPageSize: 20, maxPageSize: 50 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
 		inbox: { defaultPageSize: 20, maxPageSize: 50 }
@@ -207,6 +210,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 		comments: pageSize('COMMENTS', d.comments),
 		search: pageSize('SEARCH', d.search),
 		saved: pageSize('SAVED', d.saved),
+		activity: pageSize('ACTIVITY', d.activity),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),
 			inbox: pageSize('INBOX', d.chat.inbox)
