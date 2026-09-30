@@ -5,8 +5,10 @@
 
 	let sentinel = $state<HTMLDivElement | null>(null);
 
+	// Recreated after every load: a new observer reports the current intersection at once, so a
+	// sentinel still in view after a short page keeps loading (the old one would stay silent).
 	$effect(() => {
-		if (!sentinel || error) return;
+		if (!sentinel || error || loading) return;
 		const observer = new IntersectionObserver(
 			([entry]) => {
 				if (entry?.isIntersecting) onLoad();
