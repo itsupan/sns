@@ -246,4 +246,21 @@ describe('PostCommentsModal', () => {
 		await screen.getByRole('button', { name: 'Try again' }).click();
 		await expect.element(screen.getByText('comment c1')).toBeInTheDocument();
 	});
+
+	it('shows the error, not the feed preview as a fake new comment, when loading fails', async () => {
+		routes['GET /api/posts/post-1/comments'] = () => ({
+			status: 500,
+			body: { error: { code: 'internal', message: 'Server is down' } }
+		});
+		const screen = render(PostCommentsModal, {
+			props: {
+				open: true,
+				post: { ...testPost, commentPreview: { author: 'marcus_k', content: 'An old remark' } }
+			}
+		});
+
+		await expect.element(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+		expect(document.body.textContent).not.toContain('An old remark');
+		expect(document.body.textContent).not.toContain('Recently');
+	});
 });

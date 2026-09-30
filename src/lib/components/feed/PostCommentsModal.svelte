@@ -13,8 +13,6 @@
 		reactions: ReactionSummary;
 		canDelete: boolean;
 		author: { id: string; name: string; handle: string; avatar: string };
-		/** Built from the post's comment preview when the API is unavailable; read-only. */
-		preview?: boolean;
 	}
 
 	interface Page {
@@ -151,29 +149,6 @@
 		return data as Page;
 	}
 
-	function previewFallback(): CommentItem[] {
-		if (!post.commentPreview) return [];
-		return [
-			{
-				id: 'preview-1',
-				parentCommentId: null,
-				content: post.commentPreview.content,
-				createdAt: new Date(),
-				timeAgo: 'Recently',
-				repliesCount: 0,
-				reactions: { counts: {}, mine: [] },
-				canDelete: false,
-				author: {
-					id: '',
-					name: post.commentPreview.author,
-					handle: `@${post.commentPreview.author.replace(/^@/, '')}`,
-					avatar: ''
-				},
-				preview: true
-			}
-		];
-	}
-
 	/** Loads the next page of top-level comments; `reset` starts over (e.g. on reopen). */
 	async function loadTop(reset = false) {
 		if (reset) {
@@ -194,12 +169,7 @@
 			thread.loaded = true;
 		} catch (err) {
 			if (thread !== top) return;
-			if (!thread.loaded && post.commentPreview) {
-				thread.items = previewFallback();
-				thread.loaded = true;
-			} else {
-				loadError = err instanceof Error ? err.message : 'Could not load comments';
-			}
+			loadError = err instanceof Error ? err.message : 'Could not load comments';
 		} finally {
 			thread.loading = false;
 		}
@@ -432,96 +402,94 @@
 				{comment.content}
 			</p>
 
-			{#if !comment.preview}
-				{#if reactionTypes.length > 0}
-					<div class="flex flex-wrap items-center gap-1 mt-1.5">
-						{#each reactionTypes as type (type)}
-							{@const mine = comment.reactions.mine.includes(type)}
+			{#if reactionTypes.length > 0}
+				<div class="flex flex-wrap items-center gap-1 mt-1.5">
+					{#each reactionTypes as type (type)}
+						{@const mine = comment.reactions.mine.includes(type)}
+						<button
+							type="button"
+							onclick={() => react(comment, type)}
+							aria-pressed={mine}
+							aria-label="{REACTION_LABEL[type]}: {comment.reactions.counts[type]}{mine
+								? ', remove your reaction'
+								: ''}"
+							class="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] border cursor-pointer transition active:scale-95 {mine
+								? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-kizuna-blue/15 dark:border-kizuna-blue/40 dark:text-kizuna-blue font-semibold'
+								: 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-dark-elevated dark:border-dark-border dark:text-dark-muted'}"
+						>
+							<span aria-hidden="true">{REACTION_EMOJI[type]}</span>
+							<span>{comment.reactions.counts[type]}</span>
+						</button>
+					{/each}
+				</div>
+			{/if}
+
+			<div class="relative flex items-center gap-3 mt-1.5 pt-0.5">
+				<button
+					type="button"
+					onclick={() => startReply(comment)}
+					class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1"
+				>
+					<Icon name="reply" class="text-[10px]" />
+					<span>Reply</span>
+				</button>
+
+				<button
+					type="button"
+					onclick={() => (pickerFor = pickerFor === comment.id ? null : comment.id)}
+					aria-expanded={pickerFor === comment.id}
+					aria-label="Add reaction"
+					class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1"
+				>
+					<Icon name="smile" class="text-[11px]" />
+					<span>React</span>
+				</button>
+
+				{#if comment.canDelete}
+					<button
+						type="button"
+						onclick={() => remove(comment)}
+						disabled={deleting === comment.id}
+						class="text-[11px] font-semibold transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1 disabled:opacity-50 {confirmingDelete ===
+						comment.id
+							? 'text-rose-600'
+							: 'text-slate-400 hover:text-rose-600'}"
+					>
+						<Icon name="trash" class="text-[10px]" />
+						<span>
+							{deleting === comment.id
+								? 'Deleting…'
+								: confirmingDelete === comment.id
+									? 'Tap again to delete'
+									: 'Delete'}
+						</span>
+					</button>
+				{/if}
+
+				{#if pickerFor === comment.id}
+					<div
+						role="group"
+						aria-label="Pick a reaction"
+						class="absolute left-0 bottom-full mb-1 z-20 flex items-center gap-0.5 p-1 rounded-full bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border shadow-lg"
+					>
+						{#each COMMENT_REACTIONS as type (type)}
 							<button
 								type="button"
 								onclick={() => react(comment, type)}
-								aria-pressed={mine}
-								aria-label="{REACTION_LABEL[type]}: {comment.reactions.counts[type]}{mine
-									? ', remove your reaction'
-									: ''}"
-								class="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] border cursor-pointer transition active:scale-95 {mine
-									? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-kizuna-blue/15 dark:border-kizuna-blue/40 dark:text-kizuna-blue font-semibold'
-									: 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-dark-elevated dark:border-dark-border dark:text-dark-muted'}"
+								aria-label={REACTION_LABEL[type]}
+								aria-pressed={comment.reactions.mine.includes(type)}
+								class="size-8 rounded-full text-base flex items-center justify-center border-0 cursor-pointer transition hover:scale-125 active:scale-95 {comment.reactions.mine.includes(
+									type
+								)
+									? 'bg-blue-50 dark:bg-kizuna-blue/15'
+									: 'bg-transparent hover:bg-slate-100 dark:hover:bg-dark-elevated'}"
 							>
-								<span aria-hidden="true">{REACTION_EMOJI[type]}</span>
-								<span>{comment.reactions.counts[type]}</span>
+								{REACTION_EMOJI[type]}
 							</button>
 						{/each}
 					</div>
 				{/if}
-
-				<div class="relative flex items-center gap-3 mt-1.5 pt-0.5">
-					<button
-						type="button"
-						onclick={() => startReply(comment)}
-						class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1"
-					>
-						<Icon name="reply" class="text-[10px]" />
-						<span>Reply</span>
-					</button>
-
-					<button
-						type="button"
-						onclick={() => (pickerFor = pickerFor === comment.id ? null : comment.id)}
-						aria-expanded={pickerFor === comment.id}
-						aria-label="Add reaction"
-						class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1"
-					>
-						<Icon name="smile" class="text-[11px]" />
-						<span>React</span>
-					</button>
-
-					{#if comment.canDelete}
-						<button
-							type="button"
-							onclick={() => remove(comment)}
-							disabled={deleting === comment.id}
-							class="text-[11px] font-semibold transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1 disabled:opacity-50 {confirmingDelete ===
-							comment.id
-								? 'text-rose-600'
-								: 'text-slate-400 hover:text-rose-600'}"
-						>
-							<Icon name="trash" class="text-[10px]" />
-							<span>
-								{deleting === comment.id
-									? 'Deleting…'
-									: confirmingDelete === comment.id
-										? 'Tap again to delete'
-										: 'Delete'}
-							</span>
-						</button>
-					{/if}
-
-					{#if pickerFor === comment.id}
-						<div
-							role="group"
-							aria-label="Pick a reaction"
-							class="absolute left-0 bottom-full mb-1 z-20 flex items-center gap-0.5 p-1 rounded-full bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border shadow-lg"
-						>
-							{#each COMMENT_REACTIONS as type (type)}
-								<button
-									type="button"
-									onclick={() => react(comment, type)}
-									aria-label={REACTION_LABEL[type]}
-									aria-pressed={comment.reactions.mine.includes(type)}
-									class="size-8 rounded-full text-base flex items-center justify-center border-0 cursor-pointer transition hover:scale-125 active:scale-95 {comment.reactions.mine.includes(
-										type
-									)
-										? 'bg-blue-50 dark:bg-kizuna-blue/15'
-										: 'bg-transparent hover:bg-slate-100 dark:hover:bg-dark-elevated'}"
-								>
-									{REACTION_EMOJI[type]}
-								</button>
-							{/each}
-						</div>
-					{/if}
-				</div>
-			{/if}
+			</div>
 		</div>
 	</div>
 {/snippet}
