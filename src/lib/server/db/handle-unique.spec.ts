@@ -43,9 +43,15 @@ describe('unique handles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 
 	it('the migration keeps a duplicated handle on the oldest account only', async () => {
 		test = await createTestDb({ stopBefore: '0016' });
-		await test.db
-			.insert(user)
-			.values([account('old', 'kai'), account('new', 'kai'), account('other', 'elena')]);
+		// Raw SQL: the Drizzle schema has columns that later migrations add.
+		const insert = test.d1.prepare(
+			"INSERT INTO user (id, name, email, handle) VALUES (?1, ?1, ?1 || '@example.com', ?2)"
+		);
+		await test.d1.batch([
+			insert.bind('old', 'kai'),
+			insert.bind('new', 'kai'),
+			insert.bind('other', 'elena')
+		]);
 
 		await test.migrateRest();
 
