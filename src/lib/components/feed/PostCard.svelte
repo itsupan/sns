@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import SheetAction from '$lib/components/shared/SheetAction.svelte';
+	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
 	import { formatCount } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { authClient } from '$lib/auth-client';
@@ -365,6 +366,20 @@
 		} finally {
 			saveInFlight = false;
 		}
+	}
+
+	let reportOpen = $state(false);
+
+	async function openReport() {
+		optionsOpen = false;
+		if (!$session.data?.user) {
+			toast.show('Please log in to report posts');
+			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
+			return;
+		}
+		reportOpen = true;
 	}
 
 	async function toggleSave() {
@@ -882,15 +897,7 @@
 	<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
 	<SheetAction icon="link" label="Copy link" onclick={copyLink} />
 	{#if !isOwner}
-		<SheetAction
-			icon="flag"
-			label="Report"
-			danger
-			onclick={() => {
-				optionsOpen = false;
-				toast.show('Thanks — our team will review this post');
-			}}
-		/>
+		<SheetAction icon="flag" label="Report" danger onclick={openReport} />
 	{/if}
 </BottomSheet>
 
@@ -921,6 +928,10 @@
 			</div>
 		{/snippet}
 	</BottomSheet>
+{/if}
+
+{#if !isOwner}
+	<ReportSheet bind:open={reportOpen} targetType="post" targetId={post.id} />
 {/if}
 
 <SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
