@@ -7,6 +7,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import type { SuggestedCreator } from '$lib/explore/types';
+	import { LEGAL_LINKS } from '$lib/constants/legal';
 
 	interface Props {
 		class?: string;
@@ -134,8 +135,17 @@
 	<footer
 		class="px-2 text-[11px] xl:text-xs text-slate-400 dark:text-dark-subtle flex flex-col gap-1.5 xl:gap-2"
 	>
+		<nav aria-label="Legal" class="flex flex-wrap gap-x-3 gap-y-1">
+			{#each LEGAL_LINKS as link (link.href)}
+				<a
+					href={resolve(link.href)}
+					class="text-slate-400 dark:text-dark-subtle hover:text-slate-700 dark:hover:text-dark-text no-underline hover:underline"
+					>{link.label}</a
+				>
+			{/each}
+		</nav>
 		<p class="text-[11px] leading-relaxed text-slate-400 dark:text-dark-subtle m-0">
-			Kizuna Archive © 2025. Refreshed hourly with Nordic & Japanese design dispatches.
+			© {new Date().getFullYear()} Kizuna
 		</p>
 	</footer>
 </aside>
