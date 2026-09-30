@@ -24,6 +24,7 @@ export const user = sqliteTable("user", {
   cameraGear: text("camera_gear"),
   followersCount: integer("followers_count").default(0).notNull(),
   followingCount: integer("following_count").default(0).notNull(),
+  termsAcceptedAt: integer("terms_accepted_at", { mode: "timestamp_ms" }),
 });
 
 export const session = sqliteTable(

@@ -39,6 +39,8 @@ export function authOptions(env: Env) {
 								message: 'This email cannot be used to create an account.'
 							});
 						}
+						// Signup requires ticking the age/Terms checkbox, so record when that consent was given.
+						return { data: { ...user, termsAcceptedAt: new Date() } };
 					}
 				}
 			}
@@ -57,7 +59,9 @@ export function authOptions(env: Env) {
 				cameraGear: { type: 'string', required: false },
 				// Denormalized follow counters, recomputed in the follow/unfollow batch; never user input.
 				followersCount: { type: 'number', required: true, defaultValue: 0, input: false },
-				followingCount: { type: 'number', required: true, defaultValue: 0, input: false }
+				followingCount: { type: 'number', required: true, defaultValue: 0, input: false },
+				// Set server-side at account creation; never user input.
+				termsAcceptedAt: { type: 'date', required: false, input: false }
 			}
 		}
 	} satisfies BetterAuthOptions;

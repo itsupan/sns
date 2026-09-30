@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
+	import { MIN_AGE } from '$lib/constants/legal';
 	import { toast } from '$lib/utils/toast.svelte';
 	import Button from '$lib/components/shared/Button.svelte';
 	import KizunaLogo from '$lib/components/shared/KizunaLogo.svelte';
@@ -110,7 +111,7 @@
 			}
 
 			if (!agreeToTerms) {
-				errorMessage = 'Please agree to the Terms of Service to continue.';
+				errorMessage = `Please confirm you're ${MIN_AGE} or older and agree to the Terms to continue.`;
 				toast.error(errorMessage);
 				return;
 			}
@@ -436,13 +437,14 @@
 						required
 					/>
 					<span class="checkbox-label text-slate-600 dark:text-dark-muted text-[13px]"
-						>I agree to the <a
+						>I'm {MIN_AGE} or older and agree to the
+						<a
 							href={resolve('/legal/terms')}
 							class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
 							target="_blank"
 							rel="noopener">Terms</a
 						>
-						&amp;
+						and
 						<a
 							href={resolve('/legal/privacy')}
 							class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"

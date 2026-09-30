@@ -1,4 +1,5 @@
 import { betterAuth } from 'better-auth';
+import { eq } from 'drizzle-orm';
 import { drizzleAdapter } from '@better-auth/drizzle-adapter';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
@@ -55,5 +56,20 @@ describe('signup blocklist on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(res.status).toBe(200);
 		const users = await t.db.select({ email: schema.user.email }).from(schema.user);
 		expect(users).toEqual([{ email: 'someone.else@gmail.com' }]);
+	});
+
+	it('records when the new user accepted the Terms', async () => {
+		const before = Date.now();
+		const res = await signUp('consenting.user@gmail.com');
+		expect(res.status).toBe(200);
+		const after = Date.now();
+		const [row] = await t.db
+			.select({ termsAcceptedAt: schema.user.termsAcceptedAt })
+			.from(schema.user)
+			.where(eq(schema.user.email, 'consenting.user@gmail.com'));
+		expect(row.termsAcceptedAt).toBeInstanceOf(Date);
+		const ts = row.termsAcceptedAt!.getTime();
+		expect(ts).toBeGreaterThanOrEqual(before);
+		expect(ts).toBeLessThanOrEqual(after);
 	});
 });

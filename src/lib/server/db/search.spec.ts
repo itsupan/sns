@@ -59,13 +59,10 @@ beforeAll(async () => {
 	const testDb = await createTestDb({ stopBefore: '0012' });
 	({ db, d1, dispose } = testDb);
 	await db.batch([
-		db.insert(user).values({
-			id: 'u-elena',
-			name: 'Elena Rostova',
-			email: 'e@test.dev',
-			handle: 'elena.rostova',
-			bio: 'Architectural photographer'
-		}),
+		// Raw SQL: the Drizzle user schema has columns that later migrations add.
+		db.run(
+			sql`INSERT INTO user (id, name, email, handle, bio) VALUES ('u-elena', 'Elena Rostova', 'e@test.dev', 'elena.rostova', 'Architectural photographer')`
+		),
 		db.insert(post).values({
 			id: 'p-old',
 			userId: 'u-elena',
