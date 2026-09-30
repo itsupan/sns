@@ -121,7 +121,7 @@
 		<div class="flex flex-wrap gap-1.5 xl:gap-2">
 			{#each topics as topic (topic)}
 				<a
-					href={`#topic-${topic.replace('#', '')}`}
+					href={resolve('/explore/tags/[tag]', { tag: topic.replace('#', '').toLowerCase() })}
 					class="text-[11px] xl:text-xs font-medium px-2.5 xl:px-3 py-1 xl:py-1.5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted hover:bg-slate-200/80 dark:hover:bg-dark-hover hover:text-slate-900 dark:hover:text-dark-text transition-colors no-underline"
 				>
 					{topic}
@@ -134,28 +134,6 @@
 	<footer
 		class="px-2 text-[11px] xl:text-xs text-slate-400 dark:text-dark-subtle flex flex-col gap-1.5 xl:gap-2"
 	>
-		<div class="flex flex-wrap gap-x-3 gap-y-1">
-			<a
-				href="#about"
-				class="text-slate-500 dark:text-dark-muted hover:underline hover:text-slate-700 dark:hover:text-dark-text no-underline"
-				>About Kizuna</a
-			>
-			<a
-				href="#exhibitions"
-				class="text-slate-500 dark:text-dark-muted hover:underline hover:text-slate-700 dark:hover:text-dark-text no-underline"
-				>Exhibitions</a
-			>
-			<a
-				href="#privacy"
-				class="text-slate-500 dark:text-dark-muted hover:underline hover:text-slate-700 dark:hover:text-dark-text no-underline"
-				>Privacy</a
-			>
-			<a
-				href="#terms"
-				class="text-slate-500 dark:text-dark-muted hover:underline hover:text-slate-700 dark:hover:text-dark-text no-underline"
-				>Terms</a
-			>
-		</div>
 		<p class="text-[11px] leading-relaxed text-slate-400 dark:text-dark-subtle m-0">
 			Kizuna Archive © 2025. Refreshed hourly with Nordic & Japanese design dispatches.
 		</p>

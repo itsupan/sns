@@ -294,17 +294,6 @@
 	function handleUpdated(next: PostData) {
 		updatedPosts[next.id] = next;
 	}
-	let likedItems = $state<Record<string, boolean>>({});
-	let savedItems = $state<Record<string, boolean>>({});
-
-	function toggleLike(id: string) {
-		likedItems[id] = !likedItems[id];
-	}
-
-	function toggleSave(id: string) {
-		savedItems[id] = !savedItems[id];
-	}
-
 	function openItem(item: GridItem) {
 		onSelectItem?.(item);
 		// Real posts open their own page (comments, edit, delete); demo items use the lightbox.
@@ -315,8 +304,14 @@
 		activeModalItem = item;
 	}
 
-	function closeModal() {
-		activeModalItem = null;
+	// A native modal <dialog> gives Escape, a focus trap and focus restore for free.
+	function showModal(node: HTMLDialogElement) {
+		const previousOverflow = document.body.style.overflow;
+		document.body.style.overflow = 'hidden';
+		node.showModal();
+		return () => {
+			document.body.style.overflow = previousOverflow;
+		};
 	}
 </script>
 
@@ -420,7 +415,7 @@
 						>
 							<div class="flex items-center gap-2">
 								<Icon name="heart" class="text-base" />
-								<span>{formatCount(item.likes + (likedItems[item.id] ? 1 : 0))}</span>
+								<span>{formatCount(item.likes)}</span>
 							</div>
 							<div class="flex items-center gap-2">
 								<Icon name="comment-alt" class="text-base" />
@@ -435,8 +430,6 @@
 		{:else if viewMode === 'feed'}
 			<div class="flex flex-col max-w-2xl mx-auto w-full pt-2 sm:pt-4">
 				{#each visibleItems as item (item.id)}
-					{@const isLiked = likedItems[item.id] ?? false}
-					{@const isSaved = savedItems[item.id] ?? false}
 					{#if item.post}
 						<PostCard
 							post={item.post}
@@ -480,14 +473,6 @@
 										</span>
 									</div>
 								</div>
-
-								<button
-									type="button"
-									class="size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-black dark:hover:text-white border-0 bg-transparent cursor-pointer"
-									aria-label="Post options"
-								>
-									<Icon name="menu-dots" class="text-base" />
-								</button>
 							</div>
 
 							<!-- Title -->
@@ -539,49 +524,18 @@
 								</div>
 							{/if}
 
-							<!-- Action Bar -->
+							<!-- Counters (demo items have no post to like, save or share) -->
 							<div
-								class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-dark-border text-xs text-slate-600 dark:text-dark-muted"
+								class="flex items-center gap-5 pt-3 border-t border-slate-100 dark:border-dark-border text-xs text-slate-600 dark:text-dark-muted"
 							>
-								<div class="flex items-center gap-5">
-									<button
-										type="button"
-										class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 {isLiked
-											? 'text-rose-500 font-semibold'
-											: 'hover:text-black dark:hover:text-white'}"
-										onclick={() => toggleLike(item.id)}
-									>
-										<Icon name="heart" class="text-base {isLiked ? 'text-rose-500' : ''}" />
-										<span>{item.likes + (isLiked ? 1 : 0)}</span>
-									</button>
-
-									<button
-										type="button"
-										class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 hover:text-black dark:hover:text-white"
-										onclick={() => openItem(item)}
-									>
-										<Icon name="comment-alt" class="text-base" />
-										<span>{item.comments}</span>
-									</button>
-
-									<button
-										type="button"
-										class="flex items-center gap-1.5 cursor-pointer border-0 bg-transparent p-0 hover:text-black dark:hover:text-white"
-									>
-										<Icon name="share" class="text-base" />
-									</button>
-								</div>
-
-								<button
-									type="button"
-									class="p-1 cursor-pointer border-0 bg-transparent {isSaved
-										? 'text-blue-600'
-										: 'hover:text-black dark:hover:text-white'}"
-									onclick={() => toggleSave(item.id)}
-									aria-label="Save work"
-								>
-									<Icon name="bookmark" class="text-base" />
-								</button>
+								<span class="flex items-center gap-1.5">
+									<Icon name="heart" class="text-base" />
+									{formatCount(item.likes)}
+								</span>
+								<span class="flex items-center gap-1.5">
+									<Icon name="comment-alt" class="text-base" />
+									{formatCount(item.comments)}
+								</span>
 							</div>
 						</article>
 					{/if}
@@ -822,11 +776,14 @@
 
 	<!-- LIGHTBOX MODAL -->
 	{#if activeModalItem}
-		<div
-			class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-			role="dialog"
-			aria-modal="true"
+		<dialog
+			{@attach showModal}
+			class="fixed inset-0 z-50 m-0 size-full max-w-none max-h-none border-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
 			aria-label={activeModalItem.title}
+			onclose={() => (activeModalItem = null)}
+			onclick={(e) => {
+				if (e.target === e.currentTarget) e.currentTarget.close();
+			}}
 		>
 			<div
 				class="relative max-w-4xl w-full bg-white dark:bg-dark-card rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
@@ -854,7 +811,7 @@
 							<button
 								type="button"
 								class="size-8 rounded-full flex items-center justify-center text-slate-500 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-hover transition-colors cursor-pointer border-0 bg-transparent"
-								onclick={closeModal}
+								onclick={(e) => e.currentTarget.closest('dialog')?.close()}
 								aria-label="Close dialog"
 							>
 								✕
@@ -864,10 +821,13 @@
 						<h3 class="text-base font-bold text-slate-950 dark:text-white mt-4 mb-2">
 							{activeModalItem.title}
 						</h3>
-						<p class="text-xs text-slate-600 dark:text-dark-muted leading-relaxed">
-							{activeModalItem.description ||
-								'Archival study shot on Hasselblad 500C/M on Ilford HP5 Plus. Hand-developed in D-76.'}
-						</p>
+						{#if activeModalItem.description}
+							<p
+								class="text-xs text-slate-600 dark:text-dark-muted leading-relaxed whitespace-pre-line break-words"
+							>
+								{activeModalItem.description}
+							</p>
+						{/if}
 
 						{#if activeModalItem.cameraMeta}
 							<div
@@ -883,7 +843,7 @@
 					>
 						<div class="flex items-center gap-1.5">
 							<Icon name="heart" class="text-rose-500 text-sm" />
-							<span>{activeModalItem.likes + (likedItems[activeModalItem.id] ? 1 : 0)} likes</span>
+							<span>{activeModalItem.likes} likes</span>
 						</div>
 						<div class="flex items-center gap-1.5">
 							<Icon name="comment-alt" class="text-sm" />
@@ -892,6 +852,6 @@
 					</div>
 				</div>
 			</div>
-		</div>
+		</dialog>
 	{/if}
 </div>

@@ -347,14 +347,6 @@
 					class="form-label text-[13px] font-medium text-slate-900 dark:text-dark-text"
 					>Password</label
 				>
-				{#if mode === 'login'}
-					<a
-						href="#forgot"
-						rel="external"
-						class="forgot-link text-[12.5px] text-blue-600 dark:text-kizuna-blue font-medium no-underline hover:underline hover:text-blue-700 dark:hover:text-blue-400 transition-colors duration-150"
-						>Forgot password?</a
-					>
-				{/if}
 			</div>
 			<div class="password-input-wrapper relative flex items-center">
 				<input
@@ -490,20 +482,7 @@
 		<p
 			class="footer-disclaimer mt-4.5 text-xs leading-relaxed text-slate-500 dark:text-dark-subtle text-center max-w-[20rem] mx-auto"
 		>
-			By continuing, you agree to Kizuna's
-			<a
-				href="#terms"
-				rel="external"
-				class="legal-link text-slate-500 dark:text-dark-muted underline hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150"
-				>Terms of Service</a
-			>
-			and
-			<a
-				href="#privacy"
-				rel="external"
-				class="legal-link text-slate-500 dark:text-dark-muted underline hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150"
-				>Privacy Policy</a
-			>.
+			By continuing, you agree to Kizuna's Terms of Service and Privacy Policy.
 		</p>
 	{/if}
 </div>

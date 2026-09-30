@@ -197,7 +197,11 @@
 					class="size-20 sm:size-24 lg:size-28 rounded-full overflow-hidden ring-2 sm:ring-4 ring-slate-100 dark:ring-dark-border sm:dark:ring-dark-elevated shadow-xs sm:shadow-sm bg-slate-100 dark:bg-dark-elevated flex items-center justify-center shrink-0"
 				>
 					{#if profile.avatar}
-						<img src={profile.avatar} alt={profile.name} class="w-full h-full object-cover" />
+						<img
+							src={profile.avatar}
+							alt={profile.name || 'Profile photo'}
+							class="w-full h-full object-cover"
+						/>
 					{:else}
 						<span
 							class="font-bold text-2xl sm:text-3xl text-slate-600 dark:text-dark-text select-none"
