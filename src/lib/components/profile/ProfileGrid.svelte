@@ -802,12 +802,7 @@
 						onclick={() => openItem(item)}
 						aria-label={`View saved post ${item.title}`}
 					>
-						<img
-							src={item.image}
-							alt={item.title}
-							class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-							loading="lazy"
-						/>
+						{@render preview(item, 'text-[11px] sm:text-sm')}
 						<div class="absolute top-2 right-2 text-white drop-shadow-md">
 							<Icon name="bookmark" class="text-sm text-blue-500" />
 						</div>
