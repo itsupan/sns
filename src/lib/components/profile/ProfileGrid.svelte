@@ -192,60 +192,10 @@
 		}
 	];
 
-	const sampleEssays: EssayItem[] = [
-		{
-			id: 'e1',
-			title: 'Quiet Brutalism: Concrete Light & Shadows in Copenhagen',
-			subtitle:
-				'A study on natural dawn illumination across raw exposed concrete in the central atrium.',
-			coverImage:
-				'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=900&auto=format&fit=crop&q=80',
-			readTime: '12 min read',
-			date: 'Oct 14, 2025',
-			excerpt:
-				'Architecture is the masterly, correct, and magnificent play of masses brought together in light. When winter sets in along the Øresund, dawn light enters at a 14-degree azimuth...',
-			tags: ['#Brutalism', '#LightAndSpace', '#Monograph']
-		},
-		{
-			id: 'e2',
-			title: 'The Charred Timber of Kyoto: Shou Sugi Ban & Space',
-			subtitle:
-				'Exploring tactile surfaces and ancient cedar combustion methods in Kansai architecture.',
-			coverImage:
-				'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=900&auto=format&fit=crop&q=80',
-			readTime: '8 min read',
-			date: 'Sep 28, 2025',
-			excerpt:
-				'To burn wood is not to destroy it, but to confer longevity. Walking through the narrow alleys of Gion and outer Uji, the velvet texture of charred Yakisugi absorbs sound and sunlight alike...',
-			tags: ['#KyotoCraft', '#WabiSabi', '#JapaneseArchitecture']
-		}
-	];
-
-	const sampleCollections: PinnedCollection[] = [
-		{
-			id: 'col-1',
-			title: 'Nordic Concrete Monograph',
-			count: 18,
-			coverImage:
-				'https://images.unsplash.com/photo-1541123437800-1bb1317badc2?w=800&auto=format&fit=crop&q=80',
-			description:
-				'Exposed aggregate, board-formed walls, and raw spatial mass across Scandinavian public spaces.'
-		},
-		{
-			id: 'col-2',
-			title: 'Kansai Craft & Shigaraki Kilns',
-			count: 14,
-			coverImage:
-				'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=800&auto=format&fit=crop&q=80',
-			description:
-				'Traditional wood-fired anagama ceramics and architectural masonry in Western Japan.'
-		}
-	];
-
 	let {
 		items = defaultItems,
-		essays = sampleEssays,
-		collections = sampleCollections,
+		essays = [],
+		collections = [],
 		activeTab = 'grid',
 		viewMode = 'grid',
 		class: className = '',

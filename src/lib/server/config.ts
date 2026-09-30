@@ -25,7 +25,8 @@ export type RateLimitName =
 	| 'save'
 	| 'share'
 	| 'follow'
-	| 'uploadPresign';
+	| 'uploadPresign'
+	| 'mediaRefresh';
 
 export interface PageSize {
 	defaultPageSize: number;
@@ -69,7 +70,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 		save: { limit: 60, windowSec: 60 },
 		share: { limit: 30, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
-		uploadPresign: { limit: 20, windowSec: 60 }
+		uploadPresign: { limit: 20, windowSec: 60 },
+		mediaRefresh: { limit: 60, windowSec: 60 }
 	},
 	upload: {
 		maxBytes: 50 * 1024 * 1024,
@@ -111,7 +113,8 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	save: 'RATE_LIMIT_SAVE',
 	share: 'RATE_LIMIT_SHARE',
 	follow: 'RATE_LIMIT_FOLLOW',
-	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN'
+	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN',
+	mediaRefresh: 'RATE_LIMIT_MEDIA_REFRESH'
 };
 
 const PositiveInt = v.pipe(v.string(), v.trim(), v.regex(/^\d+$/), v.toNumber(), v.minValue(1));

@@ -97,10 +97,11 @@
 			const stick = isNearBottom();
 			const countBefore = Object.keys(byId).length;
 			let after = messages.filter((m) => !m.pending).at(-1)?.id;
-			// With no messages yet, the latest page is the catch-up; otherwise page forward.
-			for (let more = true; more;) {
+			// With no messages yet, the latest page is the catch-up; otherwise page forward. Only the
+			// first request overlaps; the rest are strict, so a burst can never return the same page.
+			for (let more = true, strict = ''; more; strict = '&strict=1') {
 				const res = await fetch(
-					after ? api(`/messages?after=${encodeURIComponent(after)}`) : api('/messages')
+					after ? api(`/messages?after=${encodeURIComponent(after)}${strict}`) : api('/messages')
 				);
 				if (!res.ok) return;
 				const page = (await res.json()) as { messages: ChatMessage[]; hasMore: boolean };

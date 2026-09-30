@@ -1,14 +1,8 @@
 <script lang="ts">
 	import ProfileHeader from '$lib/components/profile/ProfileHeader.svelte';
-	import ProfileHighlights from '$lib/components/profile/ProfileHighlights.svelte';
 	import ProfileTabs from '$lib/components/profile/ProfileTabs.svelte';
 	import ProfileGrid from '$lib/components/profile/ProfileGrid.svelte';
-	import type { Highlight } from '$lib/components/profile/ProfileHighlights.svelte';
-	import type {
-		GridItem,
-		EssayItem,
-		PinnedCollection
-	} from '$lib/components/profile/ProfileGrid.svelte';
+	import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 	import type { TabId, ViewMode } from '$lib/components/profile/ProfileTabs.svelte';
 	import { resolveProfile } from '$lib/utils/profile.svelte';
 	import type { PageData } from './$types';
@@ -34,10 +28,7 @@
 		});
 	});
 
-	const userHighlights = $derived<Highlight[]>([]);
 	const userPosts = $derived<GridItem[]>(data.posts ?? []);
-	const userEssays = $derived<EssayItem[]>([]);
-	const userCollections = $derived<PinnedCollection[]>([]);
 
 	const pageTitle = $derived(
 		currentProfile.name
@@ -116,9 +107,6 @@
 			}}
 		/>
 
-		<!-- Story Collections / Highlights -->
-		<ProfileHighlights highlights={userHighlights} />
-
 		<!-- Tabs Bar -->
 		<ProfileTabs bind:activeTab bind:viewMode showSaved={data.isOwnProfile} />
 
@@ -128,8 +116,6 @@
 			savedPosts={data.saved}
 			{viewMode}
 			items={userPosts}
-			essays={userEssays}
-			collections={userCollections}
 			user={{
 				name: currentProfile.name,
 				handle: currentProfile.handle,

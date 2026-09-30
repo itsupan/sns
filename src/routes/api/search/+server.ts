@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import type { RequestHandler } from './$types';
-import { ApiError, enforceRateLimit, parseQuery, withApi } from '$lib/server/api';
+import { ApiError, enforceRateLimit, parseQuery, rateLimitSubject, withApi } from '$lib/server/api';
 import { getConfig } from '$lib/server/config';
 import {
 	searchPosts,
@@ -21,11 +21,7 @@ import { refreshMediaUrl } from '$lib/server/services/storage';
 export const GET: RequestHandler = withApi(async (event) => {
 	const { url, locals, platform } = event;
 	const config = getConfig(platform?.env);
-	await enforceRateLimit(
-		platform,
-		'search',
-		locals.user?.id ?? `ip:${safeClientAddress(event.getClientAddress)}`
-	);
+	await enforceRateLimit(platform, 'search', rateLimitSubject(event));
 
 	const { maxPageSize, defaultPageSize } = config.search;
 	const query = await parseQuery(
@@ -85,11 +81,3 @@ export const GET: RequestHandler = withApi(async (event) => {
 		)
 	});
 });
-
-function safeClientAddress(getClientAddress: () => string): string {
-	try {
-		return getClientAddress();
-	} catch {
-		return 'unknown';
-	}
-}

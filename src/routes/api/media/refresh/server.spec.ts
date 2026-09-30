@@ -37,4 +37,23 @@ describe('POST /api/media/refresh', () => {
 		expect(data.refreshed[expiredUrl]).toBe('https://cdn.example.com/posts/u1/photo.jpg');
 		expect(data.refreshed[validUrl]).toBe(validUrl);
 	});
+
+	it('returns 429 once a signed-out client is over the limit', async () => {
+		// A KV whose counter is already past any limit.
+		const KV = { get: async () => '9999', put: async () => {} };
+		const request = new Request('http://localhost/api/media/refresh', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ urls: [] })
+		});
+
+		const res = await POST({
+			request,
+			platform: { env: { KV } },
+			locals: { user: null },
+			getClientAddress: () => '203.0.113.7'
+		} as never);
+		expect(res.status).toBe(429);
+		expect(res.headers.get('Retry-After')).toBeTruthy();
+	});
 });

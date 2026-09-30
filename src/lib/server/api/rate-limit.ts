@@ -41,6 +41,19 @@ export async function rateLimit(
 	return null;
 }
 
+/** Who a limit counts against: the signed-in user, or the client IP when signed out. */
+export function rateLimitSubject(event: {
+	locals?: Partial<App.Locals>;
+	getClientAddress?: () => string;
+}): string {
+	if (event.locals?.user) return event.locals.user.id;
+	try {
+		return `ip:${event.getClientAddress?.() ?? 'unknown'}`;
+	} catch {
+		return 'ip:unknown';
+	}
+}
+
 /**
  * Throws a 429 `ApiError` with `Retry-After` when `userId` exceeds the named limit.
  * Allows the request when the KV binding is missing (unit tests, misconfigured local dev) or
