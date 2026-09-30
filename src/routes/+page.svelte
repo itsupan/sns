@@ -8,63 +8,14 @@
 	import type { PageData } from './$types';
 	import type { PostData } from '$lib/components/feed/PostCard.svelte';
 	import { readApiError } from '$lib/utils/api-error';
-
-	const DEFAULT_POSTS: PostData[] = [
-		{
-			id: 'post-1',
-			author: {
-				name: 'Elena Rostova',
-				handle: '@elena.rostova',
-				avatar:
-					'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-				location: 'Copenhagen, Denmark',
-				timeAgo: '3h ago'
-			},
-			title: 'Quiet Brutalism: Concrete Light & Shadows',
-			description:
-				'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.',
-			image:
-				'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-			tags: ['#MinimalArchitecture', '#LightAndSpace', '#DesignArchive'],
-			likes: 842,
-			commentsCount: 46,
-			repostsCount: 12,
-			commentPreview: {
-				author: 'marcus_k',
-				content: 'The texture gradation is immaculate. Concrete takes light like velvet here.'
-			}
-		},
-		{
-			id: 'post-2',
-			author: {
-				name: 'Kai Takahashi',
-				handle: '@kai.raw',
-				avatar:
-					'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-				location: 'Kyoto, Japan',
-				timeAgo: '5h ago'
-			},
-			title: 'Wabi-Sabi Clay & Stoneware Forms',
-			description:
-				'Hand-pinched Shigaraki stoneware fired in an anagama kiln over seven days. The ash melt creates an unrepeatable landscape of mineral hues and subtle texture.',
-			image:
-				'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=1200&auto=format&fit=crop&q=80',
-			tags: ['#KyotoCeramics', '#WabiSabi', '#JapaneseCraft'],
-			likes: 618,
-			commentsCount: 29,
-			repostsCount: 8,
-			commentPreview: {
-				author: 'sophia_v',
-				content: 'The natural wood ash glaze turned out breathtaking.'
-			}
-		}
-	];
+	import { invalidateAll } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	let { data }: { data?: PageData } = $props();
 	// Page size comes from FEED_PAGE_SIZE via the server load; the fallback only applies without data.
 	let pageSize = $derived(data?.pageSize ?? 10);
 
-	let initialPosts = $derived(data?.posts && data.posts.length > 0 ? data.posts : DEFAULT_POSTS);
+	let initialPosts = $derived(data?.posts ?? []);
 	let userCreatedPosts = $state<PostData[]>([]);
 	let paginatedPosts = $state<PostData[]>([]);
 	// Keyset cursor for the next page; null once the feed is exhausted. `undefined` = use SSR's.
@@ -174,6 +125,32 @@
 				<PostCard {post} priority={post.id === posts[0]?.id} />
 			{/each}
 		</div>
+
+		{#if posts.length === 0}
+			<div
+				class="mx-4 lg:mx-0 rounded-3xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card py-16 px-6 flex flex-col items-center gap-2 text-center"
+				role={data?.loadFailed ? 'alert' : undefined}
+			>
+				{#if data?.loadFailed}
+					<Icon name="exclamation" class="text-3xl text-slate-300" />
+					<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">
+						Could not load your feed
+					</p>
+					<button
+						type="button"
+						class="text-xs font-medium underline text-slate-800 dark:text-slate-200"
+						onclick={() => invalidateAll()}>Try again</button
+					>
+				{:else}
+					<Icon name="picture" class="text-3xl text-slate-300" />
+					<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">No posts yet</p>
+					<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
+						Share the first one, or
+						<a href={resolve('/explore')} class="font-medium underline">find people on Explore</a>.
+					</p>
+				{/if}
+			</div>
+		{/if}
 
 		{#if loadError}
 			<div class="py-8 flex flex-col items-center gap-2 text-center px-4" role="alert">

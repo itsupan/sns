@@ -1,7 +1,10 @@
 import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readable } from 'svelte/store';
 import PostCard, { type PostData } from './PostCard.svelte';
+// Tailwind's line-clamp must apply for "See more" to measure a real overflow.
+import '../../../app.css';
 
 // Signed in as `owner-1`; the default demo post has no author id, so it is never "own".
 vi.mock('$lib/auth-client', () => ({
@@ -60,6 +63,58 @@ describe('PostCard component', () => {
 		await screen.getByRole('button', { name: 'Like post' }).click();
 		await expect.element(screen.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
 		await expect.element(screen.getByText('842')).toBeInTheDocument();
+	});
+
+	it('ignores a second like tap while the first is in flight and takes the count from the server', async () => {
+		let release!: (res: Response) => void;
+		const like = vi.fn(() => new Promise<Response>((resolve) => (release = resolve)));
+		vi.stubGlobal('fetch', like);
+		const screen = render(PostCard);
+
+		const likeButton = screen.getByRole('button', { name: 'Like post' });
+		await likeButton.click();
+		await likeButton.click();
+		expect(like).toHaveBeenCalledTimes(1);
+
+		release(Response.json({ liked: true, likesCount: 850 }));
+		await expect.element(screen.getByText('850')).toBeInTheDocument();
+		await expect.element(likeButton).toHaveAttribute('aria-pressed', 'true');
+	});
+
+	it('keeps line breaks and expands a long description with See more', async () => {
+		const description = Array.from({ length: 30 }, (_, i) => `Paragraph ${i + 1}`).join('\n\n');
+		const screen = render(PostCard, { post: { ...ownPost, description } });
+
+		await expect
+			.element(screen.getByText('Paragraph 1', { exact: false }).first())
+			.toHaveClass('whitespace-pre-line');
+		const more = screen.getByRole('button', { name: 'See more' });
+		await expect.element(more).toHaveAttribute('aria-expanded', 'false');
+		await more.click();
+		await expect
+			.element(screen.getByRole('button', { name: 'See less' }))
+			.toHaveAttribute('aria-expanded', 'true');
+	});
+
+	it('shows See more after resizing to a width where the text no longer fits', async () => {
+		await page.viewport(1280, 900);
+		// Five lines: inside the desktop clamp (8), over the mobile clamp (3).
+		const description = Array.from({ length: 5 }, (_, i) => `Line ${i + 1}`).join('\n');
+		const screen = render(PostCard, { post: { ...ownPost, description } });
+		await expect.element(screen.getByText('Line 1', { exact: false }).first()).toBeVisible();
+		expect(document.querySelector('[aria-expanded]')).toBeNull();
+
+		await page.viewport(390, 800);
+		await expect.element(screen.getByRole('button', { name: 'See more' })).toBeInTheDocument();
+	});
+
+	it('shows no See more for a short description or on the post page', async () => {
+		render(PostCard, { post: ownPost });
+		const description = Array.from({ length: 30 }, (_, i) => `Line ${i + 1}`).join('\n');
+		render(PostCard, { post: { ...ownPost, id: 'own-2', description }, fullText: true });
+
+		await new Promise((r) => setTimeout(r, 50));
+		expect(document.querySelector('[aria-expanded]')).toBeNull();
 	});
 
 	it('saves and unsaves through the API, sending only the final state after fast taps', async () => {

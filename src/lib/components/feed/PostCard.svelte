@@ -71,6 +71,8 @@
 		onUpdate?: (post: PostData) => void;
 		/** Show Follow / Following next to the author (off on profile pages, where the header has it). */
 		showFollow?: boolean;
+		/** Show the whole description instead of clamping it behind "See more" (the post page). */
+		fullText?: boolean;
 	}
 
 	const defaultPost: PostData = {
@@ -126,7 +128,8 @@
 		onSave,
 		onDelete,
 		onUpdate,
-		showFollow = true
+		showFollow = true,
+		fullText = false
 	}: Props = $props();
 
 	const session = authClient.useSession();
@@ -277,6 +280,22 @@
 	let displayCommentsCount = $derived(post.commentsCount + commentsDelta);
 	let activeCommentPreview = $derived(latestCommentPreview || post.commentPreview);
 
+	// Long descriptions are clamped; "See more" appears only when the text really overflows.
+	let descriptionEl = $state<HTMLParagraphElement | null>(null);
+	let expanded = $state(false);
+	let overflows = $state(false);
+	$effect(() => {
+		void post.description;
+		const el = descriptionEl;
+		if (!el || expanded || fullText) return;
+		const measure = () => (overflows = el.scrollHeight > el.clientHeight + 1);
+		measure();
+		// The clamp differs per breakpoint, so remeasure when the paragraph's size changes.
+		const observer = new ResizeObserver(measure);
+		observer.observe(el);
+		return () => observer.disconnect();
+	});
+
 	function haptic() {
 		navigator.vibrate?.(10);
 	}
@@ -290,20 +309,33 @@
 		onLike?.(next);
 	}
 
+	// The endpoint toggles, so a second tap while one is in flight would flip the server twice.
+	let likeInFlight = false;
+
 	async function toggleLike() {
+		if (likeInFlight) return;
 		const next = !isLiked;
 		setLiked(next);
+		if (!$session.data?.user) return;
 
-		if ($session.data?.user) {
-			try {
-				const res = await fetch(`/api/posts/${post.id}/like`, { method: 'POST' });
-				if (!res.ok) {
-					// rollback if server rejects
-					setLiked(!next);
-				}
-			} catch {
+		likeInFlight = true;
+		try {
+			const res = await fetch(`/api/posts/${post.id}/like`, { method: 'POST' });
+			const body = (await res.json().catch(() => null)) as {
+				liked?: boolean;
+				likesCount?: number;
+			} | null;
+			if (!res.ok || typeof body?.liked !== 'boolean') {
 				setLiked(!next);
+				return;
 			}
+			// The server's answer wins over the optimistic guess.
+			likedOverride = body.liked;
+			if (typeof body.likesCount === 'number') likesDelta = body.likesCount - post.likes;
+		} catch {
+			setLiked(!next);
+		} finally {
+			likeInFlight = false;
 		}
 	}
 
@@ -756,11 +788,27 @@
 		<div class="px-4 lg:px-0 flex flex-col">
 			<!-- Caption / Description -->
 			{#if post.description}
-				<p
-					class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mt-1.5 lg:mt-0 mb-3 line-clamp-3 lg:line-clamp-none"
-				>
-					{post.description}
-				</p>
+				<div class="mt-1.5 lg:mt-0 mb-3">
+					<p
+						bind:this={descriptionEl}
+						class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted m-0 whitespace-pre-line break-words {expanded ||
+						fullText
+							? ''
+							: 'line-clamp-3 lg:line-clamp-8'}"
+					>
+						{post.description}
+					</p>
+					{#if overflows}
+						<button
+							type="button"
+							class="mt-1 p-0 border-0 bg-transparent cursor-pointer text-sm font-medium text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text"
+							aria-expanded={expanded}
+							onclick={() => (expanded = !expanded)}
+						>
+							{expanded ? 'See less' : 'See more'}
+						</button>
+					{/if}
+				</div>
 			{/if}
 
 			<!-- Tags -->
