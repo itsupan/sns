@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import { describe, expect, it } from 'vitest';
 import ProfileGrid, { type GridItem } from './ProfileGrid.svelte';
 
@@ -35,5 +36,32 @@ describe('ProfileGrid Saved tab', () => {
 	it('shows the empty state when nothing is saved', async () => {
 		const screen = render(ProfileGrid, { props: { activeTab: 'saved', savedPosts: [] } });
 		await expect.element(screen.getByText('No saved posts')).toBeVisible();
+	});
+
+	it('shows demo items read-only in list view, with no buttons that do nothing', async () => {
+		const screen = render(ProfileGrid, { props: { viewMode: 'feed' } });
+
+		await expect.element(screen.getByText('Brutalist Spiral Staircase Atrium')).toBeInTheDocument();
+		expect(document.querySelector('[aria-label="Post options"]')).toBeNull();
+		expect(document.querySelector('[aria-label="Save work"]')).toBeNull();
+	});
+
+	it('opens a demo item in a modal dialog that closes on Escape and returns focus', async () => {
+		const screen = render(ProfileGrid, {
+			props: { items: [{ id: 'g9', title: 'Bare study', image: '', likes: 1, comments: 0 }] }
+		});
+		const tile = screen.getByRole('button', { name: 'View post Bare study' });
+		await tile.click();
+
+		const dialog = screen.getByRole('dialog', { name: 'Bare study' });
+		await expect.element(dialog).toBeVisible();
+		expect(dialog.element().matches(':modal')).toBe(true);
+		expect(document.body.style.overflow).toBe('hidden');
+		expect(document.body.textContent).not.toContain('Hasselblad');
+
+		await userEvent.keyboard('{Escape}');
+		await expect.element(dialog).not.toBeInTheDocument();
+		expect(document.body.style.overflow).toBe('');
+		expect(document.activeElement).toBe(tile.element());
 	});
 });

@@ -9,17 +9,15 @@ export interface NavItem {
 	label: string;
 	icon: string;
 	href: string;
-	/** Items without a page yet show a "coming soon" toast instead of navigating. */
-	ready: boolean;
 }
 
 export const navItems: NavItem[] = [
-	{ id: 'home', label: 'Home', icon: 'home', href: resolve('/'), ready: true },
-	{ id: 'explore', label: 'Explore', icon: 'compass-alt', href: resolve('/explore'), ready: true },
-	{ id: 'create', label: 'Create', icon: 'plus', href: resolve('/'), ready: true },
-	{ id: 'activity', label: 'Activity', icon: 'heart', href: resolve('/activity'), ready: true },
-	{ id: 'saved', label: 'Saved', icon: 'bookmark', href: resolve('/saved'), ready: true },
-	{ id: 'profile', label: 'Profile', icon: 'user', href: resolve('/profile'), ready: true }
+	{ id: 'home', label: 'Home', icon: 'home', href: resolve('/') },
+	{ id: 'explore', label: 'Explore', icon: 'compass-alt', href: resolve('/explore') },
+	{ id: 'create', label: 'Create', icon: 'plus', href: resolve('/') },
+	{ id: 'activity', label: 'Activity', icon: 'heart', href: resolve('/activity') },
+	{ id: 'saved', label: 'Saved', icon: 'bookmark', href: resolve('/saved') },
+	{ id: 'profile', label: 'Profile', icon: 'user', href: resolve('/profile') }
 ];
 
 export function activeNavId(pathname: string): NavId | null {

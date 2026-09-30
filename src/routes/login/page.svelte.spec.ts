@@ -29,7 +29,6 @@ describe('Login Page', () => {
 		// Form fields
 		await expect.element(screen.getByLabelText('Email address')).toBeInTheDocument();
 		await expect.element(screen.getByLabelText('Password', { exact: true })).toBeInTheDocument();
-		await expect.element(screen.getByText('Forgot password?')).toBeInTheDocument();
 		await expect.element(screen.getByText('Remember me')).toBeInTheDocument();
 
 		// Primary submit button

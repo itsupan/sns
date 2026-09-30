@@ -2,7 +2,6 @@
 	import { page } from '$app/state';
 	import Icon from './Icon.svelte';
 	import { navItems, activeNavId, openComposer, type NavItem } from './nav-items';
-	import { toast } from '$lib/utils/toast.svelte';
 	import { badges } from '$lib/utils/badges.svelte';
 
 	interface Props {
@@ -20,11 +19,6 @@
 		if (item.id === 'create') {
 			event.preventDefault();
 			await openComposer(page.url.pathname);
-			return;
-		}
-		if (!item.ready) {
-			event.preventDefault();
-			toast.show(`${item.label} is coming soon`);
 			return;
 		}
 		// Tapping the active tab scrolls back to the top, like native apps.
