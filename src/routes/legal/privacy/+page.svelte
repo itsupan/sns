@@ -98,7 +98,7 @@
 	<li>Edit your profile at any time.</li>
 	<li>
 		<strong>Download your data</strong> or <strong>delete your account</strong> in
-		<strong>Settings</strong>.
+		<a href={resolve('/settings')}>Settings</a>.
 	</li>
 	<li>
 		For anything else, email <span class="font-medium">{CONTACT_EMAIL}</span>. You can also complain

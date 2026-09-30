@@ -24,7 +24,7 @@
 	<li>You are responsible for what happens under your account.</li>
 	<li>Handles must not impersonate other people or brands.</li>
 	<li>
-		You can delete your account at any time in <strong>Settings</strong>.
+		You can delete your account at any time in <a href={resolve('/settings')}>Settings</a>.
 	</li>
 </ul>
 
