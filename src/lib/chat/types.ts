@@ -1,6 +1,12 @@
 /** Longest direct message, shared by the API (validation) and the composer. */
 export const MAX_MESSAGE_LENGTH = 2000;
 
+/**
+ * Close code the room sends to a user's oldest socket when they open too many. The client must
+ * not reconnect on it (that would evict another tab, forever); it falls back to polling.
+ */
+export const TOO_MANY_SOCKETS_CODE = 4008;
+
 export interface ChatMessage {
 	id: string;
 	conversationId: string;

@@ -5,8 +5,8 @@
  * Exported from worker.ts at the repo root; keep imports relative (wrangler bundles this, not SvelteKit).
  */
 import { DurableObject } from 'cloudflare:workers';
-import type { ChatServerEvent } from '../../chat/types';
-import { broadcast, handleClientFrame, type SocketAttachment } from './protocol';
+import { TOO_MANY_SOCKETS_CODE, type ChatServerEvent } from '../../chat/types';
+import { broadcast, handleClientFrame, socketsOverCap, type SocketAttachment } from './protocol';
 
 export class ChatRoom extends DurableObject<Env> {
 	constructor(ctx: DurableObjectState, env: Env) {
@@ -21,9 +21,21 @@ export class ChatRoom extends DurableObject<Env> {
 		if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket' || !userId) {
 			return new Response('Expected a WebSocket upgrade', { status: 426 });
 		}
+		// One member cannot pile up sockets: their oldest ones make room for the new one.
+		for (const old of socketsOverCap(this.ctx.getWebSockets(userId))) {
+			try {
+				old.close(TOO_MANY_SOCKETS_CODE, 'Too many connections');
+			} catch {
+				// Already closed.
+			}
+		}
 		const { 0: client, 1: server } = new WebSocketPair();
 		this.ctx.acceptWebSocket(server, [userId]);
-		server.serializeAttachment({ userId, lastTypingAt: 0 } satisfies SocketAttachment);
+		server.serializeAttachment({
+			userId,
+			lastTypingAt: 0,
+			connectedAt: Date.now()
+		} satisfies SocketAttachment);
 		return new Response(null, { status: 101, webSocket: client });
 	}
 

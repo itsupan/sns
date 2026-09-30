@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+	MAX_SOCKETS_PER_USER,
 	TYPING_RELAY_INTERVAL_MS,
 	broadcast,
 	handleClientFrame,
+	socketsOverCap,
 	type RoomSocket
 } from './protocol';
 
@@ -26,6 +28,27 @@ class FakeSocket implements RoomSocket {
 
 const sock = (userId: string, failing = false) =>
 	new FakeSocket({ userId, lastTypingAt: 0 }, failing);
+
+describe('socketsOverCap', () => {
+	const at = (connectedAt: number) => new FakeSocket({ userId: 'a', lastTypingAt: 0, connectedAt });
+
+	it('evicts nothing while one more socket still fits', () => {
+		const sockets = Array.from({ length: MAX_SOCKETS_PER_USER - 1 }, (_, i) => at(i));
+		expect(socketsOverCap(sockets)).toEqual([]);
+	});
+
+	it('evicts the oldest sockets, whatever order the runtime lists them in', () => {
+		const [newest, oldest, middle] = [at(30), at(10), at(20)];
+		expect(socketsOverCap([newest, oldest, middle], 3)).toEqual([oldest]);
+		expect(socketsOverCap([newest, oldest, middle], 2)).toEqual([oldest, middle]);
+	});
+
+	it('keeps the connection time when a typing signal rewrites the attachment', () => {
+		const ws = at(10);
+		handleClientFrame(ws, '{"type":"typing"}', [ws], TYPING_RELAY_INTERVAL_MS);
+		expect(ws.deserializeAttachment()).toMatchObject({ connectedAt: 10 });
+	});
+});
 
 describe('broadcast', () => {
 	it('sends to every socket, skipping one that fails', () => {

@@ -49,7 +49,7 @@ export function authOptions(env: Env) {
 		},
 		user: {
 			additionalFields: {
-				handle: { type: 'string', required: false },
+				handle: { type: 'string', required: false, unique: true },
 				bio: { type: 'string', required: false },
 				title: { type: 'string', required: false },
 				website: { type: 'string', required: false },
