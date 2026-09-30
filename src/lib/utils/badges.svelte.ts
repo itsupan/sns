@@ -13,22 +13,24 @@ class BadgeStore {
 	refresh(): Promise<void> {
 		if (this.inFlight) return this.inFlight;
 		const generation = this.generation;
-		const request = (async () => {
-			try {
-				const res = await fetch('/api/badges');
-				if (!res.ok) return;
-				const body = (await res.json()) as { messages: number; activity: number };
-				if (generation !== this.generation) return;
-				this.messages = body.messages;
-				this.activity = body.activity;
-			} catch {
-				// Keep the last known counts.
-			} finally {
-				if (this.inFlight === request) this.inFlight = null;
-			}
-		})();
-		this.inFlight = request;
-		return request;
+		this.inFlight = this.load(generation).finally(() => {
+			// A sign-out during the request already dropped it (and may have started a new one).
+			if (generation === this.generation) this.inFlight = null;
+		});
+		return this.inFlight;
+	}
+
+	private async load(generation: number): Promise<void> {
+		try {
+			const res = await fetch('/api/badges');
+			if (!res.ok) return;
+			const body = (await res.json()) as { messages: number; activity: number };
+			if (generation !== this.generation) return;
+			this.messages = body.messages;
+			this.activity = body.activity;
+		} catch {
+			// Keep the last known counts.
+		}
 	}
 
 	/** Signed out: nothing is unread, and any pending refresh is discarded. */
