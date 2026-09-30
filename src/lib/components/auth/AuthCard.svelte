@@ -436,7 +436,19 @@
 						required
 					/>
 					<span class="checkbox-label text-slate-600 dark:text-dark-muted text-[13px]"
-						>I agree to the Terms & Privacy</span
+						>I agree to the <a
+							href={resolve('/legal/terms')}
+							class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
+							target="_blank"
+							rel="noopener">Terms</a
+						>
+						&amp;
+						<a
+							href={resolve('/legal/privacy')}
+							class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
+							target="_blank"
+							rel="noopener">Privacy Policy</a
+						></span
 					>
 				</label>
 			{/if}
@@ -482,7 +494,20 @@
 		<p
 			class="footer-disclaimer mt-4.5 text-xs leading-relaxed text-slate-500 dark:text-dark-subtle text-center max-w-[20rem] mx-auto"
 		>
-			By continuing, you agree to Kizuna's Terms of Service and Privacy Policy.
+			By continuing, you agree to Kizuna's
+			<a
+				href={resolve('/legal/terms')}
+				class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
+				target="_blank"
+				rel="noopener">Terms of Service</a
+			>
+			and
+			<a
+				href={resolve('/legal/privacy')}
+				class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
+				target="_blank"
+				rel="noopener">Privacy Policy</a
+			>.
 		</p>
 	{/if}
 </div>
