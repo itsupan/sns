@@ -230,6 +230,28 @@ export const userFollow = sqliteTable(
 	]
 );
 
+/** A block: `blockerId` blocked `blockedId`. Blocks hide both users from each other everywhere. */
+export const userBlock = sqliteTable(
+	'user_block',
+	{
+		blockerId: text('blocker_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		blockedId: text('blocked_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes block idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.blockerId, table.blockedId] }),
+		// "Who blocked me": WHERE blocked_id = ?.
+		index('user_block_blockedId_idx').on(table.blockedId)
+	]
+);
+
 export const postRelations = relations(post, ({ one, many }) => ({
 	user: one(user, {
 		fields: [post.userId],

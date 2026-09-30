@@ -3,6 +3,7 @@ import { eq } from 'drizzle-orm';
 import type { RequestHandler, RequestEvent } from './$types';
 import { user } from '$lib/server/db/schema';
 import { setFollowing } from '$lib/server/db/follows';
+import { requireNotBlocked } from '$lib/server/db/blocks';
 import { ApiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 
 /** Shared by follow and unfollow: auth, self check, rate limit, target must exist. */
@@ -28,9 +29,13 @@ async function prepare({ params, locals, platform }: RequestEvent) {
 	return { followerId: currentUser.id, followingId: targetId };
 }
 
-/** Follow `:id`. Idempotent: following twice keeps one follow and the same counts. */
+/**
+ * Follow `:id`. Idempotent: following twice keeps one follow and the same counts. 403 when either
+ * user blocked the other.
+ */
 export const POST: RequestHandler = withApi(async (event) => {
 	const { followerId, followingId } = await prepare(event);
+	await requireNotBlocked(event.locals.db, followerId, followingId, 'You cannot follow this user');
 	const counts = await setFollowing(event.locals.db, followerId, followingId, true);
 	return json({ following: true, followersCount: counts.followersCount });
 });

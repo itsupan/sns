@@ -10,6 +10,7 @@ import {
 	type NotificationType
 } from './schema';
 import { encodeCursor, type FeedCursor } from './posts';
+import { notBlockedWith } from './blocks';
 
 /** An action that notifies `recipientId`. Which of `postId` / `commentId` is set depends on `type`. */
 export interface NotificationTarget {
@@ -104,7 +105,10 @@ export interface NotificationRow {
 const readAtOf = (userId: string) =>
 	sql`coalesce((select ${notificationRead.readAt} from ${notificationRead} where ${notificationRead.userId} = ${userId}), 0)`;
 
-/** A notification is shown only while its post (if any) is live. */
+/**
+ * A notification is shown only while its post (if any) is live, and never from a user blocked in
+ * either direction (new ones are not even stored: see the `notification_block_guard` trigger).
+ */
 const livePost = or(isNull(notification.postId), isNull(post.deletedAt));
 
 /**
@@ -136,6 +140,7 @@ export async function listNotifications(
 			and(
 				eq(notification.recipientId, userId),
 				livePost,
+				notBlockedWith(userId, notification.actorId),
 				cursor
 					? sql`(${notification.createdAt}, ${notification.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined
@@ -175,7 +180,8 @@ export async function countUnreadNotifications(db: Database, userId: string): Pr
 				and(
 					eq(notification.recipientId, userId),
 					sql`${notification.createdAt} > ${readAtOf(userId)}`,
-					livePost
+					livePost,
+					notBlockedWith(userId, notification.actorId)
 				)
 			)
 			.limit(UNREAD_CAP)

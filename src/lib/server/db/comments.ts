@@ -4,6 +4,7 @@ import { commentReaction, post, postComment, user } from './schema';
 import { commentsCountOf, reactionsCountOf, repliesCountOf } from './counters';
 import { encodeCursor, notDeleted, type FeedCursor } from './posts';
 import { notifyStatement, unnotifyReactionStatement } from './notifications';
+import { notBlockedWith } from './blocks';
 import { ApiError } from '$lib/server/api/errors';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import {
@@ -102,7 +103,7 @@ export async function loadReactionSummaries(
 
 /**
  * One page of a post's top-level comments (`parentCommentId` null) or of one comment's
- * replies, oldest first. Keyset pagination on (created_at, id), served by
+ * replies, oldest first, minus comments by users blocked in either direction with the viewer. Keyset pagination on (created_at, id), served by
  * `post_comment_postId_parent_createdAt_idx`.
  */
 export async function listComments(
@@ -143,6 +144,7 @@ export async function listComments(
 				parentCommentId === null
 					? isNull(postComment.parentCommentId)
 					: eq(postComment.parentCommentId, parentCommentId),
+				notBlockedWith(viewerId, postComment.userId),
 				cursor
 					? sql`(${postComment.createdAt}, ${postComment.id}) > (${cursor.createdAt}, ${cursor.id})`
 					: undefined

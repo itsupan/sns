@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postMedia, postTag, tag, user } from './schema';
 import { MAX_TAGS_PER_POST } from '$lib/constants/post-limits';
+import { notBlockedWith } from './blocks';
 
 /** Every read or write of a post must exclude soft-deleted rows (see `post.deletedAt`). */
 export const notDeleted = isNull(post.deletedAt);
@@ -27,11 +28,16 @@ export function decodeCursor(raw: string): FeedCursor | null {
 /**
  * One feed page, newest first, using keyset pagination on (created_at, id) served by
  * `post_createdAt_id_idx`, so posts added while scrolling never shift later pages.
- * Fetches one extra row to know whether another page exists.
+ * Fetches one extra row to know whether another page exists. Posts by users blocked in either
+ * direction with `viewerId` are left out.
  */
 export async function loadFeedPage(
 	db: Database,
-	{ limit, cursor }: { limit: number; cursor?: FeedCursor | null }
+	{
+		limit,
+		cursor,
+		viewerId
+	}: { limit: number; cursor?: FeedCursor | null; viewerId?: string | null }
 ) {
 	const rows = await db
 		.select({
@@ -49,6 +55,7 @@ export async function loadFeedPage(
 		.where(
 			and(
 				notDeleted,
+				notBlockedWith(viewerId, post.userId),
 				cursor
 					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined

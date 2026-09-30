@@ -11,6 +11,7 @@ import {
 	toGridItem
 } from '$lib/server/db/profiles';
 import { loadSavedPreview } from '$lib/server/db/saves';
+import { blockStatus } from '$lib/server/db/blocks';
 
 const FALLBACK_CURATORS: Record<
 	string,
@@ -106,6 +107,8 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	let targetUser: Record<string, unknown> | null = null;
 	let targetPosts: GridItem[] = [];
 	let stats = EMPTY_PROFILE_STATS;
+	// Either way round, a block shows a limited profile: no posts, no follow or message.
+	let block = { blocked: false, blockedBy: false };
 
 	if (locals.db) {
 		try {
@@ -133,8 +136,12 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 
 			if (found) {
 				const viewerId = locals.user?.id ?? null;
+				if (viewerId && viewerId !== found.id) {
+					block = await blockStatus(locals.db, viewerId, found.id);
+				}
+				const hidden = block.blocked || block.blockedBy;
 				const [posts, loadedStats] = await Promise.all([
-					loadProfilePosts(locals.db, found, viewerId),
+					hidden ? [] : loadProfilePosts(locals.db, found, viewerId),
 					loadProfileStats(locals.db, found.id, viewerId).catch(() => EMPTY_PROFILE_STATS)
 				]);
 				targetPosts = await Promise.all(
@@ -213,6 +220,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 			cameraGear: (targetUser.cameraGear as string | null | undefined) ?? null
 		},
 		isOwnProfile,
+		block,
 		posts: refreshedPosts,
 		saved,
 		stats,

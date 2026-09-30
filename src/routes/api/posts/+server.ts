@@ -41,7 +41,7 @@ export const GET: RequestHandler = withApi(async ({ url, locals, platform }) => 
 		throw new ApiError(400, 'validation_failed', 'Invalid cursor', { cursor: 'Invalid cursor' });
 	}
 
-	const page = await loadFeedPage(locals.db, { limit, cursor });
+	const page = await loadFeedPage(locals.db, { limit, cursor, viewerId: locals.user?.id });
 	const postRows = page.rows;
 
 	if (postRows.length === 0) {

@@ -3,6 +3,7 @@ import type { Database } from '.';
 import { post, postTag, tag, user, userFollow } from './schema';
 import { encodeCursor, loadPostMedia, notDeleted, type FeedCursor } from './posts';
 import type { ExploreTile } from '$lib/explore/types';
+import { notBlockedWith } from './blocks';
 
 /** Explore ranks only this many of the newest live posts, so each request reads a bounded set. */
 export const EXPLORE_CANDIDATES = 500;
@@ -29,11 +30,15 @@ export function exploreScore(
 const scoreSql = (now: number) =>
 	sql<number>`(1.0 + ${post.likesCount} + 2.0 * ${post.commentsCount} + ${post.viewsCount} / 50.0) / ((${now} - ${post.createdAt}) / ${sql.raw(`${HOUR_MS}.0`)} + 2.0)`;
 
-/** Posts not by the viewer and not by anyone they follow (nothing is excluded when signed out). */
+/**
+ * Posts not by the viewer, anyone they follow or anyone blocked in either direction (nothing is
+ * excluded when signed out).
+ */
 function outsideNetwork(db: Database, viewerId: string | null | undefined) {
 	if (!viewerId) return undefined;
 	return and(
 		ne(post.userId, viewerId),
+		notBlockedWith(viewerId, post.userId),
 		notExists(
 			db
 				.select({ one: sql`1` })
@@ -73,11 +78,15 @@ export async function loadExplorePage(
 	return { ids: rows.slice(0, pageSize).map((r) => r.id), hasMore };
 }
 
-/** Live posts tagged `slug`, newest first, keyset-paginated on (created_at, id). */
+/** Live posts tagged `slug` (minus those by users blocked with the viewer), newest first, keyset-paginated on (created_at, id). */
 export async function loadTagPage(
 	db: Database,
 	slug: string,
-	{ limit, cursor }: { limit: number; cursor?: FeedCursor | null }
+	{
+		limit,
+		cursor,
+		viewerId
+	}: { limit: number; cursor?: FeedCursor | null; viewerId?: string | null }
 ): Promise<{
 	tag: { slug: string; name: string } | null;
 	ids: string[];
@@ -98,6 +107,7 @@ export async function loadTagPage(
 			and(
 				eq(postTag.tagId, found.id),
 				notDeleted,
+				notBlockedWith(viewerId, post.userId),
 				cursor
 					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined
@@ -179,7 +189,8 @@ export interface CreatorRow {
 
 /**
  * Creators to follow: people followed by people the viewer follows, most shared first, topped up
- * with the most-followed creators. Never the viewer or anyone they already follow.
+ * with the most-followed creators. Never the viewer, anyone they already follow or anyone blocked
+ * in either direction.
  */
 export async function loadSuggestedCreators(
 	db: Database,
@@ -196,6 +207,7 @@ export async function loadSuggestedCreators(
 	const notMeOrFollowed = viewerId
 		? and(
 				ne(user.id, viewerId),
+				notBlockedWith(viewerId, user.id),
 				notExists(
 					db
 						.select({ one: sql`1` })
