@@ -431,6 +431,19 @@
 									<ThemeToggle variant="segmented" class="shrink-0" />
 								</div>
 
+								<a
+									href={resolve('/settings')}
+									class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 dark:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated no-underline transition-colors"
+									role="menuitem"
+									onclick={() => (desktopDropdownOpen = false)}
+								>
+									<Icon
+										name="settings"
+										class="text-sm text-slate-500 dark:text-dark-muted shrink-0"
+									/>
+									<span>Settings & privacy</span>
+								</a>
+
 								<div class="h-px my-1 bg-slate-100 dark:bg-dark-border"></div>
 
 								<button
@@ -508,6 +521,14 @@
 			onclick={() => {
 				settingsOpen = false;
 				handleShare();
+			}}
+		/>
+		<SheetAction
+			icon="settings"
+			label="Settings & privacy"
+			onclick={() => {
+				settingsOpen = false;
+				goto(resolve('/settings'));
 			}}
 		/>
 		<SheetAction icon="sign-out-alt" label="Log out" danger onclick={signOut} />
