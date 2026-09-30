@@ -21,8 +21,9 @@ vi.mock('$lib/server/db/posts', async (importOriginal) => {
 type LoadEvent = Parameters<typeof load>[0];
 
 /**
- * A drizzle-shaped mock: every select resolves to `rows` (the post query and the viewer's like
- * lookup), comment previews resolve empty, and `update(...)` (the view counter) is recorded.
+ * A drizzle-shaped mock: `.limit()` resolves to `rows` (the post query), queries awaited right
+ * after `.where()` (the viewer's likes and saves) and comment previews resolve empty, and
+ * `update(...)` (the view counter) is recorded.
  */
 function postDb(rows: unknown[]) {
 	const viewCount = vi.fn(async () => undefined);
@@ -32,7 +33,8 @@ function postDb(rows: unknown[]) {
 		innerJoin: () => query,
 		where: () => query,
 		limit: async () => rows,
-		orderBy: () => ({ limit: async () => [] })
+		orderBy: () => ({ limit: async () => [] }),
+		then: (resolve: (value: unknown[]) => void) => resolve([])
 	});
 	const db = {
 		select: vi.fn(() => query),

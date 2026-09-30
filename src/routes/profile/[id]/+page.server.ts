@@ -10,6 +10,7 @@ import {
 	loadProfileStats,
 	toGridItem
 } from '$lib/server/db/profiles';
+import { loadSavedPreview } from '$lib/server/db/saves';
 
 const FALLBACK_CURATORS: Record<
 	string,
@@ -166,6 +167,17 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	}
 
 	const isOwnProfile = Boolean(locals.user && locals.user.id === targetUser.id);
+	let saved: GridItem[] = [];
+	if (isOwnProfile && locals.user && locals.db) {
+		try {
+			const cards = await loadSavedPreview(locals.db, locals.user.id);
+			saved = await Promise.all(
+				cards.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
+			);
+		} catch (err) {
+			console.error('Failed to load saved posts:', err);
+		}
+	}
 
 	const origin =
 		url.origin && !url.origin.includes('localhost') && !url.origin.includes('127.0.0.1')
@@ -202,6 +214,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		},
 		isOwnProfile,
 		posts: refreshedPosts,
+		saved,
 		stats,
 		canonicalUrl,
 		origin

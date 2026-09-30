@@ -1,11 +1,8 @@
-import { eq, desc, inArray } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
-import { postLike, postComment, user } from '$lib/server/db/schema';
-import { formatTimeAgo } from '$lib/utils/format';
-import { loadFollowedIds } from '$lib/server/db/follows';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
-import { loadFeedPage, loadPostMedia, loadPostTags } from '$lib/server/db/posts';
+import { loadFeedPage } from '$lib/server/db/posts';
+import { toPostCards } from '$lib/server/db/post-cards';
 import { getConfig } from '$lib/server/config';
 
 const FALLBACK_POSTS: PostData[] = [
@@ -91,85 +88,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 			return { posts: FALLBACK_POSTS, hasMore: false, nextCursor: null, pageSize };
 		}
 
-		const postIds = postRows.map((r) => r.post.id);
-		const [mediaByPost, tagsByPost] = await Promise.all([
-			loadPostMedia(locals.db, postIds),
-			loadPostTags(locals.db, postIds)
-		]);
-
-		const followedAuthors = await loadFollowedIds(
-			locals.db,
-			locals.user?.id,
-			postRows.map((r) => r.user.id)
-		);
-		const likedSet = new Set<string>();
-		if (locals.user) {
-			const userLikes = await locals.db
-				.select({ postId: postLike.postId })
-				.from(postLike)
-				.where(eq(postLike.userId, locals.user.id));
-			for (const l of userLikes) {
-				likedSet.add(l.postId);
-			}
-		}
-
-		const recentComments = await locals.db
-			.select({
-				postId: postComment.postId,
-				content: postComment.content,
-				authorName: user.name,
-				authorHandle: user.handle
-			})
-			.from(postComment)
-			.innerJoin(user, eq(postComment.userId, user.id))
-			.where(inArray(postComment.postId, postIds))
-			.orderBy(desc(postComment.createdAt));
-
-		const commentPreviewMap = new Map<string, { author: string; content: string }>();
-		for (const c of recentComments) {
-			if (!commentPreviewMap.has(c.postId)) {
-				commentPreviewMap.set(c.postId, {
-					author: c.authorHandle ? `@${c.authorHandle}` : c.authorName,
-					content: c.content
-				});
-			}
-		}
-
-		const posts: PostData[] = postRows.map((r) => {
-			const parsedTags = tagsByPost.get(r.post.id) ?? [];
-			const parsedMedia = mediaByPost.get(r.post.id) ?? [];
-
-			return {
-				id: r.post.id,
-				author: {
-					id: r.user.id,
-					name: r.user.name,
-					handle: r.user.handle
-						? `@${r.user.handle.replace(/^@/, '')}`
-						: `@${r.user.name.toLowerCase().replace(/\s+/g, '')}`,
-					avatar: r.user.image || '',
-					location: r.post.location || r.user.location || undefined,
-					timeAgo: formatTimeAgo(r.post.createdAt),
-					isFollowing: followedAuthors.has(r.user.id)
-				},
-				title: r.post.title || '',
-				description: r.post.content,
-				image: parsedMedia[0]?.url || '',
-				mediaUrl: parsedMedia[0]?.url || undefined,
-				mediaType: parsedMedia[0]?.type || 'none',
-				mediaItems: parsedMedia,
-				aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
-				postType: r.post.postType as 'photo' | 'story' | 'article',
-				location: r.post.location || r.user.location || undefined,
-				cameraMeta: r.post.cameraMeta || undefined,
-				tags: parsedTags,
-				likes: r.post.likesCount,
-				commentsCount: r.post.commentsCount,
-				repostsCount: r.post.sharesCount,
-				liked: likedSet.has(r.post.id),
-				commentPreview: commentPreviewMap.get(r.post.id)
-			};
-		});
+		const posts = await toPostCards(locals.db, postRows, locals.user?.id);
 
 		const refreshedPosts = await Promise.all(
 			posts.map((p) => refreshPostMediaUrls(p, platform?.env))

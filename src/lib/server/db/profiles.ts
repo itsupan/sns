@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, sql } from 'drizzle-orm';
+import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '.';
-import { post, postLike, user } from './schema';
+import { post, user } from './schema';
 import { isFollowing } from './follows';
 import { loadPostMedia, loadPostTags, notDeleted } from './posts';
+import { loadViewerPostState } from './post-cards';
 import { formatTimeAgo } from '$lib/utils/format';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
@@ -78,17 +79,11 @@ export async function loadProfilePosts(
 	if (postRows.length === 0) return [];
 
 	const postIds = postRows.map((p) => p.id);
-	const [mediaByPost, tagsByPost, likedRows] = await Promise.all([
+	const [mediaByPost, tagsByPost, viewer] = await Promise.all([
 		loadPostMedia(db, postIds),
 		loadPostTags(db, postIds),
-		viewerId
-			? db
-					.select({ postId: postLike.postId })
-					.from(postLike)
-					.where(and(eq(postLike.userId, viewerId), inArray(postLike.postId, postIds)))
-			: Promise.resolve([])
+		loadViewerPostState(db, viewerId, postIds)
 	]);
-	const liked = new Set(likedRows.map((l) => l.postId));
 	const handle = author.handle
 		? `@${author.handle.replace(/^@/, '')}`
 		: `@${author.name.toLowerCase().replace(/\s+/g, '')}`;
@@ -120,7 +115,8 @@ export async function loadProfilePosts(
 			likes: p.likesCount,
 			commentsCount: p.commentsCount,
 			repostsCount: p.sharesCount,
-			liked: liked.has(p.id)
+			liked: viewer.liked.has(p.id),
+			saved: viewer.saved.has(p.id)
 		};
 	});
 }

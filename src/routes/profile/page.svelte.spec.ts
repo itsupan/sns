@@ -53,6 +53,7 @@ describe('Profile Page', () => {
 				data: {
 					user: testUser,
 					posts: [],
+					saved: [],
 					stats: testStats
 				}
 			}
@@ -93,6 +94,7 @@ describe('Profile Page', () => {
 				data: {
 					user: newRegisteredUser,
 					posts: [],
+					saved: [],
 					stats: emptyStats
 				}
 			}
@@ -121,6 +123,7 @@ describe('Profile Page', () => {
 				data: {
 					user: testUser,
 					posts: [],
+					saved: [],
 					stats: testStats
 				}
 			}
@@ -137,6 +140,7 @@ describe('Profile Page', () => {
 				data: {
 					user: testUser,
 					posts: [],
+					saved: [],
 					stats: testStats
 				}
 			}

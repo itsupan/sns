@@ -118,6 +118,27 @@ export const postLike = sqliteTable(
 	]
 );
 
+export const postSave = sqliteTable(
+	'post_save',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		postId: text('post_id')
+			.notNull()
+			.references(() => post.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes save idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.userId, table.postId] }),
+		// Saved list: WHERE user_id = ? ORDER BY created_at DESC, post_id DESC.
+		index('post_save_userId_createdAt_idx').on(table.userId, table.createdAt, table.postId)
+	]
+);
+
 export const postComment = sqliteTable(
 	'post_comment',
 	{

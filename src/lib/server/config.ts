@@ -22,6 +22,7 @@ export type RateLimitName =
 	| 'chatStart'
 	| 'chatMessage'
 	| 'like'
+	| 'save'
 	| 'follow'
 	| 'uploadPresign';
 
@@ -38,6 +39,8 @@ export interface AppConfig {
 	comments: PageSize;
 	/** Results per section (users, posts) of GET /api/search. */
 	search: PageSize;
+	/** The viewer's saved posts list. */
+	saved: PageSize;
 	/** Chat history pages and the conversations inbox. */
 	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
@@ -58,6 +61,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		chatStart: { limit: 10, windowSec: 60 },
 		chatMessage: { limit: 30, windowSec: 60 },
 		like: { limit: 60, windowSec: 60 },
+		save: { limit: 60, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 }
 	},
@@ -77,6 +81,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	feed: { defaultPageSize: 10, maxPageSize: 50 },
 	comments: { defaultPageSize: 20, maxPageSize: 50 },
 	search: { defaultPageSize: 5, maxPageSize: 20 },
+	saved: { defaultPageSize: 12, maxPageSize: 50 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
 		inbox: { defaultPageSize: 20, maxPageSize: 50 }
@@ -95,6 +100,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	chatStart: 'RATE_LIMIT_CHAT_START',
 	chatMessage: 'RATE_LIMIT_CHAT_MESSAGE',
 	like: 'RATE_LIMIT_LIKE',
+	save: 'RATE_LIMIT_SAVE',
 	follow: 'RATE_LIMIT_FOLLOW',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN'
 };
@@ -200,6 +206,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 		feed: pageSize('FEED', d.feed),
 		comments: pageSize('COMMENTS', d.comments),
 		search: pageSize('SEARCH', d.search),
+		saved: pageSize('SAVED', d.saved),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),
 			inbox: pageSize('INBOX', d.chat.inbox)

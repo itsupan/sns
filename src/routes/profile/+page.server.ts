@@ -11,6 +11,7 @@ import {
 	loadProfileStats,
 	toGridItem
 } from '$lib/server/db/profiles';
+import { loadSavedPreview } from '$lib/server/db/saves';
 
 export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	if (!locals.user) {
@@ -23,6 +24,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	let dbUser: Record<string, unknown> | null = null;
 	let userPosts: PostData[] = [];
 	let stats = EMPTY_PROFILE_STATS;
+	let savedPosts: PostData[] = [];
 
 	if (locals.db) {
 		try {
@@ -67,6 +69,12 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 		} catch {
 			// Stats are optional; keep zeros.
 		}
+
+		try {
+			savedPosts = await loadSavedPreview(locals.db, locals.user.id);
+		} catch (err) {
+			console.error('Failed to load saved posts:', err);
+		}
 	}
 
 	const currentUser = (dbUser ?? locals.user) as Record<string, unknown>;
@@ -93,6 +101,9 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 			cameraGear: (currentUser.cameraGear as string | null | undefined) ?? null
 		},
 		posts: refreshedPosts,
+		saved: await Promise.all(
+			savedPosts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
+		),
 		stats
 	};
 };

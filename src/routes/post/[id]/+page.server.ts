@@ -1,13 +1,14 @@
 import { error } from '@sveltejs/kit';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
-import { post, postLike, postComment, user } from '$lib/server/db/schema';
+import { post, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import { loadFollowedIds } from '$lib/server/db/follows';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
 
+import { loadViewerPostState } from '$lib/server/db/post-cards';
 const FALLBACK_POSTS: PostData[] = [
 	{
 		id: 'post-1',
@@ -142,15 +143,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					r.user.id
 				);
 
-				let isLiked = false;
-				if (locals.user) {
-					const likes = await locals.db
-						.select({ postId: postLike.postId })
-						.from(postLike)
-						.where(and(eq(postLike.postId, postId), eq(postLike.userId, locals.user.id)))
-						.limit(1);
-					isLiked = likes.length > 0;
-				}
+				const viewerState = await loadViewerPostState(locals.db, locals.user?.id, [postId]);
 
 				let commentPreview: { author: string; content: string } | undefined;
 				try {
@@ -205,7 +198,8 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					likes: r.post.likesCount,
 					commentsCount: r.post.commentsCount,
 					repostsCount: r.post.sharesCount,
-					liked: isLiked,
+					liked: viewerState.liked.has(postId),
+					saved: viewerState.saved.has(postId),
 					commentPreview
 				};
 			}

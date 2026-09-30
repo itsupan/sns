@@ -222,3 +222,12 @@ test('share post modal creates dedicated SEO URL for other platforms', async ({ 
 	const telegramLink = modal.getByRole('link', { name: /Telegram/i });
 	await expect(telegramLink).toHaveAttribute('href', /post%2F/);
 });
+
+test('Create in the mobile nav opens the composer from another page', async ({ page }) => {
+	await page.setViewportSize({ width: 390, height: 844 });
+	await page.goto('/profile/elena.rostova');
+	await page.getByRole('button', { name: 'Create post' }).click();
+
+	await expect(page).toHaveURL(/\/$/);
+	await expect(page.getByRole('dialog', { name: 'Create post' })).toBeVisible();
+});
