@@ -519,7 +519,9 @@
 
 							<!-- Description -->
 							{#if item.description}
-								<p class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mb-3.5">
+								<p
+									class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mb-3.5 whitespace-pre-line break-words"
+								>
 									{item.description}
 								</p>
 							{/if}

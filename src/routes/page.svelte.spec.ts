@@ -9,11 +9,33 @@ describe('home page', () => {
 		await expect
 			.element(screen.getByRole('heading', { level: 1 }))
 			.toHaveTextContent('Kizuna home feed');
-		await expect
-			.element(screen.getByText('Quiet Brutalism: Concrete Light & Shadows'))
-			.toBeInTheDocument();
 		await expect.element(screen.getByText('Your story')).toBeInTheDocument();
 		await expect.element(screen.getByText('Curators to Follow')).toBeInTheDocument();
+	});
+
+	it('shows an empty state instead of demo posts when the feed is empty', async () => {
+		const screen = render(Page, {
+			props: {
+				data: { posts: [], hasMore: false, nextCursor: null, pageSize: 10, loadFailed: false }
+			}
+		});
+
+		await expect.element(screen.getByText('No posts yet')).toBeInTheDocument();
+		await expect
+			.element(screen.getByRole('link', { name: 'find people on Explore' }))
+			.toHaveAttribute('href', '/explore');
+		expect(document.querySelector('article')).toBeNull();
+	});
+
+	it('shows an error with a retry when the feed failed to load', async () => {
+		const screen = render(Page, {
+			props: {
+				data: { posts: [], hasMore: false, nextCursor: null, pageSize: 10, loadFailed: true }
+			}
+		});
+
+		await expect.element(screen.getByRole('alert')).toHaveTextContent('Could not load your feed');
+		await expect.element(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
 	});
 
 	it('shows "You\'re all caught up" indicator when no more posts exist', async () => {
@@ -39,7 +61,8 @@ describe('home page', () => {
 					],
 					hasMore: false,
 					nextCursor: null,
-					pageSize: 10
+					pageSize: 10,
+					loadFailed: false
 				}
 			}
 		});
@@ -78,7 +101,13 @@ describe('home page', () => {
 			);
 			const screen = render(Page, {
 				props: {
-					data: { posts: [makePost('page-1')], hasMore: true, nextCursor: '1700_p1', pageSize: 1 }
+					data: {
+						posts: [makePost('page-1')],
+						hasMore: true,
+						nextCursor: '1700_p1',
+						pageSize: 1,
+						loadFailed: false
+					}
 				}
 			});
 			await expect.element(screen.getByText('Title page-2')).toBeInTheDocument();
@@ -95,7 +124,13 @@ describe('home page', () => {
 			);
 			const screen = render(Page, {
 				props: {
-					data: { posts: [makePost('page-1')], hasMore: true, nextCursor: 'bad', pageSize: 1 }
+					data: {
+						posts: [makePost('page-1')],
+						hasMore: true,
+						nextCursor: 'bad',
+						pageSize: 1,
+						loadFailed: false
+					}
 				}
 			});
 			await expect.element(screen.getByText('Invalid cursor')).toBeInTheDocument();

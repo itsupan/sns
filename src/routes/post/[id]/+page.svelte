@@ -139,7 +139,7 @@
 
 		<!-- The Post -->
 		<div class="feed-posts flex flex-col">
-			<PostCard {post} priority={true} onDelete={() => goto(resolve('/profile'))} />
+			<PostCard {post} priority={true} fullText onDelete={() => goto(resolve('/profile'))} />
 		</div>
 	</main>
 
