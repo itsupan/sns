@@ -286,9 +286,14 @@
 	let overflows = $state(false);
 	$effect(() => {
 		void post.description;
-		if (descriptionEl && !expanded && !fullText) {
-			overflows = descriptionEl.scrollHeight > descriptionEl.clientHeight + 1;
-		}
+		const el = descriptionEl;
+		if (!el || expanded || fullText) return;
+		const measure = () => (overflows = el.scrollHeight > el.clientHeight + 1);
+		measure();
+		// The clamp differs per breakpoint, so remeasure when the paragraph's size changes.
+		const observer = new ResizeObserver(measure);
+		observer.observe(el);
+		return () => observer.disconnect();
 	});
 
 	function haptic() {

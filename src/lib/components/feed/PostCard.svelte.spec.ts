@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { page } from 'vitest/browser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readable } from 'svelte/store';
 import PostCard, { type PostData } from './PostCard.svelte';
@@ -93,6 +94,18 @@ describe('PostCard component', () => {
 		await expect
 			.element(screen.getByRole('button', { name: 'See less' }))
 			.toHaveAttribute('aria-expanded', 'true');
+	});
+
+	it('shows See more after resizing to a width where the text no longer fits', async () => {
+		await page.viewport(1280, 900);
+		// Five lines: inside the desktop clamp (8), over the mobile clamp (3).
+		const description = Array.from({ length: 5 }, (_, i) => `Line ${i + 1}`).join('\n');
+		const screen = render(PostCard, { post: { ...ownPost, description } });
+		await expect.element(screen.getByText('Line 1', { exact: false }).first()).toBeVisible();
+		expect(document.querySelector('[aria-expanded]')).toBeNull();
+
+		await page.viewport(390, 800);
+		await expect.element(screen.getByRole('button', { name: 'See more' })).toBeInTheDocument();
 	});
 
 	it('shows no See more for a short description or on the post page', async () => {
