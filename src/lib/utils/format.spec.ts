@@ -26,4 +26,16 @@ describe('formatTimeAgo', () => {
 		expect(formatTimeAgo(now - 2 * 86400 * 1000)).toBe('2d ago');
 		expect(formatTimeAgo('invalid date')).toBe('');
 	});
+
+	it('shows the year only for dates from another year', () => {
+		const thisYear = new Date().getFullYear();
+		// Noon avoids a timezone shifting the date across a year boundary.
+		const lastYear = formatTimeAgo(new Date(thisYear - 1, 2, 3, 12));
+		expect(lastYear).toContain(String(thisYear - 1));
+
+		const weeksAgo = new Date(Date.now() - 35 * 86400 * 1000);
+		if (weeksAgo.getFullYear() === thisYear) {
+			expect(formatTimeAgo(weeksAgo)).not.toContain(String(thisYear));
+		}
+	});
 });

@@ -16,7 +16,7 @@ export function formatCount(value: number): string {
 	return String(value);
 }
 
-/** Formats a timestamp into relative time string: "Just now", "5m ago", "2h ago", "3d ago". */
+/** Relative time ("Just now", "5m ago", "3d ago", "2w ago"), then a date: "Mar 3", or "Mar 3, 2025" for another year. */
 export function formatTimeAgo(date: Date | number | string): string {
 	const timestamp =
 		typeof date === 'string'
@@ -37,7 +37,13 @@ export function formatTimeAgo(date: Date | number | string): string {
 	if (diffDays < 7) return `${diffDays}d ago`;
 	const diffWeeks = Math.floor(diffDays / 7);
 	if (diffWeeks < 4) return `${diffWeeks}w ago`;
-	return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+	const then = new Date(timestamp);
+	return then.toLocaleDateString(undefined, {
+		month: 'short',
+		day: 'numeric',
+		// A date from another year would otherwise look recent.
+		year: then.getFullYear() === new Date().getFullYear() ? undefined : 'numeric'
+	});
 }
 
 /** `@handle` for display; users without a handle get one derived from their name. */

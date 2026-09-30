@@ -1,6 +1,4 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
 	import ProfileHeader from '$lib/components/profile/ProfileHeader.svelte';
 	import ProfileHighlights from '$lib/components/profile/ProfileHighlights.svelte';
 	import ProfileTabs from '$lib/components/profile/ProfileTabs.svelte';
@@ -26,14 +24,6 @@
 	let viewMode = $state<ViewMode>('grid');
 
 	const session = authClient.useSession();
-
-	// Client-side authentication guard: redirect to login if unauthenticated
-	$effect(() => {
-		if (!$session.isPending && !$session.data?.user && !data?.user) {
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			goto(`${resolve('/login')}?redirectTo=${encodeURIComponent('/profile')}`);
-		}
-	});
 
 	$effect(() => {
 		profileStore.init();
