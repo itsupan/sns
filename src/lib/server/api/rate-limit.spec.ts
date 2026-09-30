@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ApiError, RATE_LIMITS, enforceRateLimit, rateLimit } from '.';
 
 function fakeKv() {
@@ -62,6 +62,20 @@ describe('enforceRateLimit', () => {
 		const platform = { env: { KV: kv } } as unknown as App.Platform;
 		for (let i = 0; i < RATE_LIMITS.like.limit; i++) await enforceRateLimit(platform, 'like', 'a');
 		await expect(enforceRateLimit(platform, 'like', 'b')).resolves.toBeUndefined();
+	});
+
+	it('allows requests when KV fails, e.g. once the daily write quota is used up', async () => {
+		const kv = {
+			get: async () => '0',
+			put: async () => {
+				throw new Error('KV put() limit exceeded for the day.');
+			}
+		} as unknown as KVNamespace;
+		const platform = { env: { KV: kv } } as unknown as App.Platform;
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		await expect(enforceRateLimit(platform, 'like', 'a')).resolves.toBeUndefined();
+		expect(warn).toHaveBeenCalledOnce();
+		warn.mockRestore();
 	});
 
 	it('allows requests when no KV binding is present', async () => {
