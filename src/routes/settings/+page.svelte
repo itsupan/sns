@@ -5,11 +5,40 @@
 	import { LEGAL_LINKS } from '$lib/constants/legal';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import ThemeToggle from '$lib/components/shared/ThemeToggle.svelte';
+	import { readApiError } from '$lib/utils/api-error';
+	import { toast } from '$lib/utils/toast.svelte';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
 	let signingOut = $state(false);
+	let exporting = $state(false);
+
+	async function downloadData() {
+		exporting = true;
+		try {
+			const res = await fetch('/api/account/export');
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				toast.error(readApiError(body, 'Could not prepare your data').message);
+				return;
+			}
+			const name =
+				/filename="([^"]+)"/.exec(res.headers.get('content-disposition') ?? '')?.[1] ??
+				'kizuna-data.json';
+			const href = URL.createObjectURL(await res.blob());
+			const a = document.createElement('a');
+			a.href = href;
+			a.download = name;
+			a.click();
+			URL.revokeObjectURL(href);
+			toast.success('Your data is downloading');
+		} catch {
+			toast.error('Could not prepare your data');
+		} finally {
+			exporting = false;
+		}
+	}
 
 	async function signOut() {
 		signingOut = true;
@@ -49,6 +78,29 @@
 			<div class={rowClass}>
 				<span>Appearance</span>
 				<ThemeToggle variant="segmented" />
+			</div>
+		</div>
+	</section>
+
+	<section aria-labelledby="settings-data">
+		<h2 id="settings-data" class={headingClass}>Privacy & data</h2>
+		<div class={cardClass}>
+			<div class={rowClass}>
+				<div class="flex flex-col min-w-0">
+					<span>Download your data</span>
+					<span class="text-xs text-slate-500 dark:text-dark-muted"
+						>Profile, posts, comments, follows and messages as a JSON file</span
+					>
+				</div>
+				<button
+					type="button"
+					class="shrink-0 h-9 px-4 rounded-full text-xs font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text hover:bg-slate-200 dark:hover:bg-dark-hover border-0 cursor-pointer disabled:opacity-60"
+					onclick={downloadData}
+					disabled={exporting}
+					aria-busy={exporting}
+				>
+					{exporting ? 'Preparing…' : 'Download'}
+				</button>
 			</div>
 		</div>
 	</section>
