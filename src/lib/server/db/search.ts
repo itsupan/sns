@@ -4,6 +4,7 @@ import { post, postMedia, user } from './schema';
 import { notDeleted } from './posts';
 import { displayHandle } from '$lib/utils/format';
 import { searchTermsOf } from '$lib/search';
+import { notBlockedWith } from './blocks';
 
 /**
  * Turns user input into a safe FTS5 MATCH expression, or `null` when nothing is searchable.
@@ -49,11 +50,15 @@ export interface PostResult {
 	author: { id: string; name: string; handle: string; image: string | null };
 }
 
-/** Users ranked by bm25; a handle hit weighs most, then name, then bio. */
+/**
+ * Users ranked by bm25; a handle hit weighs most, then name, then bio. Users blocked in either
+ * direction with `viewerId` are left out.
+ */
 export async function searchUsers(
 	db: Database,
 	match: string,
-	limit: number
+	limit: number,
+	viewerId?: string | null
 ): Promise<UserResult[]> {
 	const rank = sql<number>`bm25(user_fts, 3.0, 5.0, 1.0)`;
 	const rows = await db
@@ -67,7 +72,7 @@ export async function searchUsers(
 		})
 		.from(sql`user_fts`)
 		.innerJoin(user, sql`${user}.rowid = user_fts.rowid`)
-		.where(sql`user_fts MATCH ${match}`)
+		.where(and(sql`user_fts MATCH ${match}`, notBlockedWith(viewerId, user.id)))
 		.orderBy(rank, asc(user.id))
 		.limit(limit);
 
@@ -78,12 +83,16 @@ export async function searchUsers(
 	}));
 }
 
-/** Live (not soft-deleted) posts ranked by bm25; a content hit weighs more than location. */
+/**
+ * Live (not soft-deleted) posts ranked by bm25; a content hit weighs more than location. Posts by
+ * users blocked in either direction with `viewerId` are left out.
+ */
 export async function searchPosts(
 	db: Database,
 	match: string,
 	terms: string[],
-	limit: number
+	limit: number,
+	viewerId?: string | null
 ): Promise<PostResult[]> {
 	const rank = sql<number>`bm25(post_fts, 2.0, 1.0)`;
 	const rows = await db
@@ -97,7 +106,7 @@ export async function searchPosts(
 		.from(sql`post_fts`)
 		.innerJoin(post, sql`${post}.rowid = post_fts.rowid`)
 		.innerJoin(user, eq(user.id, post.userId))
-		.where(and(sql`post_fts MATCH ${match}`, notDeleted))
+		.where(and(sql`post_fts MATCH ${match}`, notDeleted, notBlockedWith(viewerId, post.userId)))
 		.orderBy(rank, asc(post.id))
 		.limit(limit);
 

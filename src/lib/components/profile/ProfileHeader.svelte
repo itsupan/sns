@@ -6,6 +6,7 @@
 	import SheetAction from '$lib/components/shared/SheetAction.svelte';
 	import ThemeToggle from '$lib/components/shared/ThemeToggle.svelte';
 	import ShareProfileModal from './ShareProfileModal.svelte';
+	import BlockButton from './BlockButton.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
@@ -19,13 +20,16 @@
 		class?: string;
 		onFollowChange?: (following: boolean) => void;
 		user?: Record<string, unknown> | null;
+		/** Block state between the viewer and this (other) user, for the Block / Unblock action. */
+		block?: { blocked: boolean; blockedBy: boolean };
 	}
 
 	let {
 		profile: customProfile,
 		class: className = '',
 		onFollowChange,
-		user: initialUser
+		user: initialUser,
+		block
 	}: Props = $props();
 
 	let settingsOpen = $state(false);
@@ -503,6 +507,14 @@
 					>
 						<Icon name="share" class="text-sm" />
 					</button>
+
+					{#if $session.data?.user && profile.id}
+						<BlockButton
+							userId={profile.id}
+							name={profile.name}
+							blocked={block?.blocked ?? false}
+						/>
+					{/if}
 				{/if}
 			</div>
 		</div>

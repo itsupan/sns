@@ -12,7 +12,7 @@ export const load: PageServerLoad = async ({ locals, platform }) => {
 		() => []
 	);
 	try {
-		const page = await loadFeedPage(locals.db, { limit: pageSize });
+		const page = await loadFeedPage(locals.db, { limit: pageSize, viewerId: locals.user?.id });
 		const posts = await toPostCards(locals.db, page.rows, locals.user?.id);
 
 		const refreshedPosts = await Promise.all(

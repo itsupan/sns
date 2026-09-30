@@ -2,6 +2,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { ApiError, enforceRateLimit, parseQuery, requireUser, withApi } from '$lib/server/api';
 import { requireMembership } from '$lib/server/db/chat';
+import { requireNotBlocked } from '$lib/server/db/blocks';
 import { chatRoom } from '$lib/server/chat/rooms';
 
 /**
@@ -18,7 +19,9 @@ export const GET: RequestHandler = withApi(async ({ url, request, locals, platfo
 		v.object({ conversationId: v.pipe(v.string(), v.minLength(1, 'Conversation is required')) })
 	);
 	await enforceRateLimit(platform, 'chatConnect', viewer.id);
-	await requireMembership(locals.db, conversationId, viewer.id);
+	const { other } = await requireMembership(locals.db, conversationId, viewer.id);
+	// A blocked pair gets no live room either (typing indicators included).
+	await requireNotBlocked(locals.db, viewer.id, other.id, 'You cannot message this user');
 
 	const room = chatRoom(platform, conversationId);
 	if (!room) throw new ApiError(503, 'chat_unavailable', 'Live chat is unavailable right now');

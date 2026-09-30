@@ -22,6 +22,6 @@ describe('Settings +page.server.ts', () => {
 			url: new URL('http://localhost:5173/settings')
 		} as unknown as LoadEvent;
 
-		await expect(load(event)).resolves.toEqual({ email: 'a@example.com' });
+		await expect(load(event)).resolves.toEqual({ email: 'a@example.com', blockedUsers: [] });
 	});
 });

@@ -14,6 +14,11 @@ class FollowStore {
 		return this.overrides[userId] ?? loaded;
 	}
 
+	/** Drops the local override, e.g. after a block removed the follow on the server. */
+	forget(userId: string): void {
+		delete this.overrides[userId];
+	}
+
 	isPending(userId: string): boolean {
 		return Boolean(this.pending[userId]);
 	}

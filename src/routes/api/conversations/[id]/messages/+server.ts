@@ -11,6 +11,7 @@ import {
 } from '$lib/server/api';
 import { getConfig } from '$lib/server/config';
 import { listMessages, requireMembership, sendMessage } from '$lib/server/db/chat';
+import { requireNotBlocked } from '$lib/server/db/blocks';
 import { broadcastLater } from '$lib/server/chat/rooms';
 import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
 
@@ -48,12 +49,16 @@ export const GET: RequestHandler = withApi(async ({ params, url, locals, platfor
 	);
 });
 
-/** Stores a message (201), or returns it again for a retried `id` (200), then pushes it live. */
+/**
+ * Stores a message (201), or returns it again for a retried `id` (200), then pushes it live.
+ * 403 when either member blocked the other.
+ */
 export const POST: RequestHandler = withApi(async ({ params, request, locals, platform }) => {
 	const viewer = requireUser(locals);
 	await enforceRateLimit(platform, 'chatMessage', viewer.id);
 	const { id, content } = await parseBody(request, SendMessage);
-	await requireMembership(locals.db, params.id, viewer.id);
+	const { other } = await requireMembership(locals.db, params.id, viewer.id);
+	await requireNotBlocked(locals.db, viewer.id, other.id, 'You cannot message this user');
 
 	const { message, created } = await sendMessage(locals.db, {
 		id,

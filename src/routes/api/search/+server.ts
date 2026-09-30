@@ -51,10 +51,10 @@ export const GET: RequestHandler = withApi(async (event) => {
 	if (match) {
 		try {
 			[users, posts] = await Promise.all([
-				query.type === 'posts' ? [] : searchUsers(locals.db, match, query.limit),
+				query.type === 'posts' ? [] : searchUsers(locals.db, match, query.limit, locals.user?.id),
 				query.type === 'users'
 					? []
-					: searchPosts(locals.db, match, searchTermsOf(query.q), query.limit)
+					: searchPosts(locals.db, match, searchTermsOf(query.q), query.limit, locals.user?.id)
 			]);
 		} catch (err) {
 			// toFtsQuery quotes every term, so this should be unreachable; never let it be a 500.

@@ -105,23 +105,34 @@
 				...data.stats,
 				isOwnProfile: data.isOwnProfile
 			}}
+			block={data.block}
 		/>
 
-		<!-- Tabs Bar -->
-		<ProfileTabs bind:activeTab bind:viewMode showSaved={data.isOwnProfile} />
+		{#if data.block.blocked || data.block.blockedBy}
+			<p
+				class="mx-4 sm:mx-0 mt-6 p-6 rounded-2xl border border-slate-100 dark:border-dark-border text-center text-sm text-slate-500 dark:text-dark-muted"
+			>
+				{data.block.blocked
+					? 'You blocked this user. Unblock them to see their posts.'
+					: "This profile isn't available."}
+			</p>
+		{:else}
+			<!-- Tabs Bar -->
+			<ProfileTabs bind:activeTab bind:viewMode showSaved={data.isOwnProfile} />
 
-		<!-- Curated Grid Gallery / List / Essays -->
-		<ProfileGrid
-			{activeTab}
-			savedPosts={data.saved}
-			{viewMode}
-			items={userPosts}
-			user={{
-				name: currentProfile.name,
-				handle: currentProfile.handle,
-				image: currentProfile.avatar
-			}}
-			isOwnProfile={data.isOwnProfile}
-		/>
+			<!-- Curated Grid Gallery / List / Essays -->
+			<ProfileGrid
+				{activeTab}
+				savedPosts={data.saved}
+				{viewMode}
+				items={userPosts}
+				user={{
+					name: currentProfile.name,
+					handle: currentProfile.handle,
+					image: currentProfile.avatar
+				}}
+				isOwnProfile={data.isOwnProfile}
+			/>
+		{/if}
 	</div>
 </main>

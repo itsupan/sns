@@ -4,6 +4,7 @@ import type { Database } from '.';
 import { conversation, conversationMember, message, user } from './schema';
 import { encodeCursor, type FeedCursor } from './posts';
 import { ApiError } from '$lib/server/api/errors';
+import { requireNotBlocked } from './blocks';
 import { displayHandle } from '$lib/utils/format';
 import type { ChatMessage, ChatUser, InboxItem } from '$lib/chat/types';
 
@@ -52,7 +53,8 @@ const toMessage = (m: typeof message.$inferSelect): ChatMessage => ({
 
 /**
  * Returns the DM between `userId` and `otherId`, creating it on first use. Idempotent and safe
- * under concurrency: the unique `dm_key` makes both racers land on the same row.
+ * under concurrency: the unique `dm_key` makes both racers land on the same row. 403 when either
+ * user blocked the other.
  */
 export async function getOrCreateDm(
 	db: Database,
@@ -68,6 +70,7 @@ export async function getOrCreateDm(
 		.where(eq(user.id, otherId))
 		.limit(1);
 	if (!other) throw new ApiError(404, 'not_found', 'User not found');
+	await requireNotBlocked(db, userId, otherId, 'You cannot message this user');
 
 	const key = dmKey(userId, otherId);
 	const inserted = await db
