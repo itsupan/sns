@@ -95,6 +95,12 @@ export const GET: RequestHandler = withApi(async ({ params, locals }) => {
 	return json({ user: { ...rows[0], isFollowing: following } });
 });
 
+function handleTaken() {
+	return new ApiError(409, 'handle_taken', 'This handle is already taken', {
+		handle: 'This handle is already taken'
+	});
+}
+
 export const PATCH: RequestHandler = withApi(async ({ params, request, locals }) => {
 	const targetUserId = params.id;
 	if (!targetUserId) {
@@ -126,21 +132,24 @@ export const PATCH: RequestHandler = withApi(async ({ params, request, locals })
 			.where(and(eq(user.handle, updates.handle), ne(user.id, targetUserId)))
 			.limit(1);
 
-		if (existing.length > 0) {
-			throw new ApiError(409, 'handle_taken', 'This handle is already taken', {
-				handle: 'This handle is already taken'
-			});
-		}
+		if (existing.length > 0) throw handleTaken();
 	}
 
 	// 4. Update the user row in database
-	await locals.db
-		.update(user)
-		.set({
-			...updates,
-			updatedAt: new Date()
-		})
-		.where(eq(user.id, targetUserId));
+	try {
+		await locals.db
+			.update(user)
+			.set({
+				...updates,
+				updatedAt: new Date()
+			})
+			.where(eq(user.id, targetUserId));
+	} catch (err) {
+		// The unique index is the real guard: two requests can both pass the check above.
+		const detail = `${err} ${(err as { cause?: unknown })?.cause ?? ''}`;
+		if (detail.includes('UNIQUE constraint failed: user.handle')) throw handleTaken();
+		throw err;
+	}
 
 	// 5. Fetch updated row
 	const updatedRows = await locals.db

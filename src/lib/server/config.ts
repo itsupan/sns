@@ -21,6 +21,7 @@ export type RateLimitName =
 	| 'search'
 	| 'chatStart'
 	| 'chatMessage'
+	| 'chatConnect'
 	| 'like'
 	| 'save'
 	| 'share'
@@ -66,6 +67,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		search: { limit: 60, windowSec: 60 },
 		chatStart: { limit: 10, windowSec: 60 },
 		chatMessage: { limit: 30, windowSec: 60 },
+		chatConnect: { limit: 30, windowSec: 60 },
 		like: { limit: 60, windowSec: 60 },
 		save: { limit: 60, windowSec: 60 },
 		share: { limit: 30, windowSec: 60 },
@@ -109,6 +111,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	search: 'RATE_LIMIT_SEARCH',
 	chatStart: 'RATE_LIMIT_CHAT_START',
 	chatMessage: 'RATE_LIMIT_CHAT_MESSAGE',
+	chatConnect: 'RATE_LIMIT_CHAT_CONNECT',
 	like: 'RATE_LIMIT_LIKE',
 	save: 'RATE_LIMIT_SAVE',
 	share: 'RATE_LIMIT_SHARE',

@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
-import { ApiError, parseQuery, requireUser, withApi } from '$lib/server/api';
+import { ApiError, enforceRateLimit, parseQuery, requireUser, withApi } from '$lib/server/api';
 import { requireMembership } from '$lib/server/db/chat';
 import { chatRoom } from '$lib/server/chat/rooms';
 
@@ -17,6 +17,7 @@ export const GET: RequestHandler = withApi(async ({ url, request, locals, platfo
 		url,
 		v.object({ conversationId: v.pipe(v.string(), v.minLength(1, 'Conversation is required')) })
 	);
+	await enforceRateLimit(platform, 'chatConnect', viewer.id);
 	await requireMembership(locals.db, conversationId, viewer.id);
 
 	const room = chatRoom(platform, conversationId);

@@ -4,6 +4,9 @@
  */
 import type { ChatServerEvent } from '../../chat/types';
 
+/** Live sockets one member may hold in a conversation (tabs and devices). */
+export const MAX_SOCKETS_PER_USER = 5;
+
 /** Relay a member's typing signal to the others at most this often. */
 export const TYPING_RELAY_INTERVAL_MS = 1500;
 
@@ -11,6 +14,7 @@ export const TYPING_RELAY_INTERVAL_MS = 1500;
 export interface SocketAttachment {
 	userId: string;
 	lastTypingAt: number;
+	connectedAt: number;
 }
 
 /** The part of a hibernatable WebSocket the room logic needs. */
@@ -23,8 +27,23 @@ export interface RoomSocket {
 export function attachmentOf(ws: RoomSocket): SocketAttachment | null {
 	const value = ws.deserializeAttachment() as Partial<SocketAttachment> | null;
 	return value && typeof value.userId === 'string'
-		? { userId: value.userId, lastTypingAt: value.lastTypingAt ?? 0 }
+		? {
+				userId: value.userId,
+				lastTypingAt: value.lastTypingAt ?? 0,
+				connectedAt: value.connectedAt ?? 0
+			}
 		: null;
+}
+
+/** The oldest of a member's sockets to close so that one more fits under the cap. */
+export function socketsOverCap<T extends RoomSocket>(
+	existing: T[],
+	max = MAX_SOCKETS_PER_USER
+): T[] {
+	const connectedAt = (ws: T) => attachmentOf(ws)?.connectedAt ?? 0;
+	return [...existing]
+		.sort((a, b) => connectedAt(a) - connectedAt(b))
+		.slice(0, Math.max(0, existing.length - (max - 1)));
 }
 
 /** Sends `event` to every socket except `exclude`; a socket that fails to send is skipped. */

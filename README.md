@@ -146,6 +146,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fix
 | `search`        | `RATE_LIMIT_SEARCH`         | `GET /api/search` (per user, or per IP when signed out) | 60 / min |
 | `chatStart`     | `RATE_LIMIT_CHAT_START`     | `POST /api/conversations`                               | 10 / min |
 | `chatMessage`   | `RATE_LIMIT_CHAT_MESSAGE`   | `POST /api/conversations/:id/messages`                  | 30 / min |
+| `chatConnect`   | `RATE_LIMIT_CHAT_CONNECT`   | `GET /api/chat/ws` (WebSocket upgrade)                  | 30 / min |
 | `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`                              | 60 / min |
 | `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)                                 | 30 / min |
 | `share`         | `RATE_LIMIT_SHARE`          | `POST /api/posts/:id/share`                             | 30 / min |
@@ -167,6 +168,8 @@ live events:
 3. Browsers hold a WebSocket to `GET /api/chat/ws?conversationId=`, which checks the session and
    membership before handing the upgrade to the room. The room uses the Hibernation API, answers
    `ping` with `pong` without waking, and relays throttled `typing` signals to the other member.
+   A member may hold 5 sockets per conversation; opening more closes their oldest (code 4008),
+   and that tab falls back to polling instead of reconnecting.
 4. The client (`src/lib/chat/socket.svelte.ts`) reconnects with exponential backoff and jitter,
    recycles a connection that stops answering pings, and after every reconnect fetches
    `?after=<last message id>`, so nothing sent while it was offline is lost. While the socket

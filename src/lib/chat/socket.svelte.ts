@@ -1,4 +1,4 @@
-import type { ChatServerEvent } from './types';
+import { TOO_MANY_SOCKETS_CODE, type ChatServerEvent } from './types';
 
 export type SocketStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -130,9 +130,16 @@ export class ChatSocket {
 				// Ignore malformed frames.
 			}
 		};
-		socket.onclose = () => {
+		socket.onclose = (ev) => {
 			if (this.socket !== socket) return;
 			this.socket = null;
+			// Evicted for a newer tab: reconnecting would evict that one in turn. The view keeps
+			// polling, and coming back online or to the tab connects again.
+			if (ev?.code === TOO_MANY_SOCKETS_CODE) {
+				this.clearTimers();
+				this.status = 'reconnecting';
+				return;
+			}
 			this.scheduleReconnect();
 		};
 		socket.onerror = () => {

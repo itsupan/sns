@@ -113,6 +113,20 @@ describe('ChatSocket', () => {
 		chat.close();
 	});
 
+	it('does not reconnect when the room evicted it for a newer tab', () => {
+		const { chat } = make();
+		latest().open();
+
+		latest().readyState = 3;
+		latest().onclose?.(new CloseEvent('close', { code: 4008 }));
+		vi.advanceTimersByTime(120_000);
+
+		// Still down (so the view polls), and no new socket that would evict another tab.
+		expect(chat.status).toBe('reconnecting');
+		expect(sockets).toHaveLength(1);
+		chat.close();
+	});
+
 	it('recycles a connection that stops answering pings', () => {
 		const { chat } = make();
 		const first = latest();
