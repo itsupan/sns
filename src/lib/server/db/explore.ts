@@ -1,3 +1,4 @@
+import { stripFormatting } from '$lib/formatting';
 import { and, desc, eq, inArray, ne, notExists, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postTag, tag, user, userFollow } from './schema';
@@ -150,7 +151,7 @@ export async function loadTiles(db: Database, ids: string[]): Promise<ExploreTil
 		return [
 			{
 				id,
-				title: r.title || r.content.slice(0, 80),
+				title: r.title || stripFormatting(r.content).slice(0, 80),
 				cover: items[0] ?? null,
 				isCarousel: items.length > 1,
 				likes: r.likes,

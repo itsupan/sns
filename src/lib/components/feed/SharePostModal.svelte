@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { stripFormatting } from '$lib/formatting';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
@@ -19,9 +20,10 @@
 	let postUrl = $derived(origin ? `${origin}/post/${post.id}` : `/post/${post.id}`);
 
 	let shareTitle = $derived(post.title || `Post by ${post.author.name}`);
+	let plainDescription = $derived(post.description ? stripFormatting(post.description) : '');
 	let shareText = $derived(
-		post.description
-			? `${shareTitle} — "${post.description.slice(0, 100)}${post.description.length > 100 ? '…' : ''}" on Kizuna`
+		plainDescription
+			? `${shareTitle} — "${plainDescription.slice(0, 100)}${plainDescription.length > 100 ? '…' : ''}" on Kizuna`
 			: `${shareTitle} on Kizuna`
 	);
 
@@ -174,7 +176,7 @@
 						{post.author.name}
 					</span>
 					<p class="text-xs text-slate-500 dark:text-dark-muted line-clamp-1 m-0 mt-0.5">
-						{post.title || post.description}
+						{post.title || plainDescription}
 					</p>
 				</div>
 				{#if post.mediaItems?.[0]?.url || post.mediaUrl || post.image}

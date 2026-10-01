@@ -11,6 +11,8 @@
 	import { resolve } from '$app/paths';
 	import type { PostData } from './PostCard.svelte';
 	import PostComposerFields from './PostComposerFields.svelte';
+	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
+	import { formatShortcuts } from '$lib/formatting-editor';
 	import {
 		ASPECT_RATIOS as ratios,
 		MAX_CONTENT_LENGTH,
@@ -34,6 +36,7 @@
 	let sheetOpen = $state(false);
 	let studioModalOpen = $state(false);
 	let inlineInput = $state<HTMLTextAreaElement | null>(null);
+	let studioInput = $state<HTMLTextAreaElement | null>(null);
 
 	let fileInputDesktop = $state<HTMLInputElement | null>(null);
 	let fileInputStudio = $state<HTMLInputElement | null>(null);
@@ -269,10 +272,12 @@
 		<div class="flex items-start gap-3.5">
 			<Avatar src={avatarSrc} name={currentUser.name} size="md" />
 			<div class="flex-1 flex flex-col gap-3">
+				<FormatToolbar target={inlineInput} />
 				<textarea
 					bind:this={inlineInput}
 					bind:value={draft.content}
 					use:autogrow
+					use:formatShortcuts
 					rows="2"
 					maxlength={MAX_CONTENT_LENGTH}
 					placeholder="Share an architectural observation, exhibition note..."
@@ -836,9 +841,12 @@
 							</label>
 							<span>{draft.content.length} / {MAX_CONTENT_LENGTH.toLocaleString()}</span>
 						</div>
+						<FormatToolbar target={studioInput} />
 						<textarea
 							id="studio-narrative"
+							bind:this={studioInput}
 							bind:value={draft.content}
+							use:formatShortcuts
 							rows="5"
 							maxlength={MAX_CONTENT_LENGTH}
 							placeholder="Examining the monolithic concrete structures erected across during the late twentieth century..."

@@ -85,9 +85,8 @@ describe('PostCard component', () => {
 		const description = Array.from({ length: 30 }, (_, i) => `Paragraph ${i + 1}`).join('\n\n');
 		const screen = render(PostCard, { post: { ...ownPost, description } });
 
-		await expect
-			.element(screen.getByText('Paragraph 1', { exact: false }).first())
-			.toHaveClass('whitespace-pre-line');
+		await expect.element(screen.getByText('Paragraph 1', { exact: true })).toBeInTheDocument();
+		await expect.element(screen.getByText('Paragraph 2', { exact: true })).toBeInTheDocument();
 		const more = screen.getByRole('button', { name: 'See more' });
 		await expect.element(more).toHaveAttribute('aria-expanded', 'false');
 		await more.click();

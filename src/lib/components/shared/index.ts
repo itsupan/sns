@@ -11,3 +11,5 @@ export { default as BottomSheet } from './BottomSheet.svelte';
 export { default as SheetAction } from './SheetAction.svelte';
 export { default as Toast } from './Toast.svelte';
 export { default as ReportSheet } from './ReportSheet.svelte';
+export { default as FormattedText } from './FormattedText.svelte';
+export { default as FormatToolbar } from './FormatToolbar.svelte';

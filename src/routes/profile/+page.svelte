@@ -79,7 +79,7 @@
 		<!-- Tabs Bar (Responsive: Mobile Icon Tabs / Desktop Filter Pills) -->
 		<ProfileTabs bind:activeTab bind:viewMode showSaved />
 
-		<!-- Curated Grid Gallery / List / Essays -->
+		<!-- Curated Grid Gallery / List / Saved -->
 		<ProfileGrid
 			{activeTab}
 			savedPosts={data?.saved ?? []}

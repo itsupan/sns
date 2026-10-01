@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import FormattedText from '$lib/components/shared/FormattedText.svelte';
 	import PostCard, { type PostData } from '$lib/components/feed/PostCard.svelte';
 	import { formatCount } from '$lib/utils/format';
 	import type { TabId, ViewMode } from './ProfileTabs.svelte';
@@ -24,29 +25,8 @@
 		post?: PostData;
 	}
 
-	export interface EssayItem {
-		id: string;
-		title: string;
-		subtitle: string;
-		coverImage: string;
-		readTime: string;
-		date: string;
-		excerpt: string;
-		tags: string[];
-	}
-
-	export interface PinnedCollection {
-		id: string;
-		title: string;
-		count: number;
-		coverImage: string;
-		description: string;
-	}
-
 	interface Props {
 		items?: GridItem[];
-		essays?: EssayItem[];
-		collections?: PinnedCollection[];
 		activeTab?: TabId;
 		viewMode?: ViewMode;
 		class?: string;
@@ -194,8 +174,6 @@
 
 	let {
 		items = defaultItems,
-		essays = [],
-		collections = [],
 		activeTab = 'grid',
 		viewMode = 'grid',
 		class: className = '',
@@ -454,11 +432,10 @@
 
 							<!-- Description -->
 							{#if item.description}
-								<p
-									class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mb-3.5 whitespace-pre-line break-words"
-								>
-									{item.description}
-								</p>
+								<FormattedText
+									text={item.description}
+									class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mb-3.5 break-words"
+								/>
 							{/if}
 
 							<!-- Tags -->
@@ -556,136 +533,7 @@
 			</div>
 		{/if}
 
-		<!-- 2. EDITORIAL ESSAYS / SERIES TAB -->
-	{:else if activeTab === 'essays'}
-		{#if essays.length === 0}
-			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
-				<div
-					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
-				>
-					<Icon name="document" class="text-2xl" />
-				</div>
-				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
-					No essays published yet
-				</h3>
-				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm">
-					In-depth architectural monographs and critical essays will appear here.
-				</p>
-			</div>
-		{:else}
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-3 sm:px-0">
-				{#each essays as essay (essay.id)}
-					<article
-						class="bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl overflow-hidden shadow-xs dark:shadow-none hover:shadow-md transition-shadow flex flex-col"
-					>
-						<div class="w-full aspect-[16/9] overflow-hidden bg-slate-100 dark:bg-dark-elevated">
-							<img
-								src={essay.coverImage}
-								alt={essay.title}
-								class="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-								loading="lazy"
-							/>
-						</div>
-						<div class="p-5 sm:p-6 flex-1 flex flex-col justify-between">
-							<div>
-								<div class="flex items-center gap-2 text-xs text-slate-400 mb-2">
-									<span>{essay.date}</span>
-									<span>•</span>
-									<span>{essay.readTime}</span>
-								</div>
-								<h3 class="text-lg font-bold text-slate-950 dark:text-white mb-2 leading-snug">
-									{essay.title}
-								</h3>
-								<p
-									class="text-xs sm:text-sm text-slate-600 dark:text-dark-muted leading-relaxed line-clamp-3 mb-4"
-								>
-									{essay.excerpt}
-								</p>
-							</div>
-							<div
-								class="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-dark-border"
-							>
-								<div class="flex items-center gap-1.5 flex-wrap">
-									{#each essay.tags as tag (tag)}
-										<span
-											class="text-[11px] font-medium text-slate-500 bg-slate-100 dark:bg-dark-elevated px-2.5 py-0.5 rounded-full"
-										>
-											{tag}
-										</span>
-									{/each}
-								</div>
-								<button
-									type="button"
-									class="text-xs font-semibold text-blue-600 dark:text-kizuna-blue hover:underline bg-transparent border-0 cursor-pointer"
-								>
-									Read Essay →
-								</button>
-							</div>
-						</div>
-					</article>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- 3. PINNED COLLECTIONS TAB -->
-	{:else if activeTab === 'pinned'}
-		{#if collections.length === 0}
-			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
-				<div
-					class="size-16 rounded-full bg-slate-100 dark:bg-dark-elevated flex items-center justify-center mb-4 text-slate-400 dark:text-dark-muted"
-				>
-					<Icon name="bookmark" class="text-2xl" />
-				</div>
-				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">No collections yet</h3>
-				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm">
-					Curated photo series and collections will appear here.
-				</p>
-			</div>
-		{:else}
-			<div class="grid grid-cols-1 md:grid-cols-2 gap-6 py-6 px-3 sm:px-0">
-				{#each collections as col (col.id)}
-					<div
-						class="group bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl overflow-hidden p-4 shadow-xs dark:shadow-none hover:border-slate-300 dark:hover:border-dark-hover transition-all cursor-pointer"
-					>
-						<div
-							class="relative w-full aspect-[16/10] rounded-xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-3.5"
-						>
-							<img
-								src={col.coverImage}
-								alt={col.title}
-								class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-								loading="lazy"
-							/>
-							<div
-								class="absolute bottom-2 right-2 bg-black/75 backdrop-blur-xs text-white text-xs font-semibold px-2.5 py-1 rounded-md"
-							>
-								{col.count} works
-							</div>
-						</div>
-						<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
-							{col.title}
-						</h3>
-						<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-							{col.description}
-						</p>
-					</div>
-				{/each}
-			</div>
-		{/if}
-
-		<!-- 4. CRITIQUES TAB -->
-	{:else if activeTab === 'critiques'}
-		<div class="max-w-2xl mx-auto py-8 text-center text-slate-500 dark:text-dark-muted">
-			<Icon name="document-signed" class="text-3xl text-slate-400 mb-3" />
-			<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
-				Peer Architectural Critiques
-			</h3>
-			<p class="text-xs leading-relaxed max-w-md mx-auto">
-				Curated critical evaluations and commentary from architectural fellows and gallery curators.
-			</p>
-		</div>
-
-		<!-- 5. SAVED TAB -->
+		<!-- 2. SAVED TAB -->
 	{:else if activeTab === 'saved'}
 		{#if savedPosts.length === 0}
 			<div class="flex flex-col items-center justify-center py-16 px-4 text-center">
@@ -696,7 +544,7 @@
 				</div>
 				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">No saved posts</h3>
 				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm">
-					Save photos and essays to revisit them later in your private archive.
+					Save posts to revisit them later in your private archive.
 				</p>
 			</div>
 		{:else}
@@ -772,11 +620,10 @@
 							{activeModalItem.title}
 						</h3>
 						{#if activeModalItem.description}
-							<p
-								class="text-xs text-slate-600 dark:text-dark-muted leading-relaxed whitespace-pre-line break-words"
-							>
-								{activeModalItem.description}
-							</p>
+							<FormattedText
+								text={activeModalItem.description}
+								class="text-xs text-slate-600 dark:text-dark-muted leading-relaxed break-words"
+							/>
 						{/if}
 
 						{#if activeModalItem.cameraMeta}

@@ -1,5 +1,16 @@
 import { describe, expect, it, vi } from 'vitest';
 import { DELETE } from './+server';
+import { loadPostMedia } from '$lib/server/db/posts';
+import { deleteMediaObjects } from '$lib/server/services/storage';
+
+vi.mock('$lib/server/db/posts', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/db/posts')>()),
+	loadPostMedia: vi.fn(async () => new Map())
+}));
+vi.mock('$lib/server/services/storage', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/services/storage')>()),
+	deleteMediaObjects: vi.fn(async () => {})
+}));
 import type { RequestEvent } from './$types';
 import type { ApiErrorBody } from '$lib/server/api';
 
@@ -128,5 +139,43 @@ describe('DELETE /api/posts/:id', () => {
 
 		// Ensure that update was called (soft delete)
 		expect(updateMock).toHaveBeenCalled();
+	});
+
+	it("cleans up only the owner's media after soft deleting", async () => {
+		vi.mocked(loadPostMedia).mockResolvedValueOnce(
+			new Map([
+				[
+					'post-1',
+					[
+						{ url: '/api/upload/mock-r2/posts/user-1/a.jpg', type: 'image' },
+						{ url: 'posts/user-2/victim.jpg', type: 'image' }
+					]
+				]
+			])
+		);
+		const db = {
+			select: vi.fn(() => ({
+				from: vi.fn(() => ({
+					where: vi.fn(() => ({
+						limit: vi.fn(async () => [{ id: 'post-1', userId: 'user-1', deletedAt: null }])
+					}))
+				}))
+			})),
+			update: vi.fn(() => ({ set: vi.fn(() => ({ where: vi.fn(async () => []) })) }))
+		};
+		const waitUntil = vi.fn();
+		const env = {};
+
+		const event = {
+			params: { id: 'post-1' },
+			locals: { db, user: { id: 'user-1' } },
+			platform: { env, ctx: { waitUntil } }
+		} as unknown as RequestEvent;
+
+		const res = await DELETE(event);
+		expect(res.status).toBe(204);
+		expect(db.update).toHaveBeenCalled();
+		expect(deleteMediaObjects).toHaveBeenCalledWith(['posts/user-1/a.jpg'], env);
+		expect(waitUntil).toHaveBeenCalledTimes(1);
 	});
 });
