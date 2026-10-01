@@ -85,7 +85,7 @@ describe('Profile Page', () => {
 
 		// Filter pills
 		await expect.element(screen.getByText('Curated Grid')).toBeInTheDocument();
-		await expect.element(screen.getByText('Editorial Essays / Series')).toBeInTheDocument();
+		await expect.element(screen.getByText('Editorial Essays / Series')).not.toBeInTheDocument();
 	});
 
 	it('displays only the user data without dummy data for newly registered users', async () => {

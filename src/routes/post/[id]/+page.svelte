@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { stripFormatting } from '$lib/formatting';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import SidebarNav from '$lib/components/shared/SidebarNav.svelte';
@@ -19,7 +20,7 @@
 
 	let metaDescription = $derived(
 		post.description
-			? post.description.slice(0, 160)
+			? stripFormatting(post.description).replace(/\s+/g, ' ').trim().slice(0, 160)
 			: `Curated visual observation by ${post.author.name} on Kizuna.`
 	);
 

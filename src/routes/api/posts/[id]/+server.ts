@@ -10,7 +10,12 @@ import {
 	normalizeMedia,
 	normalizeTags
 } from '$lib/server/db/posts';
-import { extractR2Key, refreshPostMediaUrls } from '$lib/server/services/storage';
+import {
+	deleteMediaObjects,
+	extractR2Key,
+	ownedMediaKeys,
+	refreshPostMediaUrls
+} from '$lib/server/services/storage';
 import {
 	MAX_MEDIA_PER_POST,
 	MAX_POST_CONTENT_LENGTH,
@@ -192,8 +197,20 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 	return json({ post: edits });
 });
 
-export const DELETE: RequestHandler = withApi(async ({ params, locals }) => {
+export const DELETE: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const { currentUser, postId } = await requireOwnPost(locals, params.id, 'delete');
+
+	// Collect the post's stored media keys before deleting so the objects can be cleaned up.
+	let mediaKeys: string[] = [];
+	try {
+		const media = (await loadPostMedia(locals.db, [postId])).get(postId) ?? [];
+		mediaKeys = ownedMediaKeys(
+			media.map((m) => m.url),
+			currentUser.id
+		);
+	} catch (err) {
+		console.warn('[posts] Failed to load media for cleanup:', err);
+	}
 
 	// Soft delete the post
 	await locals.db
@@ -201,7 +218,14 @@ export const DELETE: RequestHandler = withApi(async ({ params, locals }) => {
 		.set({ deletedAt: new Date() })
 		.where(and(eq(post.id, postId), eq(post.userId, currentUser.id)));
 
-	// TODO: Schedule R2 media cleanup for the post's media items.
+	if (mediaKeys.length > 0) {
+		const cleanup = deleteMediaObjects(mediaKeys, platform?.env);
+		if (platform?.ctx?.waitUntil) {
+			platform.ctx.waitUntil(cleanup);
+		} else {
+			await cleanup;
+		}
+	}
 
 	return new Response(null, { status: 204 });
 });

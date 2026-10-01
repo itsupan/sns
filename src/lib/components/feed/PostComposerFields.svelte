@@ -1,5 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
+	import { formatShortcuts } from '$lib/formatting-editor';
 	import {
 		ASPECT_RATIOS,
 		MAX_CONTENT_LENGTH,
@@ -21,6 +23,7 @@
 	let { draft, id, onsubmit, alwaysShowTitle = false, beforeAddMedia }: Props = $props();
 
 	let fileInput = $state<HTMLInputElement | null>(null);
+	let contentInput = $state<HTMLTextAreaElement | null>(null);
 
 	function openPicker() {
 		if (beforeAddMedia && !beforeAddMedia()) return;
@@ -188,9 +191,12 @@
 			<span class="font-medium text-slate-600 dark:text-dark-muted">Caption & Intent</span>
 			<span>{draft.content.length} / {MAX_CONTENT_LENGTH.toLocaleString()}</span>
 		</div>
+		<FormatToolbar target={contentInput} class="mb-1" />
 		<textarea
+			bind:this={contentInput}
 			bind:value={draft.content}
 			use:autogrow
+			use:formatShortcuts
 			rows="3"
 			maxlength={MAX_CONTENT_LENGTH}
 			placeholder="Share an architectural observation, exhibition note..."

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import FormattedText from '$lib/components/shared/FormattedText.svelte';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
@@ -282,7 +283,7 @@
 	let activeCommentPreview = $derived(latestCommentPreview || post.commentPreview);
 
 	// Long descriptions are clamped; "See more" appears only when the text really overflows.
-	let descriptionEl = $state<HTMLParagraphElement | null>(null);
+	let descriptionEl = $state<HTMLDivElement | null>(null);
 	let expanded = $state(false);
 	let overflows = $state(false);
 	$effect(() => {
@@ -809,15 +810,15 @@
 			<!-- Caption / Description -->
 			{#if post.description}
 				<div class="mt-1.5 lg:mt-0 mb-3">
-					<p
+					<div
 						bind:this={descriptionEl}
-						class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted m-0 whitespace-pre-line break-words {expanded ||
-						fullText
-							? ''
-							: 'line-clamp-3 lg:line-clamp-8'}"
+						class={expanded || fullText ? '' : 'line-clamp-3 lg:line-clamp-8'}
 					>
-						{post.description}
-					</p>
+						<FormattedText
+							text={post.description}
+							class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted m-0"
+						/>
+					</div>
 					{#if overflows}
 						<button
 							type="button"

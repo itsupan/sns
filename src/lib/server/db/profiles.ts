@@ -1,3 +1,4 @@
+import { stripFormatting } from '$lib/formatting';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, user } from './schema';
@@ -126,7 +127,7 @@ export function toGridItem(p: PostData): GridItem {
 	const first = p.mediaItems?.[0];
 	return {
 		id: p.id,
-		title: p.title || p.description.slice(0, 40),
+		title: p.title || stripFormatting(p.description).slice(0, 40),
 		image: first?.url || p.image,
 		mediaType: first?.type ?? 'none',
 		likes: p.likes,

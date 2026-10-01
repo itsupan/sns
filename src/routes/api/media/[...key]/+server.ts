@@ -126,7 +126,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 				const responseHeaders = new Headers(CORS_HEADERS);
 				r2Obj.writeHttpMetadata(responseHeaders);
 				responseHeaders.set('Accept-Ranges', 'bytes');
-				responseHeaders.set('Cache-Control', 'public, max-age=31536000, immutable');
+				responseHeaders.set('Cache-Control', 'public, max-age=3600');
 
 				if (r2Obj.range) {
 					responseHeaders.set(
@@ -244,7 +244,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 				'Content-Range': `bytes ${start}-${end}/${totalSize}`,
 				'Accept-Ranges': 'bytes',
 				'Content-Length': chunkSize.toString(),
-				'Cache-Control': 'public, max-age=31536000, immutable',
+				'Cache-Control': 'public, max-age=3600',
 				...CORS_HEADERS
 			}
 		});
@@ -256,7 +256,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 			'Content-Type': item.contentType,
 			'Accept-Ranges': 'bytes',
 			'Content-Length': totalSize.toString(),
-			'Cache-Control': 'public, max-age=31536000, immutable',
+			'Cache-Control': 'public, max-age=3600',
 			...CORS_HEADERS
 		}
 	});
@@ -304,7 +304,7 @@ export const HEAD: RequestHandler = async ({ params, request }) => {
 				'Content-Range': `bytes ${start}-${end}/${totalSize}`,
 				'Accept-Ranges': 'bytes',
 				'Content-Length': chunkSize.toString(),
-				'Cache-Control': 'public, max-age=31536000, immutable',
+				'Cache-Control': 'public, max-age=3600',
 				...CORS_HEADERS
 			}
 		});
@@ -316,7 +316,7 @@ export const HEAD: RequestHandler = async ({ params, request }) => {
 			'Content-Type': item.contentType,
 			'Accept-Ranges': 'bytes',
 			'Content-Length': totalSize.toString(),
-			'Cache-Control': 'public, max-age=31536000, immutable',
+			'Cache-Control': 'public, max-age=3600',
 			...CORS_HEADERS
 		}
 	});

@@ -1,5 +1,14 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const env = vi.hoisted(() => ({ dev: true }));
+vi.mock('$app/environment', () => ({
+	get dev() {
+		return env.dev;
+	}
+}));
+
 import { ApiError, RATE_LIMITS, enforceRateLimit, rateLimit } from '.';
+import { FAIL_CLOSED_LIMITS } from './rate-limit';
 
 function fakeKv() {
 	const store = new Map<string, { value: string; ttl?: number }>();
@@ -62,6 +71,49 @@ describe('enforceRateLimit', () => {
 		const platform = { env: { KV: kv } } as unknown as App.Platform;
 		for (let i = 0; i < RATE_LIMITS.like.limit; i++) await enforceRateLimit(platform, 'like', 'a');
 		await expect(enforceRateLimit(platform, 'like', 'b')).resolves.toBeUndefined();
+	});
+
+	afterEach(() => {
+		env.dev = true;
+		vi.unstubAllEnvs();
+		vi.restoreAllMocks();
+	});
+
+	const failingKv = {
+		get: async () => {
+			throw new Error('KV get() failed');
+		},
+		put: async () => {}
+	} as unknown as KVNamespace;
+
+	it('fails closed with a 503 for write-heavy limits when KV fails', async () => {
+		const platform = { env: { KV: failingKv } } as unknown as App.Platform;
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		for (const name of FAIL_CLOSED_LIMITS) {
+			const err = await enforceRateLimit(platform, name, 'a').catch((e) => e);
+			expect(err).toBeInstanceOf(ApiError);
+			const res = (err as ApiError).toResponse();
+			expect(res.status).toBe(503);
+			expect(res.headers.get('Retry-After')).toBe('60');
+			expect(((await res.json()) as { error: { code: string } }).error.code).toBe(
+				'rate_limit_unavailable'
+			);
+		}
+	});
+
+	it('fails closed for write-heavy limits when KV is missing outside dev/tests', async () => {
+		env.dev = false;
+		vi.stubEnv('MODE', 'production');
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const err = await enforceRateLimit(undefined, 'comment', 'a').catch((e) => e);
+		expect((err as ApiError).status).toBe(503);
+		await expect(enforceRateLimit(undefined, 'search', 'a')).resolves.toBeUndefined();
+	});
+
+	it('allows write-heavy limits without KV in dev', async () => {
+		vi.stubEnv('MODE', 'production');
+		await expect(enforceRateLimit(undefined, 'createPost', 'a')).resolves.toBeUndefined();
 	});
 
 	it('allows requests when KV fails, e.g. once the daily write quota is used up', async () => {

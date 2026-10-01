@@ -91,6 +91,20 @@ export function extractR2Key(urlOrKey: string | undefined | null): string | null
  * Checks whether an AWS SigV4 / Cloudflare R2 presigned URL is expired or close to expiring.
  * Also marks unauthenticated raw private S3 endpoints as needing a fresh signed URL.
  */
+/**
+ * Unique storage keys from post media URLs that sit under `userId`'s own upload prefix
+ * (`<prefix>/<userId>/...`, see generatePresignedUploadUrl). Media URLs are author-supplied,
+ * so anything else must never be deleted on that user's behalf.
+ */
+export function ownedMediaKeys(urls: string[], userId: string): string[] {
+	const keys = new Set<string>();
+	for (const url of urls) {
+		const key = extractR2Key(url);
+		if (key && key.split('/')[1] === userId) keys.add(key);
+	}
+	return [...keys];
+}
+
 export function isPresignedUrlExpired(
 	urlStr: string | undefined | null,
 	marginMs = 60000
@@ -409,4 +423,27 @@ export async function deleteR2Objects(
 
 	for (const key of unique) mockStorage.delete(key);
 	return [];
+}
+
+/**
+ * Removes a deleted post's media everywhere the media proxy may serve it from: the bucket
+ * (via deleteR2Objects), the KV copy and the in-memory dev store. Never throws.
+ */
+export async function deleteMediaObjects(keys: string[], env?: Partial<Env>): Promise<void> {
+	const unique = [...new Set(keys)];
+	if (unique.length === 0) return;
+
+	const failed = await deleteR2Objects(env, unique);
+	if (failed.length > 0) console.warn('[storage] Failed to delete media objects:', failed);
+
+	await Promise.all(
+		unique.map(async (key) => {
+			mockStorage.delete(key);
+			try {
+				await env?.KV?.delete(key);
+			} catch (err) {
+				console.warn(`[storage] Failed to delete KV media copy ${key}:`, err);
+			}
+		})
+	);
 }

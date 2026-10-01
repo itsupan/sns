@@ -1,11 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { mockStorage } from './media-storage';
 import {
 	generatePresignedUploadUrl,
 	extractR2Key,
 	isPresignedUrlExpired,
 	generatePresignedGetUrl,
 	refreshMediaUrl,
-	refreshPostMediaUrls
+	refreshPostMediaUrls,
+	deleteMediaObjects,
+	ownedMediaKeys
 } from './storage';
 
 describe('storage service', () => {
@@ -66,6 +69,23 @@ describe('storage service', () => {
 		expect(result.uploadUrl).toContain('X-Amz-Signature=');
 		expect(result.publicUrl).toMatch(/^https:\/\/cdn\.example\.com\/avatars\/user-456\//);
 		expect(result.key).toMatch(/^avatars\/user-456\/\d+-[a-f0-9-]+\.png$/);
+	});
+
+	describe('ownedMediaKeys', () => {
+		it("keeps only unique keys under the user's own upload prefix", () => {
+			expect(
+				ownedMediaKeys(
+					[
+						'posts/user-1/a.jpg',
+						'/api/upload/mock-r2/posts/user-1/a.jpg',
+						'posts/user-2/victim.jpg',
+						'posts/user-10/b.jpg',
+						'https://example.com/elsewhere.jpg'
+					],
+					'user-1'
+				)
+			).toEqual(['posts/user-1/a.jpg']);
+		});
 	});
 
 	describe('extractR2Key', () => {
@@ -198,5 +218,39 @@ describe('storage service', () => {
 			expect(refreshed.mediaItems[0].url).toBe('https://cdn.example.com/posts/u1/photo.jpg');
 			expect(refreshed.mediaItems[1].url).toBe(validUrl);
 		});
+	});
+});
+
+describe('deleteMediaObjects', () => {
+	it('deletes through the R2 binding, KV and in-memory storage', async () => {
+		const r2Delete = vi.fn(async () => undefined);
+		const kvDelete = vi.fn(async () => undefined);
+		mockStorage.set('posts/u/a.jpg', { buffer: new ArrayBuffer(1), contentType: 'image/jpeg' });
+		const env = { R2_BUCKET: { delete: r2Delete }, KV: { delete: kvDelete } } as unknown as Env;
+
+		await deleteMediaObjects(['posts/u/a.jpg', 'posts/u/b.jpg'], env);
+
+		expect(r2Delete).toHaveBeenCalledWith(['posts/u/a.jpg', 'posts/u/b.jpg']);
+		expect(kvDelete).toHaveBeenCalledTimes(2);
+		expect(mockStorage.has('posts/u/a.jpg')).toBe(false);
+	});
+
+	it('deletes KV copies when no R2 binding or credentials exist', async () => {
+		const kvDelete = vi.fn(async () => undefined);
+		await deleteMediaObjects(['posts/u/c.png'], { KV: { delete: kvDelete } } as unknown as Env);
+		expect(kvDelete).toHaveBeenCalledWith('posts/u/c.png');
+	});
+
+	it('never throws when deletes fail', async () => {
+		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+		const env = {
+			R2_BUCKET: { delete: vi.fn(async () => Promise.reject(new Error('r2 down'))) },
+			KV: { delete: vi.fn(async () => Promise.reject(new Error('kv down'))) }
+		} as unknown as Env;
+		await expect(deleteMediaObjects(['posts/u/d.jpg'], env)).resolves.toBeUndefined();
+		expect(warn).toHaveBeenCalled();
+		warn.mockRestore();
+		error.mockRestore();
 	});
 });

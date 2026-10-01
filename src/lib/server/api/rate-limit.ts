@@ -1,3 +1,4 @@
+import { dev } from '$app/environment';
 import { ApiError } from './errors';
 import {
 	DEFAULT_CONFIG,
@@ -55,9 +56,48 @@ export function rateLimitSubject(event: {
 }
 
 /**
+ * Limits guarding writes that are costly or easy to abuse. When the limiter cannot run
+ * (KV error, missing binding in production) these fail closed with a 503; the rest fail open.
+ */
+export const FAIL_CLOSED_LIMITS: ReadonlySet<RateLimitName> = new Set<RateLimitName>([
+	'createPost',
+	'createStory',
+	'comment',
+	'chatStart',
+	'chatMessage',
+	'uploadPresign',
+	'follow',
+	'share',
+	'accountExport',
+	'report'
+]);
+
+/** Missing KV is only acceptable in local dev and unit tests. */
+function kvOptional(): boolean {
+	return dev || import.meta.env.MODE === 'test';
+}
+
+function limiterUnavailable(name: RateLimitName, reason: unknown): void {
+	if (FAIL_CLOSED_LIMITS.has(name)) {
+		console.error(`[rate-limit] limiter unavailable, rejecting ${name}:`, reason);
+		throw new ApiError(
+			503,
+			'rate_limit_unavailable',
+			'This action is temporarily unavailable. Please try again in a minute.',
+			undefined,
+			{ 'Retry-After': '60' }
+		);
+	}
+	console.warn(`[rate-limit] limiter unavailable, allowing ${name}:`, reason);
+}
+
+/**
  * Throws a 429 `ApiError` with `Retry-After` when `userId` exceeds the named limit.
- * Allows the request when the KV binding is missing (unit tests, misconfigured local dev) or
- * when KV errors, e.g. once the daily write quota is exhausted.
+ *
+ * When the limiter cannot run (KV errors, e.g. once the daily write quota is exhausted, or the
+ * KV binding is missing outside dev/tests), limits in `FAIL_CLOSED_LIMITS` throw a 503
+ * `rate_limit_unavailable` with `Retry-After: 60`; other limits allow the request with a warning.
+ * A missing binding in local dev or unit tests always allows the request.
  */
 export async function enforceRateLimit(
 	platform: App.Platform | undefined,
@@ -65,7 +105,11 @@ export async function enforceRateLimit(
 	userId: string
 ): Promise<void> {
 	const kv = platform?.env?.KV;
-	if (!kv) return;
+	if (!kv) {
+		if (kvOptional()) return;
+		limiterUnavailable(name, 'KV binding missing');
+		return;
+	}
 
 	let retryAfter: number | null;
 	try {
@@ -75,9 +119,7 @@ export async function enforceRateLimit(
 			getConfig(platform?.env).rateLimits[name]
 		);
 	} catch (err) {
-		// KV failing (e.g. the Free plan's daily write quota is used up) must not take the action
-		// down with it: allow the request and stop rate limiting until KV recovers.
-		console.warn(`[rate-limit] KV unavailable, allowing ${name}:`, err);
+		limiterUnavailable(name, err);
 		return;
 	}
 	if (retryAfter !== null) {

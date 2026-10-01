@@ -1,3 +1,4 @@
+import { stripFormatting } from '$lib/formatting';
 import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postMedia, user } from './schema';
@@ -20,7 +21,7 @@ export function toFtsQuery(raw: string): string | null {
 
 /** ~`width` characters of `text` around the first match of any term, with ellipses. */
 export function snippetAround(text: string, terms: string[], width = 120): string {
-	const clean = text.replace(/\s+/g, ' ').trim();
+	const clean = stripFormatting(text).replace(/\s+/g, ' ').trim();
 	if (clean.length <= width) return clean;
 	const lower = clean.toLowerCase();
 	const hits = terms.map((t) => lower.indexOf(t.toLowerCase())).filter((i) => i >= 0);

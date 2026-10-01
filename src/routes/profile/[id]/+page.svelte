@@ -120,7 +120,7 @@
 			<!-- Tabs Bar -->
 			<ProfileTabs bind:activeTab bind:viewMode showSaved={data.isOwnProfile} />
 
-			<!-- Curated Grid Gallery / List / Essays -->
+			<!-- Curated Grid Gallery / List / Saved -->
 			<ProfileGrid
 				{activeTab}
 				savedPosts={data.saved}
