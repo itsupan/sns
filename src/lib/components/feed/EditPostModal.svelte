@@ -20,6 +20,7 @@
 		| 'mediaItems'
 		| 'aspectRatio'
 		| 'postType'
+		| 'background'
 	>;
 
 	interface Props {

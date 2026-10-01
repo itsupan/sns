@@ -5,6 +5,7 @@ import { post, postTag, tag, user, userFollow } from './schema';
 import { encodeCursor, loadPostMedia, notDeleted, type FeedCursor } from './posts';
 import type { ExploreTile } from '$lib/explore/types';
 import { notBlockedWith } from './blocks';
+import { backgroundOf } from './post-cards';
 
 /** Explore ranks only this many of the newest live posts, so each request reads a bounded set. */
 export const EXPLORE_CANDIDATES = 500;
@@ -137,7 +138,9 @@ export async function loadTiles(db: Database, ids: string[]): Promise<ExploreTil
 				title: post.title,
 				content: post.content,
 				likes: post.likesCount,
-				comments: post.commentsCount
+				comments: post.commentsCount,
+				postType: post.postType,
+				background: post.background
 			})
 			.from(post)
 			.where(and(inArray(post.id, ids), notDeleted)),
@@ -153,6 +156,7 @@ export async function loadTiles(db: Database, ids: string[]): Promise<ExploreTil
 				id,
 				title: r.title || stripFormatting(r.content).slice(0, 80),
 				cover: items[0] ?? null,
+				background: backgroundOf(r),
 				isCarousel: items.length > 1,
 				likes: r.likes,
 				comments: r.comments

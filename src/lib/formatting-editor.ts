@@ -79,3 +79,21 @@ export function formatShortcuts(node: HTMLTextAreaElement) {
 	node.addEventListener('keydown', onKey);
 	return { destroy: () => node.removeEventListener('keydown', onKey) };
 }
+
+/** The `@handle` being typed just before the caret: where its `@` is and what follows it. */
+export function mentionAt(value: string, caret: number): { start: number; query: string } | null {
+	const match = /(?:^|[^\w@.])@([a-z0-9_.-]{0,30})$/i.exec(value.slice(0, caret));
+	return match ? { start: caret - match[1].length - 1, query: match[1] } : null;
+}
+
+/** Replaces the mention typed from `start` to `caret` with `@handle ` and puts the caret after it. */
+export function insertMention(
+	value: string,
+	start: number,
+	caret: number,
+	handle: string
+): EditResult {
+	const text = `@${handle} `;
+	const end = start + text.length;
+	return { value: value.slice(0, start) + text + value.slice(caret), start: end, end };
+}

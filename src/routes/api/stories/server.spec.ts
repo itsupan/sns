@@ -1,13 +1,15 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
-import { user, userFollow } from '$lib/server/db/schema';
+import { message, notification, user, userBlock, userFollow } from '$lib/server/db/schema';
 import type { ApiErrorBody } from '$lib/server/api';
 import { STORY_TTL_SEC, listUserStories, putStory, storyKey } from '$lib/server/stories';
 import { GET, POST } from './+server';
 import { DELETE } from './[id]/+server';
 import { POST as VIEW } from './[id]/view/+server';
 import { GET as VIEWS } from './[id]/views/+server';
+import { POST as REACT } from './[id]/react/+server';
+import { POST as REPLY } from './[id]/reply/+server';
 
 type Db = Awaited<ReturnType<typeof createTestDb>>['db'];
 type Handler = (event: never) => Promise<Response>;
@@ -276,5 +278,104 @@ describe('story views', { timeout: REAL_D1_TIMEOUT }, () => {
 		await view('me', story.id);
 		expect((await call(DELETE as Handler, { userId: 'friend', id: story.id })).status).toBe(204);
 		expect((await kv.list({ prefix: `view:${story.id}:` })).keys).toHaveLength(0);
+	});
+});
+
+describe('story reactions and replies', { timeout: REAL_D1_TIMEOUT }, () => {
+	async function share(userId: string) {
+		const res = await call(POST as Handler, {
+			userId,
+			body: { mediaUrl: media(userId), caption: 'hi' }
+		});
+		return ((await res.json()) as { story: { id: string } }).story;
+	}
+
+	const react = (userId: string, id: string, reaction: unknown) =>
+		call(REACT as Handler, { userId, id, body: { reaction } });
+
+	const reply = (userId: string, id: string, content: unknown) =>
+		call(REPLY as Handler, { userId, id, body: { content } });
+
+	const storyNotices = (storyId: string) =>
+		db
+			.select({ actorId: notification.actorId, recipientId: notification.recipientId })
+			.from(notification)
+			.where(
+				and(
+					eq(notification.type, 'story_reaction'),
+					eq(notification.dedupeKey, `story_reaction:me:${storyId}`)
+				)
+			);
+
+	it('records the reaction on the view, shows it to the author and notifies them once', async () => {
+		const story = await share('friend');
+		expect((await react('me', story.id, '😂')).status).toBe(200);
+		expect((await react('me', story.id, '❤️')).status).toBe(200);
+
+		const res = await call(VIEWS as Handler, { userId: 'friend', id: story.id });
+		const body = (await res.json()) as { viewers: { id: string; reaction: string | null }[] };
+		expect(body.viewers).toEqual([expect.objectContaining({ id: 'me', reaction: '❤️' })]);
+		expect(await storyNotices(story.id)).toEqual([{ actorId: 'me', recipientId: 'friend' }]);
+
+		expect((await react('me', story.id, null)).status).toBe(200);
+		const cleared = (await (
+			await call(VIEWS as Handler, { userId: 'friend', id: story.id })
+		).json()) as { viewers: { reaction: string | null }[] };
+		expect(cleared.viewers[0].reaction).toBeNull();
+		expect(await storyNotices(story.id)).toEqual([]);
+	});
+
+	it('returns your saved reaction with the stories list', async () => {
+		const story = await share('friend');
+		await react('me', story.id, '🔥');
+		const groups = await groupsFor('me');
+		const friend = groups.find((g) => g.user.id === 'friend')!;
+		expect(friend.stories[0]).toMatchObject({ id: story.id, reaction: '🔥' });
+
+		await react('me', story.id, null);
+		const cleared = (await groupsFor('me')).find((g) => g.user.id === 'friend')!;
+		expect(cleared.stories[0]).toMatchObject({ reaction: null });
+	});
+
+	it('rejects unknown emoji, your own story, and stories you cannot see', async () => {
+		const story = await share('friend');
+		expect((await react('me', story.id, '💩')).status).toBe(400);
+		expect((await react('friend', story.id, '❤️')).status).toBe(400);
+		expect((await react('stranger', story.id, '❤️')).status).toBe(404);
+		expect((await react('me', 'friend:123', '❤️')).status).toBe(404);
+	});
+
+	it('sends a reply as a DM linked to the story', async () => {
+		const story = await share('friend');
+		const res = await reply('me', story.id, '  Love this!  ');
+		expect(res.status).toBe(201);
+		const body = (await res.json()) as {
+			conversationId: string;
+			message: { content: string; senderId: string; storyRef: string };
+		};
+		expect(body.message).toMatchObject({
+			content: 'Love this!',
+			senderId: 'me',
+			storyRef: story.id
+		});
+		const [stored] = await db
+			.select({ storyRef: message.storyRef, conversationId: message.conversationId })
+			.from(message)
+			.where(eq(message.senderId, 'me'));
+		expect(stored).toEqual({ storyRef: story.id, conversationId: body.conversationId });
+	});
+
+	it('rejects empty replies, replies to your own story, and blocked pairs', async () => {
+		const story = await share('friend');
+		expect((await reply('me', story.id, '   ')).status).toBe(400);
+		expect((await reply('friend', story.id, 'hi')).status).toBe(400);
+		expect((await reply('stranger', story.id, 'hi')).status).toBe(404);
+
+		await db.insert(userBlock).values({ blockerId: 'friend', blockedId: 'me' });
+		try {
+			expect((await reply('me', story.id, 'hi')).status).toBe(403);
+		} finally {
+			await db.delete(userBlock).where(eq(userBlock.blockerId, 'friend'));
+		}
 	});
 });

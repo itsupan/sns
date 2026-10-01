@@ -48,7 +48,8 @@ const toMessage = (m: typeof message.$inferSelect): ChatMessage => ({
 	conversationId: m.conversationId,
 	senderId: m.senderId,
 	content: m.content,
-	createdAt: m.createdAt.getTime()
+	createdAt: m.createdAt.getTime(),
+	...(m.storyRef ? { storyRef: m.storyRef } : {})
 });
 
 /**
@@ -281,8 +282,15 @@ export async function sendMessage(
 		id = crypto.randomUUID(),
 		conversationId,
 		senderId,
-		content
-	}: { id?: string; conversationId: string; senderId: string; content: string }
+		content,
+		storyRef = null
+	}: {
+		id?: string;
+		conversationId: string;
+		senderId: string;
+		content: string;
+		storyRef?: string | null;
+	}
 ): Promise<{ message: ChatMessage; created: boolean }> {
 	// NULL when `id` is someone else's message, which leaves every column below unchanged.
 	const sentAt = sql`(select ${message.createdAt} from ${message} where ${message.id} = ${id} and ${message.conversationId} = ${conversationId} and ${message.senderId} = ${senderId})`;
@@ -292,7 +300,7 @@ export async function sendMessage(
 	const [inserted] = await db.batch([
 		db
 			.insert(message)
-			.values({ id, conversationId, senderId, content })
+			.values({ id, conversationId, senderId, content, storyRef })
 			.onConflictDoNothing()
 			.returning(),
 		db

@@ -1,9 +1,15 @@
 import { uploadToR2 } from '$lib/utils/upload';
 import { toast } from '$lib/utils/toast.svelte';
-import { MAX_MEDIA_PER_POST, MAX_TAGS_PER_POST, MAX_TAG_LENGTH } from '$lib/constants/post-limits';
-import type { PostData } from './PostCard.svelte';
+import {
+	MAX_MEDIA_PER_POST,
+	MAX_TAGS_PER_POST,
+	MAX_TAG_LENGTH,
+	MAX_TEXT_POST_LENGTH
+} from '$lib/constants/post-limits';
+import { DEFAULT_TEXT_BACKGROUND, type TextBackground } from '$lib/post-backgrounds';
+import type { PostData, PostType } from './PostCard.svelte';
 
-export type PostType = 'photo' | 'story' | 'article';
+export type { PostType };
 export type AspectRatio = '1:1' | '4:5' | '16:9';
 
 export interface MediaPlate {
@@ -19,7 +25,8 @@ export interface MediaPlate {
 export const POST_TYPES: { id: PostType; label: string; icon: string }[] = [
 	{ id: 'photo', label: 'Photo', icon: 'picture' },
 	{ id: 'story', label: 'Story', icon: 'play-alt' },
-	{ id: 'article', label: 'Article', icon: 'document' }
+	{ id: 'article', label: 'Article', icon: 'document' },
+	{ id: 'text', label: 'Text', icon: 'text' }
 ];
 
 export const ASPECT_RATIOS: { id: AspectRatio; label: string; sub: string }[] = [
@@ -38,6 +45,7 @@ export class PostDraft {
 	content = $state('');
 	title = $state('');
 	selectedType = $state<PostType>('photo');
+	background = $state<TextBackground>(DEFAULT_TEXT_BACKGROUND);
 	canvasRatio = $state<AspectRatio>('1:1');
 	location = $state('');
 	mediaPlates = $state<MediaPlate[]>([]);
@@ -46,7 +54,10 @@ export class PostDraft {
 	tags = $state<string[]>([]);
 
 	isUploadingAny = $derived(this.mediaPlates.some((p) => p.uploading));
-	isEmpty = $derived(!this.content.trim() && this.mediaPlates.length === 0);
+	/** Text posts are words on a background: no media, and a shorter limit. */
+	isText = $derived(this.selectedType === 'text');
+	maxLength = $derived(this.isText ? MAX_TEXT_POST_LENGTH : MAX_CONTENT_LENGTH);
+	isEmpty = $derived(!this.content.trim() && (this.isText || this.mediaPlates.length === 0));
 	activePlate = $derived(this.mediaPlates[this.activePlateIndex] ?? this.mediaPlates[0] ?? null);
 
 	/** Draft pre-filled from an existing post, for editing. */
@@ -55,6 +66,7 @@ export class PostDraft {
 		draft.content = post.description;
 		draft.title = post.title;
 		draft.selectedType = post.postType ?? 'photo';
+		draft.background = post.background ?? DEFAULT_TEXT_BACKGROUND;
 		draft.canvasRatio = post.aspectRatio ?? '1:1';
 		draft.location = post.location ?? '';
 		draft.tags = [...post.tags];
@@ -181,6 +193,17 @@ export class PostDraft {
 	/** Request body for POST /api/posts and PATCH /api/posts/:id. */
 	toPayload() {
 		const trimmed = this.content.trim();
+		if (this.isText) {
+			return {
+				content: trimmed,
+				title: null,
+				mediaUrls: [],
+				location: this.location.trim() || null,
+				postType: this.selectedType,
+				background: this.background,
+				tags: this.tags
+			};
+		}
 		const mediaUrls = this.mediaPlates
 			.filter((p) => p.url)
 			.map((p) => ({ url: p.url, type: p.type }));

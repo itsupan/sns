@@ -1,8 +1,12 @@
+import type { TextBackground } from '$lib/post-backgrounds';
+
 /** A post tile on Explore and tag pages. */
 export interface ExploreTile {
 	id: string;
 	title: string;
 	cover: { url: string; type: 'image' | 'video' } | null;
+	/** Text posts: the background the title is shown on. */
+	background?: TextBackground;
 	isCarousel: boolean;
 	likes: number;
 	comments: number;

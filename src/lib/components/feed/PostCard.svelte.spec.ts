@@ -46,11 +46,37 @@ describe('PostCard component', () => {
 
 		const likeButton = screen.getByRole('button', { name: 'Like post' });
 		await expect.element(likeButton).toBeInTheDocument();
-		await expect.element(screen.getByText('842')).toBeInTheDocument();
+		await expect.element(screen.getByText('842', { exact: true })).toBeInTheDocument();
 
 		await likeButton.click();
-		await expect.element(screen.getByText('843')).toBeInTheDocument();
+		await expect.element(screen.getByText('843', { exact: true })).toBeInTheDocument();
 		expect(like).toHaveBeenCalledWith('/api/posts/post-1/like', { method: 'POST' });
+	});
+
+	it('always shows the like count under the post, naming who liked it', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => Response.json({ liked: true, likesCount: 2 }))
+		);
+		const screen = render(PostCard, { post: { ...ownPost, likes: 0 } });
+		const summary = screen.getByTestId('likes-summary');
+		await expect.element(summary).toHaveTextContent('0 likes');
+
+		screen.rerender({ post: { ...ownPost, likes: 1, likedBy: 'Ana' } });
+		await expect.element(summary).toHaveTextContent('Liked by Ana');
+
+		await screen.getByRole('button', { name: 'Like post' }).click();
+		await expect.element(summary).toHaveTextContent('Liked by you and 1 other');
+	});
+
+	it('shows a text post on its background instead of as a caption', async () => {
+		const screen = render(PostCard, {
+			post: { ...ownPost, postType: 'text', background: 'ocean', description: 'Hello **world**' }
+		});
+		const card = screen.getByTestId('text-post');
+		await expect.element(card).toHaveClass(/from-sky-500/);
+		await expect.element(card.getByText('world')).toBeVisible();
+		expect(screen.getByText('Hello').elements()).toHaveLength(1);
 	});
 
 	it('rolls the like back when the server rejects it', async () => {
@@ -62,7 +88,7 @@ describe('PostCard component', () => {
 
 		await screen.getByRole('button', { name: 'Like post' }).click();
 		await expect.element(screen.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
-		await expect.element(screen.getByText('842')).toBeInTheDocument();
+		await expect.element(screen.getByText('842', { exact: true })).toBeInTheDocument();
 	});
 
 	it('ignores a second like tap while the first is in flight and takes the count from the server', async () => {
@@ -77,7 +103,7 @@ describe('PostCard component', () => {
 		expect(like).toHaveBeenCalledTimes(1);
 
 		release(Response.json({ liked: true, likesCount: 850 }));
-		await expect.element(screen.getByText('850')).toBeInTheDocument();
+		await expect.element(screen.getByText('850', { exact: true })).toBeInTheDocument();
 		await expect.element(likeButton).toHaveAttribute('aria-pressed', 'true');
 	});
 

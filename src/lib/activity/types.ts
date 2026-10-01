@@ -1,4 +1,5 @@
-export type ActivityType = 'like' | 'comment' | 'reply' | 'reaction' | 'follow';
+export type ActivityType =
+	'like' | 'comment' | 'reply' | 'reaction' | 'follow' | 'mention' | 'story_reaction';
 
 /** One notification as the Activity API returns it. */
 export interface ActivityItem {

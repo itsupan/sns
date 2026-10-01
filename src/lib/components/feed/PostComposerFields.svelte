@@ -1,13 +1,10 @@
 <script lang="ts">
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
+	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
+	import TextPostPicker from './TextPostPicker.svelte';
 	import { formatShortcuts } from '$lib/formatting-editor';
-	import {
-		ASPECT_RATIOS,
-		MAX_CONTENT_LENGTH,
-		POST_TYPES,
-		type PostDraft
-	} from './post-draft.svelte';
+	import { ASPECT_RATIOS, POST_TYPES, type PostDraft } from './post-draft.svelte';
 
 	interface Props {
 		draft: PostDraft;
@@ -85,8 +82,12 @@
 		{/each}
 	</div>
 
+	{#if draft.isText}
+		<TextPostPicker {draft} />
+	{/if}
+
 	<!-- Multiple Media Sequence Tray (Mockup 0) -->
-	{#if draft.mediaPlates.length > 0}
+	{#if !draft.isText && draft.mediaPlates.length > 0}
 		<div class="flex items-center gap-3 overflow-x-auto pb-2 no-scrollbar">
 			{#each draft.mediaPlates as plate, idx (plate.id)}
 				<div
@@ -151,7 +152,7 @@
 	{/if}
 
 	<!-- Canvas Ratio Selector (Only when media attached) -->
-	{#if draft.mediaPlates.length > 0}
+	{#if !draft.isText && draft.mediaPlates.length > 0}
 		<div
 			class="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-dark-elevated/60 rounded-2xl text-xs"
 		>
@@ -189,7 +190,7 @@
 	<div class="flex flex-col gap-1.5">
 		<div class="flex items-center justify-between text-xs text-slate-400">
 			<span class="font-medium text-slate-600 dark:text-dark-muted">Caption & Intent</span>
-			<span>{draft.content.length} / {MAX_CONTENT_LENGTH.toLocaleString()}</span>
+			<span>{draft.content.length} / {draft.maxLength.toLocaleString()}</span>
 		</div>
 		<FormatToolbar target={contentInput} class="mb-1" />
 		<textarea
@@ -198,12 +199,13 @@
 			use:autogrow
 			use:formatShortcuts
 			rows="3"
-			maxlength={MAX_CONTENT_LENGTH}
+			maxlength={draft.maxLength}
 			placeholder="Share an architectural observation, exhibition note..."
 			aria-label="Post content"
 			enterkeyhint="enter"
 			class="w-full min-h-24 max-h-[30dvh] resize-none bg-slate-50 dark:bg-dark-elevated/40 rounded-2xl p-3 text-sm leading-relaxed text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 		></textarea>
+		<MentionSuggest target={contentInput} />
 	</div>
 
 	<!-- Interactive Tags List -->
@@ -241,14 +243,16 @@
 		</div>
 
 		<div class="flex items-center gap-2">
-			<button
-				type="button"
-				onclick={() => openPicker()}
-				class="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-slate-100 dark:bg-dark-elevated text-xs font-semibold text-slate-700 dark:text-dark-text border-0 cursor-pointer active:scale-95 transition"
-			>
-				<Icon name="picture" class="text-sm text-blue-600 dark:text-kizuna-blue" />
-				<span>{draft.mediaPlates.length > 0 ? 'Add more stills' : 'Attach Stills / Media'}</span>
-			</button>
+			{#if !draft.isText}
+				<button
+					type="button"
+					onclick={() => openPicker()}
+					class="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-slate-100 dark:bg-dark-elevated text-xs font-semibold text-slate-700 dark:text-dark-text border-0 cursor-pointer active:scale-95 transition"
+				>
+					<Icon name="picture" class="text-sm text-blue-600 dark:text-kizuna-blue" />
+					<span>{draft.mediaPlates.length > 0 ? 'Add more stills' : 'Attach Stills / Media'}</span>
+				</button>
+			{/if}
 
 			<input
 				type="text"

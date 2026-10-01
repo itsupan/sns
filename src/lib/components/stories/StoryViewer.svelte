@@ -8,6 +8,8 @@
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import { followStore } from '$lib/utils/follow.svelte';
+	import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
+	import { STORY_REACTIONS, type StoryReaction } from '$lib/reactions';
 	import type { Story, StoryGroup } from './stories.svelte';
 
 	interface StoryViewer {
@@ -16,6 +18,7 @@
 		handle: string | null;
 		image: string | null;
 		viewedAt: number;
+		reaction: StoryReaction | null;
 		isFollowing: boolean;
 	}
 
@@ -48,13 +51,20 @@
 	let viewersLoading = $state(false);
 	let viewers = $state<StoryViewer[]>([]);
 	let deleting = $state(false);
+	// Reply box and reactions on other people's stories.
+	let replyDraft = $state('');
+	let replying = $state(false);
+	let replyInput = $state<HTMLInputElement | null>(null);
+	let sendingReply = $state(false);
+	// Reactions sent in this viewer; anything else comes from `story.reaction`.
+	let reactions = $state<Record<string, StoryReaction | null>>({});
 	let dragY = $state(0);
 	let video = $state<HTMLVideoElement | null>(null);
 	let closeButton = $state<HTMLButtonElement | null>(null);
 
 	let group = $derived(groups[gi]);
 	let story = $derived(group?.stories[si]);
-	let stopped = $derived(paused || held || confirmDelete || viewersOpen);
+	let stopped = $derived(paused || held || confirmDelete || viewersOpen || replying);
 
 	// Start on the requested group every time the viewer opens.
 	$effect(() => {
@@ -79,6 +89,9 @@
 		progress = 0;
 		confirmDelete = false;
 		viewersOpen = false;
+		replyDraft = '';
+		// The reply box may have unmounted with focus (your own story, or the viewer reopened).
+		replying = document.activeElement === untrack(() => replyInput);
 		const current = story;
 		untrack(() => onSeen?.(current));
 		const upcoming = group?.stories[si + 1] ?? groups[gi + 1]?.stories[0];
@@ -193,6 +206,8 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		if (!open) return;
+		// Typing a reply must not navigate or pause.
+		if (e.key !== 'Escape' && (e.target as HTMLElement).closest('input')) return;
 		if (e.key === 'Escape') close();
 		else if (e.key === 'ArrowRight') next();
 		else if (e.key === 'ArrowLeft') prev();
@@ -266,6 +281,57 @@
 			await followStore.set(person.id, next);
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+		}
+	}
+
+	async function react(emoji: StoryReaction) {
+		if (!story) return;
+		const target = story;
+		const previous = reactionOf(target);
+		const next = previous === emoji ? null : emoji;
+		reactions[target.id] = next;
+		try {
+			const res = await fetch(`/api/stories/${encodeURIComponent(target.id)}/react`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ reaction: next })
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				throw new Error(readApiError(body, 'Could not send your reaction').message);
+			}
+		} catch (err) {
+			reactions[target.id] = previous;
+			toast.show(err instanceof Error ? err.message : 'Could not send your reaction');
+		}
+	}
+
+	function reactionOf(s: Story): StoryReaction | null {
+		return s.id in reactions ? reactions[s.id] : (s.reaction ?? null);
+	}
+
+	async function sendReply(e: SubmitEvent) {
+		e.preventDefault();
+		const content = replyDraft.trim();
+		if (!story || !content || sendingReply) return;
+		sendingReply = true;
+		try {
+			const res = await fetch(`/api/stories/${encodeURIComponent(story.id)}/reply`, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ content })
+			});
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				toast.show(readApiError(body, 'Could not send your reply').message);
+				return;
+			}
+			replyDraft = '';
+			toast.show('Reply sent');
+		} catch {
+			toast.show('Could not send your reply');
+		} finally {
+			sendingReply = false;
 		}
 	}
 
@@ -435,7 +501,7 @@
 				</div>
 			</div>
 
-			<!-- Bottom: caption card, and on your own story the viewers button -->
+			<!-- Bottom: caption card, then the viewers button (own story) or reactions and reply -->
 			<div
 				class="absolute inset-x-3 bottom-[max(1rem,env(safe-area-inset-bottom))] flex flex-col gap-2"
 			>
@@ -457,11 +523,51 @@
 						type="button"
 						class="self-start flex items-center gap-2 h-9 px-3.5 rounded-full bg-black/45 hover:bg-black/60 backdrop-blur-md text-white text-xs font-semibold border-0 cursor-pointer"
 						onclick={openViewers}
-						aria-label={`${story.viewCount ?? 0} views, see who viewed`}
+						aria-label={`${story.viewCount ?? 0} ${story.viewCount === 1 ? 'view' : 'views'}, see who viewed`}
 					>
 						<Icon name="eye" class="text-sm" />
 						<span>{story.viewCount ?? 0} {story.viewCount === 1 ? 'view' : 'views'}</span>
 					</button>
+				{:else}
+					{@const mine = reactionOf(story)}
+					<div class="flex items-center justify-between gap-1" role="group" aria-label="React">
+						{#each STORY_REACTIONS as emoji (emoji)}
+							<button
+								type="button"
+								class="size-10 rounded-full flex items-center justify-center text-xl border-0 cursor-pointer transition active:scale-90 {mine ===
+								emoji
+									? 'bg-white/35 scale-110'
+									: 'bg-black/30 hover:bg-black/45'}"
+								aria-label={`React ${emoji}`}
+								aria-pressed={mine === emoji}
+								onclick={() => react(emoji)}
+							>
+								{emoji}
+							</button>
+						{/each}
+					</div>
+					<form class="flex items-center gap-2" onsubmit={sendReply}>
+						<input
+							bind:this={replyInput}
+							bind:value={replyDraft}
+							type="text"
+							maxlength={MAX_MESSAGE_LENGTH}
+							placeholder={`Reply to ${group.user.name}…`}
+							aria-label={`Reply to ${group.user.name}`}
+							class="flex-1 min-w-0 h-11 px-4 rounded-full bg-black/30 border border-white/50 text-sm text-white placeholder:text-white/70 focus:outline-none focus:border-white"
+							onfocus={() => (replying = true)}
+							onblur={() => (replying = false)}
+						/>
+						{#if replyDraft.trim()}
+							<button
+								type="submit"
+								class="shrink-0 h-11 px-4 rounded-full bg-white text-slate-950 text-sm font-semibold border-0 cursor-pointer disabled:opacity-50"
+								disabled={sendingReply}
+							>
+								Send
+							</button>
+						{/if}
+					</form>
 				{/if}
 			</div>
 
@@ -485,7 +591,11 @@
 						>
 							<h2 class="m-0 text-sm font-semibold flex items-center gap-2">
 								<Icon name="eye" class="text-sm text-slate-500 dark:text-dark-muted" />
-								<span>{viewersLoading ? 'Viewers' : `${viewers.length} viewers`}</span>
+								<span
+									>{viewersLoading
+										? 'Viewers'
+										: `${viewers.length} ${viewers.length === 1 ? 'viewer' : 'viewers'}`}</span
+								>
 							</h2>
 							<button
 								type="button"
@@ -530,6 +640,11 @@
 												</span>
 											</span>
 										</a>
+										{#if person.reaction}
+											<span class="shrink-0 text-xl" aria-label={`Reacted ${person.reaction}`}
+												>{person.reaction}</span
+											>
+										{/if}
 										<button
 											type="button"
 											class="shrink-0 h-8 px-4 rounded-full text-xs font-semibold border-0 cursor-pointer transition {following

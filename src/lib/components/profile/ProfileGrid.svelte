@@ -3,6 +3,8 @@
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import FormattedText from '$lib/components/shared/FormattedText.svelte';
+	import { TEXT_BACKGROUNDS } from '$lib/post-backgrounds';
+	import { stripFormatting } from '$lib/formatting';
 	import PostCard, { type PostData } from '$lib/components/feed/PostCard.svelte';
 	import { formatCount } from '$lib/utils/format';
 	import type { TabId, ViewMode } from './ProfileTabs.svelte';
@@ -267,6 +269,16 @@
 			aria-hidden="true"
 		>
 			<Icon name="play" type="sr" class="text-[10px]" />
+		</div>
+	{:else if item.post?.background}
+		<div
+			class="w-full h-full flex items-center justify-center p-3 sm:p-5 text-center text-white font-semibold {TEXT_BACKGROUNDS[
+				item.post.background
+			]}"
+		>
+			<span class="line-clamp-5 leading-snug {textSize}"
+				>{stripFormatting(item.post.description)}</span
+			>
 		</div>
 	{:else}
 		<div

@@ -79,5 +79,9 @@ export function activityVerb(group: ActivityGroup): string {
 			return 'reacted to your comment';
 		case 'follow':
 			return 'started following you';
+		case 'mention':
+			return 'tagged you in a post';
+		case 'story_reaction':
+			return 'reacted to your story';
 	}
 }

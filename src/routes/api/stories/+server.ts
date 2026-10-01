@@ -10,6 +10,7 @@ import {
 	MAX_STORY_CAPTION,
 	MAX_STORY_LOCATION,
 	getSeenStoryIds,
+	getViewerReactions,
 	listStoriesByUser,
 	listViews,
 	putStory
@@ -110,6 +111,15 @@ export const GET: RequestHandler = withApi(async ({ locals, platform }) => {
 		).then((pairs) => new Map(pairs))
 	]);
 
+	// Only a watched story can carry the viewer's reaction, so only those are read.
+	const reactions = await getViewerReactions(
+		kv,
+		[...byUser.entries()].flatMap(([userId, stories]) =>
+			userId === viewer.id ? [] : stories.filter((s) => seen.has(s.id)).map((s) => s.id)
+		),
+		viewer.id
+	);
+
 	const authors = await locals.db
 		.select({ id: user.id, name: user.name, handle: user.handle, image: user.image })
 		.from(user)
@@ -132,7 +142,9 @@ export const GET: RequestHandler = withApi(async ({ locals, platform }) => {
 						mediaUrl: await refreshMediaUrl(s.mediaUrl, env),
 						// Your own stories always count as watched.
 						seen: author.id === viewer.id || seen.has(s.id),
-						...(author.id === viewer.id ? { viewCount: ownViewCounts.get(s.id) ?? 0 } : {})
+						...(author.id === viewer.id
+							? { viewCount: ownViewCounts.get(s.id) ?? 0 }
+							: { reaction: reactions.get(s.id) ?? null })
 					}))
 				)
 			};

@@ -5,7 +5,8 @@
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import SheetAction from '$lib/components/shared/SheetAction.svelte';
 	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
-	import { formatCount } from '$lib/utils/format';
+	import { formatCount, likesSummary } from '$lib/utils/format';
+	import { TEXT_BACKGROUNDS, type TextBackground } from '$lib/post-backgrounds';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { authClient } from '$lib/auth-client';
 	import SharePostModal from './SharePostModal.svelte';
@@ -34,6 +35,8 @@
 		content: string;
 	}
 
+	export type PostType = 'photo' | 'story' | 'article' | 'text';
+
 	export interface MediaItem {
 		url: string;
 		type: 'image' | 'video';
@@ -49,11 +52,15 @@
 		mediaType?: 'image' | 'video' | 'none';
 		mediaItems?: MediaItem[];
 		aspectRatio?: '1:1' | '4:5' | '16:9';
-		postType?: 'photo' | 'story' | 'article';
+		postType?: PostType;
+		/** Text posts: the background preset the text sits on. */
+		background?: TextBackground;
 		location?: string;
 		cameraMeta?: string;
 		tags: string[];
 		likes: number;
+		/** Most recent liker other than the viewer, for the "Liked by" line. */
+		likedBy?: string;
 		commentsCount: number;
 		repostsCount: number;
 		commentPreview?: PostComment;
@@ -274,6 +281,17 @@
 			}
 		}
 	}
+
+	let textBackground = $derived(
+		post.postType === 'text' && post.background ? TEXT_BACKGROUNDS[post.background] : null
+	);
+	let textSize = $derived(
+		post.description.length <= 80
+			? 'text-2xl lg:text-3xl'
+			: post.description.length <= 160
+				? 'text-xl lg:text-2xl'
+				: 'text-lg lg:text-xl'
+	);
 
 	let isLiked = $derived(likedOverride !== null ? likedOverride : (post.liked ?? false));
 	let isSaved = $derived(savedOverride !== null ? savedOverride : (post.saved ?? false));
@@ -573,7 +591,14 @@
 		{/if}
 
 		<!-- Media: full-bleed on phones & vertical tablets, rounded on larger screens. Multi-image carousel with counter & dots. Double-tap to like. -->
-		{#if allMedia.length > 0}
+		{#if textBackground}
+			<div
+				class="w-full aspect-square sm:aspect-[4/3] rounded-none lg:rounded-2xl overflow-hidden mb-3 lg:mb-4 flex items-center justify-center p-8 text-center text-white font-semibold leading-snug {textBackground} {textSize}"
+				data-testid="text-post"
+			>
+				<FormattedText text={post.description} class="max-w-full drop-shadow-sm" />
+			</div>
+		{:else if allMedia.length > 0}
 			{@const currentMedia = allMedia[activeSlide] ?? allMedia[0]}
 			{@const activeMediaUrl = dynamicMediaUrls[activeSlide] || currentMedia.url}
 			{@const isVideo =
@@ -806,9 +831,16 @@
 			</div>
 		</div>
 
+		<p
+			class="px-4 lg:px-0 lg:order-1 m-0 mt-1 lg:mt-0 text-sm font-semibold text-slate-900 dark:text-dark-text"
+			data-testid="likes-summary"
+		>
+			{likesSummary(likesCount, isLiked, post.likedBy)}
+		</p>
+
 		<div class="px-4 lg:px-0 flex flex-col">
-			<!-- Caption / Description -->
-			{#if post.description}
+			<!-- Caption / Description (a text post shows it on its background instead) -->
+			{#if post.description && !textBackground}
 				<div class="mt-1.5 lg:mt-0 mb-3">
 					<div
 						bind:this={descriptionEl}

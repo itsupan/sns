@@ -24,7 +24,9 @@ export const post = sqliteTable(
 		aspectRatio: text('aspect_ratio').default('1:1'), // '1:1' | '4:5' | '16:9'
 		location: text('location'), // e.g. "Fondazione Prada, Milano"
 		cameraMeta: text('camera_meta'),
-		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article'
+		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article' | 'text'
+		// Text posts only: a key of TEXT_BACKGROUNDS ($lib/post-backgrounds).
+		background: text('background'),
 		likesCount: integer('likes_count').default(0).notNull(),
 		commentsCount: integer('comments_count').default(0).notNull(),
 		sharesCount: integer('shares_count').default(0).notNull(),
@@ -252,6 +254,23 @@ export const userBlock = sqliteTable(
 	]
 );
 
+/** Users tagged (@mentioned) in a post. */
+export const postMention = sqliteTable(
+	'post_mention',
+	{
+		postId: text('post_id')
+			.notNull()
+			.references(() => post.id, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' })
+	},
+	(table) => [
+		primaryKey({ columns: [table.postId, table.userId] }),
+		index('post_mention_userId_idx').on(table.userId)
+	]
+);
+
 export const postRelations = relations(post, ({ one, many }) => ({
 	user: one(user, {
 		fields: [post.userId],
@@ -355,6 +374,8 @@ export const message = sqliteTable(
 			.notNull()
 			.references(() => user.id, { onDelete: 'cascade' }),
 		content: text('content').notNull(),
+		// Set when the message is a reply to a story: the story id (`<userId>:<createdAtMs>`).
+		storyRef: text('story_ref'),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
@@ -370,7 +391,15 @@ export const message = sqliteTable(
 	]
 );
 
-export const NOTIFICATION_TYPES = ['like', 'comment', 'reply', 'reaction', 'follow'] as const;
+export const NOTIFICATION_TYPES = [
+	'like',
+	'comment',
+	'reply',
+	'reaction',
+	'follow',
+	'mention',
+	'story_reaction'
+] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
 /**

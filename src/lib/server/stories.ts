@@ -1,3 +1,6 @@
+import type { StoryReaction } from '$lib/reactions';
+import { STORY_TTL_SEC } from '$lib/stories';
+
 /**
  * Stories live only in the STORIES KV namespace. Each story is one key written with
  * `expirationTtl: STORY_TTL_SEC`, so KV deletes it after 24 hours without any cleanup job.
@@ -7,7 +10,7 @@
  * key's metadata so `list()` returns everything without a `get()` per story.
  */
 
-export const STORY_TTL_SEC = 24 * 60 * 60;
+export { STORY_TTL_SEC };
 export const MAX_STORY_CAPTION = 200;
 export const MAX_STORY_LOCATION = 100;
 /** Cap on authors read per request: one KV `list` each, well under the Workers subrequest limit. */
@@ -107,6 +110,7 @@ export async function listStoriesByUser(
 /*
  * Views. Two kinds of keys, both expiring with the story they belong to:
  * - `view:<storyId>:<viewerId>` — one per viewer (so repeat opens count once), listed by the author.
+ *   It also carries the viewer's reaction, so the viewers list shows both from one `list()`.
  * - `seen:<viewerId>` — that viewer's `{ storyId: expiresAtMs }` map, so the tray can show
  *   watched rings from one read instead of one read per story.
  */
@@ -121,6 +125,7 @@ const seenKey = (viewerId: string) => `seen:${viewerId}`;
 export interface StoryView {
 	viewerId: string;
 	viewedAt: number;
+	reaction?: StoryReaction;
 }
 
 /** `<userId>:<createdAtMs>`, the id format `putStory` returns. */
@@ -186,6 +191,47 @@ export async function recordView(
 		});
 	}
 	return counted;
+}
+
+/**
+ * Sets (or with `null` clears) `viewerId`'s reaction on `story`. Reacting counts as watching, so
+ * the view is recorded too. Returns false for the author's own story or one about to expire.
+ */
+export async function setStoryReaction(
+	kv: KVNamespace,
+	story: StoredStory,
+	viewerId: string,
+	reaction: StoryReaction | null,
+	now = Date.now()
+): Promise<boolean> {
+	if (viewerId === story.userId) return false;
+	await recordView(kv, story, viewerId, now);
+	const expiration = expirationFor(story, now);
+	if (expiration === null) return false;
+
+	const key = viewKey(story.id, viewerId);
+	const existing = await kv.get<StoryView>(key, 'json');
+	const view: StoryView = { viewerId, viewedAt: existing?.viewedAt ?? now };
+	if (reaction) view.reaction = reaction;
+	await kv.put(key, JSON.stringify(view), { expiration, metadata: view });
+	return true;
+}
+
+/** `viewerId`'s reaction on each of `storyIds` that has one. */
+export async function getViewerReactions(
+	kv: KVNamespace,
+	storyIds: string[],
+	viewerId: string
+): Promise<Map<string, StoryReaction>> {
+	const views = await Promise.all(
+		storyIds.map((id) => kv.get<StoryView>(viewKey(id, viewerId), 'json'))
+	);
+	const reactions = new Map<string, StoryReaction>();
+	storyIds.forEach((id, i) => {
+		const reaction = views[i]?.reaction;
+		if (reaction) reactions.set(id, reaction);
+	});
+	return reactions;
 }
 
 /** Everyone who watched a story, most recent first. */

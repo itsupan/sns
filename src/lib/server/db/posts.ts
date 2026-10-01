@@ -1,6 +1,6 @@
-import { and, asc, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '.';
-import { post, postMedia, postTag, tag, user } from './schema';
+import { post, postLike, postMedia, postTag, tag, user } from './schema';
 import { MAX_TAGS_PER_POST } from '$lib/constants/post-limits';
 import { notBlockedWith } from './blocks';
 
@@ -207,4 +207,39 @@ export function attachTagsStatements(db: Database, postId: string, tags: Normali
 				)
 		)
 	] as const;
+}
+
+/**
+ * Each post's most recent liker other than the viewer (and not blocked with them), by name, for
+ * the "Liked by" line under a post.
+ */
+export async function loadRecentLikers(
+	db: Database,
+	viewerId: string | null | undefined,
+	postIds: string[]
+): Promise<Map<string, string>> {
+	if (postIds.length === 0) return new Map();
+	const ranked = db
+		.select({
+			postId: postLike.postId,
+			name: user.name,
+			rank: sql<number>`row_number() over (partition by ${postLike.postId} order by ${postLike.createdAt} desc)`.as(
+				'rank'
+			)
+		})
+		.from(postLike)
+		.innerJoin(user, eq(user.id, postLike.userId))
+		.where(
+			and(
+				inArray(postLike.postId, postIds),
+				viewerId ? ne(postLike.userId, viewerId) : undefined,
+				notBlockedWith(viewerId, postLike.userId)
+			)
+		)
+		.as('ranked');
+	const rows = await db
+		.select({ postId: ranked.postId, name: ranked.name })
+		.from(ranked)
+		.where(eq(ranked.rank, 1));
+	return new Map(rows.map((r) => [r.postId, r.name]));
 }

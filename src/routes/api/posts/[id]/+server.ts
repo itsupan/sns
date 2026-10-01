@@ -22,8 +22,13 @@ import {
 	MAX_POST_LOCATION_LENGTH,
 	MAX_POST_TITLE_LENGTH,
 	MAX_TAGS_PER_POST,
-	MAX_TAG_LENGTH
+	MAX_TAG_LENGTH,
+	MAX_TEXT_POST_LENGTH
 } from '$lib/constants/post-limits';
+import { TEXT_BACKGROUND_KEYS } from '$lib/post-backgrounds';
+import { backgroundOf } from '$lib/server/db/post-cards';
+import { syncMentionsStatements } from '$lib/server/db/mentions';
+import type { PostType } from '$lib/components/feed/PostCard.svelte';
 
 /** Same fields as the create composer; anything omitted is left unchanged. */
 const UpdatePostBody = v.object(
@@ -59,7 +64,8 @@ const UpdatePostBody = v.object(
 		tags: v.optional(v.array(v.string('Tags must be strings'), 'Tags must be an array')),
 		mediaUrls: v.optional(v.array(v.unknown(), 'Media must be an array')),
 		aspectRatio: v.optional(v.picklist(['1:1', '4:5', '16:9'], 'Invalid aspect ratio')),
-		postType: v.optional(v.picklist(['photo', 'story', 'article'], 'Invalid post type'))
+		postType: v.optional(v.picklist(['photo', 'story', 'article', 'text'], 'Invalid post type')),
+		background: v.optional(v.picklist(TEXT_BACKGROUND_KEYS, 'Invalid background'))
 	},
 	'Request body must be an object'
 );
@@ -72,7 +78,14 @@ async function requireOwnPost(locals: App.Locals, postId: string | undefined, ac
 	}
 
 	const [existingPost] = await locals.db
-		.select({ id: post.id, userId: post.userId, deletedAt: post.deletedAt })
+		.select({
+			id: post.id,
+			userId: post.userId,
+			deletedAt: post.deletedAt,
+			content: post.content,
+			postType: post.postType,
+			background: post.background
+		})
 		.from(post)
 		.where(eq(post.id, postId))
 		.limit(1);
@@ -83,11 +96,11 @@ async function requireOwnPost(locals: App.Locals, postId: string | undefined, ac
 	if (existingPost.userId !== currentUser.id) {
 		throw new ApiError(403, 'forbidden', `You do not have permission to ${action} this post`);
 	}
-	return { currentUser, postId };
+	return { currentUser, postId, existingPost };
 }
 
 export const PATCH: RequestHandler = withApi(async ({ params, locals, request, platform }) => {
-	const { currentUser, postId } = await requireOwnPost(locals, params.id, 'edit');
+	const { currentUser, postId, existingPost } = await requireOwnPost(locals, params.id, 'edit');
 	const body = await parseBody(request, UpdatePostBody);
 
 	const tags = body.tags === undefined ? undefined : normalizeTags(body.tags);
@@ -115,20 +128,51 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 		}));
 	}
 
+	// A text post (after this edit) needs a background, no media and short text.
+	const isText = (body.postType ?? existingPost.postType) === 'text';
+	const background = isText ? (body.background ?? existingPost.background) : null;
+	if (isText) {
+		if (!background) {
+			const message = 'Choose a background for your text post';
+			throw new ApiError(400, 'validation_failed', message, { background: message });
+		}
+		const mediaCount = (media ?? (await loadPostMedia(locals.db, [postId])).get(postId) ?? [])
+			.length;
+		if (mediaCount > 0) {
+			const message = 'Text posts cannot have photos or videos';
+			throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
+		}
+		if ((body.content ?? existingPost.content).length > MAX_TEXT_POST_LENGTH) {
+			const message = `Text posts can be at most ${MAX_TEXT_POST_LENGTH} characters`;
+			throw new ApiError(400, 'validation_failed', message, { content: message });
+		}
+	}
+
 	const fields = Object.fromEntries(
 		Object.entries({
 			title: body.title,
 			content: body.content,
 			location: body.location,
 			aspectRatio: body.aspectRatio,
-			postType: body.postType
+			postType: body.postType,
+			background:
+				body.postType !== undefined || body.background !== undefined ? background : undefined
 		}).filter(([, value]) => value !== undefined)
 	);
 	if (Object.keys(fields).length === 0 && tags === undefined && media === undefined) {
 		throw new ApiError(400, 'validation_failed', 'No valid fields provided to update');
 	}
 
-	// Post fields, media and tags change together or not at all.
+	const mentionStatements =
+		body.content === undefined
+			? []
+			: await syncMentionsStatements(locals.db, {
+					postId,
+					authorId: currentUser.id,
+					content: body.content
+				});
+
+	// Post fields, media, tags and mentions change together or not at all.
 	await locals.db.batch([
 		locals.db
 			.update(post)
@@ -157,7 +201,8 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 					locals.db.delete(postTag).where(eq(postTag.postId, postId)),
 					...attachTagsStatements(locals.db, postId, tags)
 				]
-			: [])
+			: []),
+		...mentionStatements
 	]);
 
 	const [[updated], tagsByPost, mediaByPost] = await Promise.all([
@@ -167,7 +212,8 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 				content: post.content,
 				location: post.location,
 				aspectRatio: post.aspectRatio,
-				postType: post.postType
+				postType: post.postType,
+				background: post.background
 			})
 			.from(post)
 			.where(eq(post.id, postId))
@@ -189,7 +235,8 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 			mediaType: mediaItems[0]?.type ?? 'none',
 			mediaItems,
 			aspectRatio: (updated?.aspectRatio ?? '1:1') as '1:1' | '4:5' | '16:9',
-			postType: (updated?.postType ?? 'photo') as 'photo' | 'story' | 'article'
+			postType: (updated?.postType ?? 'photo') as PostType,
+			background: updated ? backgroundOf(updated) : undefined
 		},
 		platform?.env
 	);

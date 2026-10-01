@@ -32,3 +32,12 @@ export interface ReactionSummary {
 }
 
 export const emptyReactionSummary = (): ReactionSummary => ({ counts: {}, mine: [] });
+
+/** Quick reactions a viewer can send on a story. Shared by the API (validation) and the viewer. */
+export const STORY_REACTIONS = ['❤️', '😂', '😮', '😢', '👏', '🔥'] as const;
+
+export type StoryReaction = (typeof STORY_REACTIONS)[number];
+
+export function isStoryReaction(value: unknown): value is StoryReaction {
+	return (STORY_REACTIONS as readonly unknown[]).includes(value);
+}

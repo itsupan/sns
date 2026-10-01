@@ -14,6 +14,8 @@ export interface ChatMessage {
 	content: string;
 	/** Epoch ms assigned by D1, so every message in a conversation shares one clock. */
 	createdAt: number;
+	/** Set when the message replies to a story: its id, `<authorId>:<createdAtMs>`. */
+	storyRef?: string;
 }
 
 export interface ChatUser {

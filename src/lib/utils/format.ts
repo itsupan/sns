@@ -1,4 +1,14 @@
 /** Compact count for social metrics: 842 → "842", 1420 → "1.4K", 2_300_000 → "2.3M". */
+/** The line under a post: "Liked by you and 3 others", "Liked by Ana", "0 likes". */
+export function likesSummary(count: number, liked: boolean, likedBy?: string): string {
+	const others = count - 1;
+	const rest =
+		others === 1 ? ' and 1 other' : others > 1 ? ` and ${formatCount(others)} others` : '';
+	if (count > 0 && liked) return `Liked by you${rest}`;
+	if (count > 0 && likedBy) return `Liked by ${likedBy}${rest}`;
+	return `${formatCount(count)} ${count === 1 ? 'like' : 'likes'}`;
+}
+
 export function formatCount(value: number): string {
 	if (value < 1000) return String(value);
 	const units = [

@@ -12,13 +12,17 @@ import {
 import { encodeCursor, type FeedCursor } from './posts';
 import { notBlockedWith } from './blocks';
 
-/** An action that notifies `recipientId`. Which of `postId` / `commentId` is set depends on `type`. */
+/**
+ * An action that notifies `recipientId`. Which of `postId` / `commentId` / `storyId` is set
+ * depends on `type`.
+ */
 export interface NotificationTarget {
 	type: NotificationType;
 	actorId: string;
 	recipientId: string;
 	postId?: string | null;
 	commentId?: string | null;
+	storyId?: string | null;
 }
 
 /** Notifications older than this are pruned when the user marks Activity read. */
@@ -29,7 +33,8 @@ export const UNREAD_CAP = 99;
 
 /**
  * One row per action: a like or reaction is per actor and target, a comment or reply is the
- * comment itself, a follow is per pair. Repeating an action hits the same key; undoing deletes it.
+ * comment itself, a follow is per pair, a mention is per post and tagged user. Repeating an
+ * action hits the same key; undoing deletes it.
  */
 export function dedupeKey(t: NotificationTarget): string {
 	switch (t.type) {
@@ -43,6 +48,10 @@ export function dedupeKey(t: NotificationTarget): string {
 			return `reaction:${t.actorId}:${t.commentId}`;
 		case 'follow':
 			return `follow:${t.actorId}:${t.recipientId}`;
+		case 'mention':
+			return `mention:${t.postId}:${t.recipientId}`;
+		case 'story_reaction':
+			return `story_reaction:${t.actorId}:${t.storyId}`;
 	}
 }
 

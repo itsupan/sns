@@ -1,4 +1,5 @@
 import { readApiError } from '$lib/utils/api-error';
+import type { StoryReaction } from '$lib/reactions';
 
 /** One story as returned by `/api/stories` (media URL already signed for viewing). */
 export interface Story {
@@ -14,6 +15,8 @@ export interface Story {
 	seen?: boolean;
 	/** Your own stories only: how many people watched it. */
 	viewCount?: number;
+	/** Other people's stories only: the reaction you sent, if any. */
+	reaction?: StoryReaction | null;
 }
 
 export interface StoryGroup {
