@@ -127,6 +127,7 @@ describe('StoryViewer', () => {
 							handle: 'aoi',
 							image: null,
 							viewedAt: now - 60_000,
+							reaction: '🔥',
 							isFollowing: false
 						}
 					]
@@ -140,10 +141,11 @@ describe('StoryViewer', () => {
 		];
 		const screen = render(StoryViewer, { props: { open: true, groups: own } });
 
-		await screen.getByRole('button', { name: '1 views, see who viewed' }).click();
+		await screen.getByRole('button', { name: '1 view, see who viewed' }).click();
 		const panel = screen.getByRole('dialog', { name: 'Story viewers' });
 		await expect.element(panel.getByText('Aoi Tanaka')).toBeVisible();
-		await expect.element(panel.getByText('1 viewers')).toBeVisible();
+		await expect.element(panel.getByText('1 viewer', { exact: true })).toBeVisible();
+		await expect.element(panel.getByLabelText('Reacted 🔥')).toBeVisible();
 		expect(fetchMock).toHaveBeenCalledWith(
 			`/api/stories/${encodeURIComponent(own[0].stories[0].id)}/views`
 		);
@@ -157,6 +159,65 @@ describe('StoryViewer', () => {
 
 		// The story stays put while the list is open.
 		await expect.element(screen.getByText('My first')).toBeVisible();
+	});
+
+	it('sends a reaction and toggles it off with a second tap', async () => {
+		const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
+		vi.stubGlobal('fetch', fetchMock);
+		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+		const url = `/api/stories/${encodeURIComponent(groups[1].stories[0].id)}/react`;
+		const sent = () => JSON.parse(String(fetchMock.mock.lastCall?.[1]?.body));
+
+		const fire = screen.getByRole('button', { name: 'React 🔥' });
+		await fire.click();
+		await expect.element(fire).toHaveAttribute('aria-pressed', 'true');
+		expect(fetchMock).toHaveBeenLastCalledWith(url, expect.objectContaining({ method: 'POST' }));
+		expect(sent()).toEqual({ reaction: '🔥' });
+
+		await fire.click();
+		await expect.element(fire).toHaveAttribute('aria-pressed', 'false');
+		expect(sent()).toEqual({ reaction: null });
+	});
+
+	it('shows a reaction saved earlier and clears it with a tap', async () => {
+		const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
+		vi.stubGlobal('fetch', fetchMock);
+		const reacted: StoryGroup[] = [
+			groups[0],
+			{ ...groups[1], stories: [{ ...groups[1].stories[0], reaction: '😂' }, groups[1].stories[1]] }
+		];
+		const screen = render(StoryViewer, { props: { open: true, groups: reacted, startIndex: 1 } });
+
+		const laugh = screen.getByRole('button', { name: 'React 😂' });
+		await expect.element(laugh).toHaveAttribute('aria-pressed', 'true');
+		await laugh.click();
+		await expect.element(laugh).toHaveAttribute('aria-pressed', 'false');
+		expect(JSON.parse(String(fetchMock.mock.lastCall?.[1]?.body))).toEqual({ reaction: null });
+	});
+
+	it('replies to a story without moving on while typing', async () => {
+		const fetchMock = vi.fn(async () => Response.json({}, { status: 201 }));
+		vi.stubGlobal('fetch', fetchMock);
+		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+
+		const input = screen.getByRole('textbox', { name: 'Reply to Aoi' });
+		await input.fill('So good');
+		await userEvent.keyboard('{ArrowRight}');
+		await expect.element(screen.getByText('Aoi one')).toBeVisible();
+
+		await screen.getByRole('button', { name: 'Send' }).click();
+		await expect.element(input).toHaveValue('');
+		expect(fetchMock).toHaveBeenCalledWith(
+			`/api/stories/${encodeURIComponent(groups[1].stories[0].id)}/reply`,
+			expect.objectContaining({ method: 'POST', body: JSON.stringify({ content: 'So good' }) })
+		);
+	});
+
+	it("doesn't show reactions or a reply box on your own story", async () => {
+		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 0 } });
+		await expect.element(screen.getByText('My first')).toBeVisible();
+		expect(screen.getByRole('button', { name: 'React 🔥' }).query()).toBeNull();
+		expect(screen.getByRole('textbox', { name: /Reply to/ }).query()).toBeNull();
 	});
 
 	it("doesn't show a views button on other people's stories", async () => {

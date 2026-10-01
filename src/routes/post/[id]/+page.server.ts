@@ -5,11 +5,11 @@ import { post, postComment, user } from '$lib/server/db/schema';
 import { formatTimeAgo } from '$lib/utils/format';
 import { loadFollowedIds } from '$lib/server/db/follows';
 import { loadSuggestions } from '$lib/server/explore';
-import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
-import { loadPostMedia, loadPostTags, notDeleted } from '$lib/server/db/posts';
+import { loadPostMedia, loadPostTags, loadRecentLikers, notDeleted } from '$lib/server/db/posts';
 
-import { loadViewerPostState } from '$lib/server/db/post-cards';
+import { backgroundOf, loadViewerPostState } from '$lib/server/db/post-cards';
 const FALLBACK_POSTS: PostData[] = [
 	{
 		id: 'post-1',
@@ -144,7 +144,10 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					r.user.id
 				);
 
-				const viewerState = await loadViewerPostState(locals.db, locals.user?.id, [postId]);
+				const [viewerState, likers] = await Promise.all([
+					loadViewerPostState(locals.db, locals.user?.id, [postId]),
+					loadRecentLikers(locals.db, locals.user?.id, [postId])
+				]);
 
 				let commentPreview: { author: string; content: string } | undefined;
 				try {
@@ -192,13 +195,15 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					mediaType: parsedMedia[0]?.type || 'none',
 					mediaItems: parsedMedia,
 					aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
-					postType: r.post.postType as 'photo' | 'story' | 'article',
+					postType: r.post.postType as PostType,
+					background: backgroundOf(r.post),
 					location: r.post.location || r.user.location || undefined,
 					cameraMeta: r.post.cameraMeta || undefined,
 					tags: parsedTags,
 					likes: r.post.likesCount,
 					commentsCount: r.post.commentsCount,
 					repostsCount: r.post.sharesCount,
+					likedBy: likers.get(postId),
 					liked: viewerState.liked.has(postId),
 					saved: viewerState.saved.has(postId),
 					commentPreview

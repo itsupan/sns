@@ -1,9 +1,10 @@
 /**
- * Safe Markdown-subset formatting for post text (#123).
+ * Safe Markdown-subset formatting for post text (#123), plus @mentions (#152).
  *
  * Everything is HTML-escaped FIRST; only a fixed set of tags we emit ourselves
- * (<strong>, <em>, <u>, <ul>, <ol>, <li>, <p>, <br>) can appear in the output.
- * No links, no attributes, no raw HTML — so the result is safe for {@html}.
+ * (<strong>, <em>, <u>, <ul>, <ol>, <li>, <p>, <br>, and <a> for mentions) can appear in
+ * the output. The only attribute is a mention's href, built from handle characters alone —
+ * so the result is safe for {@html}.
  */
 
 const ESCAPES: Record<string, string> = {
@@ -28,12 +29,30 @@ const BOLD = new RegExp(String.raw`\*\*${INNER}\*\*`, 'g');
 const ITALIC_STAR = new RegExp(String.raw`(?<!\*)\*(?!\*)${INNER}(?<!\*)\*(?!\*)`, 'g');
 const ITALIC_UNDER = new RegExp(String.raw`(?<![\w_])_(?!_)${INNER}(?<!_)_(?![\w_])`, 'g');
 
+/**
+ * `@handle` using the characters profile handles allow, not part of an email or another
+ * mention. A trailing `.` or `-` is read as punctuation ("thanks @bob.").
+ */
+const MENTION = /(?<![\w@.])@([a-z0-9_.-]{0,29}[a-z0-9_])(?![a-z0-9_])/gi;
+
+/** Lowercased handles mentioned in `src`, each once, in order of appearance. */
+export function parseMentions(src: string): string[] {
+	return [...new Set([...(src ?? '').matchAll(MENTION)].map((m) => m[1].toLowerCase()))];
+}
+
 function inline(escaped: string): string {
+	// Mentions become placeholders first so emphasis markers never split a handle like @a_b_c.
+	const mentions: string[] = [];
 	return escaped
+		.replace(MENTION, (_, handle: string) => `\0${mentions.push(handle) - 1}\0`)
 		.replace(UNDERLINE, '<u>$1</u>')
 		.replace(BOLD, '<strong>$1</strong>')
 		.replace(ITALIC_STAR, '<em>$1</em>')
-		.replace(ITALIC_UNDER, '<em>$1</em>');
+		.replace(ITALIC_UNDER, '<em>$1</em>')
+		.replace(/\0(\d+)\0/g, (_, i: string) => {
+			const handle = mentions[Number(i)];
+			return `<a href="/profile/${handle.toLowerCase()}" class="mention">@${handle}</a>`;
+		});
 }
 
 function renderBlock(lines: string[]): string {
@@ -74,7 +93,9 @@ function renderBlock(lines: string[]): string {
 
 /** Render post text to safe HTML. */
 export function renderFormatted(src: string): string {
-	const escaped = escapeHtml(src ?? '').replace(/\r\n?/g, '\n');
+	const escaped = escapeHtml(src ?? '')
+		.replace(/\r\n?/g, '\n')
+		.replace(/\0/g, '');
 	return escaped
 		.split(/\n[ \t]*\n+/)
 		.map((b) => b.replace(/^\n+|\n+$/g, ''))

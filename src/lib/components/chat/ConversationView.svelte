@@ -25,6 +25,7 @@
 	import { MAX_MESSAGE_LENGTH, type ChatServerEvent, type ChatUser } from '$lib/chat/types';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { isStoryExpired } from '$lib/stories';
 
 	interface Props {
 		conversationId: string;
@@ -348,6 +349,17 @@
 				class="flex flex-col max-w-[80%] {mine ? 'self-end items-end' : 'self-start items-start'}"
 				data-testid="message"
 			>
+				{#if m.storyRef}
+					<p
+						class="m-0 mb-1 text-[11px] text-slate-500 dark:text-dark-muted flex items-center gap-1"
+					>
+						<Icon name="circle" size={10} />
+						{mine ? `You replied to ${other.name}'s story` : 'Replied to your story'}
+						{#if isStoryExpired(m.storyRef)}
+							<span class="text-slate-400">· Story expired</span>
+						{/if}
+					</p>
+				{/if}
 				<p
 					class="m-0 px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words {mine
 						? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 rounded-br-md'

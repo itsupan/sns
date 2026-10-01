@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount, formatTimeAgo } from './format';
+import { formatCount, formatTimeAgo, likesSummary } from './format';
 
 describe('formatCount', () => {
 	it('keeps small numbers as-is', () => {
@@ -37,5 +37,20 @@ describe('formatTimeAgo', () => {
 		if (weeksAgo.getFullYear() === thisYear) {
 			expect(formatTimeAgo(weeksAgo)).not.toContain(String(thisYear));
 		}
+	});
+});
+
+describe('likesSummary', () => {
+	it('always shows a count, even with no likes', () => {
+		expect(likesSummary(0, false)).toBe('0 likes');
+		expect(likesSummary(1, false)).toBe('1 like');
+		expect(likesSummary(2500, false)).toBe('2.5K likes');
+	});
+
+	it('names the viewer first, then a recent liker', () => {
+		expect(likesSummary(1, true, 'Ana')).toBe('Liked by you');
+		expect(likesSummary(2, true, 'Ana')).toBe('Liked by you and 1 other');
+		expect(likesSummary(1, false, 'Ana')).toBe('Liked by Ana');
+		expect(likesSummary(1201, false, 'Ana')).toBe('Liked by Ana and 1.2K others');
 	});
 });

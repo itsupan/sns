@@ -62,6 +62,7 @@ export function rateLimitSubject(event: {
 export const FAIL_CLOSED_LIMITS: ReadonlySet<RateLimitName> = new Set<RateLimitName>([
 	'createPost',
 	'createStory',
+	'storyReaction',
 	'comment',
 	'chatStart',
 	'chatMessage',

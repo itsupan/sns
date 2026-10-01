@@ -143,6 +143,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fix
 | `createPost`    | `RATE_LIMIT_CREATE_POST`    | `POST /api/posts`                                       | 10 / min  |
 | `comment`       | `RATE_LIMIT_COMMENT`        | `POST /api/posts/:id/comments`                          | 20 / min  |
 | `reaction`      | `RATE_LIMIT_REACTION`       | `POST /api/comments/:id/reactions`                      | 60 / min  |
+| `storyReaction` | `RATE_LIMIT_STORY_REACTION` | `POST /api/stories/:id/react`                           | 60 / min  |
 | `search`        | `RATE_LIMIT_SEARCH`         | `GET /api/search` (per user, or per IP when signed out) | 60 / min  |
 | `chatStart`     | `RATE_LIMIT_CHAT_START`     | `POST /api/conversations`                               | 10 / min  |
 | `chatMessage`   | `RATE_LIMIT_CHAT_MESSAGE`   | `POST /api/conversations/:id/messages`                  | 30 / min  |

@@ -63,4 +63,17 @@ describe('actorNames and activityVerb', () => {
 		const [g] = groupActivity([item('1', 'reply', 'bob')]);
 		expect(activityVerb(g)).toBe('replied to your comment');
 	});
+
+	it('describes tags and story reactions, never grouping them', () => {
+		const groups = groupActivity([
+			item('1', 'mention', 'bob', p1),
+			item('2', 'mention', 'carol', p1),
+			item('3', 'story_reaction', 'bob')
+		]);
+		expect(groups.map(activityVerb)).toEqual([
+			'tagged you in a post',
+			'tagged you in a post',
+			'reacted to your story'
+		]);
+	});
 });

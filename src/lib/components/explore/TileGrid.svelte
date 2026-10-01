@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { formatCount } from '$lib/utils/format';
+	import { TEXT_BACKGROUNDS } from '$lib/post-backgrounds';
 	import type { ExploreTile } from '$lib/explore/types';
 
 	let { tiles }: { tiles: ExploreTile[] } = $props();
@@ -31,6 +32,14 @@
 						playsinline
 						preload="metadata"
 					></video>
+				{:else if tile.background}
+					<p
+						class="w-full h-full m-0 p-3 flex items-center justify-center text-center text-sm font-semibold leading-snug text-white overflow-hidden {TEXT_BACKGROUNDS[
+							tile.background
+						]}"
+					>
+						{tile.title}
+					</p>
 				{:else}
 					<p
 						class="w-full h-full m-0 p-3 text-xs leading-snug text-slate-700 dark:text-dark-text overflow-hidden"

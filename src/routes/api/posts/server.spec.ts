@@ -13,6 +13,7 @@ vi.mock('$lib/server/db/posts', async (importOriginal) => {
 	const tags: Record<string, string[]> = { 'post-1': ['#MinimalArchitecture'] };
 	return {
 		...actual,
+		loadRecentLikers: vi.fn(async () => new Map()),
 		loadPostMedia: vi.fn(
 			async (_db: unknown, ids: string[]) =>
 				new Map(ids.filter((id) => media[id]).map((id) => [id, media[id]]))

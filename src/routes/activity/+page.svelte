@@ -61,7 +61,9 @@
 		comment: 'comment',
 		reply: 'comment',
 		reaction: 'smile',
-		follow: 'user-add'
+		follow: 'user-add',
+		mention: 'at',
+		story_reaction: 'smile'
 	} as const;
 </script>
 
@@ -79,7 +81,7 @@
 			<Icon name="heart" class="text-3xl text-slate-300" />
 			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">No activity yet</p>
 			<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-				Likes, comments and new followers will show up here.
+				Likes, comments, tags and new followers will show up here.
 			</p>
 		</div>
 	{:else}

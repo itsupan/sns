@@ -13,3 +13,4 @@ export { default as Toast } from './Toast.svelte';
 export { default as ReportSheet } from './ReportSheet.svelte';
 export { default as FormattedText } from './FormattedText.svelte';
 export { default as FormatToolbar } from './FormatToolbar.svelte';
+export { default as MentionSuggest } from './MentionSuggest.svelte';

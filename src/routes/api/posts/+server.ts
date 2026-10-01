@@ -2,7 +2,8 @@ import { json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import type { RequestHandler } from './$types';
 import { post, postMedia } from '$lib/server/db/schema';
-import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
+import { isTextBackground, type TextBackground } from '$lib/post-backgrounds';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
 import {
@@ -12,7 +13,8 @@ import {
 	MAX_POST_LOCATION_LENGTH,
 	MAX_POST_TITLE_LENGTH,
 	MAX_TAGS_PER_POST,
-	MAX_TAG_LENGTH
+	MAX_TAG_LENGTH,
+	MAX_TEXT_POST_LENGTH
 } from '$lib/constants/post-limits';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
@@ -24,6 +26,7 @@ import {
 	normalizeTags
 } from '$lib/server/db/posts';
 import { toPostCards } from '$lib/server/db/post-cards';
+import { syncMentionsStatements } from '$lib/server/db/mentions';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
 const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
@@ -107,8 +110,27 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		throw new ApiError(400, 'validation_failed', tooLong[3], { [tooLong[0]]: tooLong[3] });
 	}
 
-	const postType: 'photo' | 'story' | 'article' =
-		body.postType === 'story' || body.postType === 'article' ? body.postType : 'photo';
+	const postType: PostType =
+		body.postType === 'story' || body.postType === 'article' || body.postType === 'text'
+			? body.postType
+			: 'photo';
+
+	let background: TextBackground | null = null;
+	if (postType === 'text') {
+		if (!isTextBackground(body.background)) {
+			const message = 'Choose a background for your text post';
+			throw new ApiError(400, 'validation_failed', message, { background: message });
+		}
+		background = body.background;
+		if (mediaItems.length > 0) {
+			const message = 'Text posts cannot have photos or videos';
+			throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
+		}
+		if (content.length > MAX_TEXT_POST_LENGTH) {
+			const message = `Text posts can be at most ${MAX_TEXT_POST_LENGTH} characters`;
+			throw new ApiError(400, 'validation_failed', message, { content: message });
+		}
+	}
 
 	const normalizedTags = normalizeTags(body.tags);
 	if (normalizedTags.length > MAX_TAGS_PER_POST) {
@@ -121,6 +143,12 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 	}
 
 	const newPostId = crypto.randomUUID();
+	const mentionStatements = await syncMentionsStatements(locals.db, {
+		postId: newPostId,
+		authorId: currentUser.id,
+		content,
+		isNew: true
+	});
 
 	const insertPost = locals.db.insert(post).values({
 		id: newPostId,
@@ -131,12 +159,13 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		location,
 		cameraMeta,
 		postType,
+		background,
 		likesCount: 0,
 		commentsCount: 0,
 		sharesCount: 0
 	});
 
-	// Post, media and tags land together in one transaction.
+	// Post, media, tags and mentions land together in one transaction.
 	const insertMedia =
 		mediaItems.length > 0
 			? [
@@ -154,7 +183,8 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 	await locals.db.batch([
 		insertPost,
 		...insertMedia,
-		...attachTagsStatements(locals.db, newPostId, normalizedTags)
+		...attachTagsStatements(locals.db, newPostId, normalizedTags),
+		...mentionStatements
 	]);
 	// Existing tags keep their original spelling, so read back what was stored.
 	const storedTags =
@@ -182,6 +212,7 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		mediaItems,
 		aspectRatio,
 		postType,
+		background: background ?? undefined,
 		location: location || currentUser.location || undefined,
 		cameraMeta: cameraMeta || undefined,
 		tags: storedTags,

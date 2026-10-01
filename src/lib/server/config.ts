@@ -18,6 +18,7 @@ export type RateLimitName =
 	| 'createStory'
 	| 'comment'
 	| 'reaction'
+	| 'storyReaction'
 	| 'search'
 	| 'chatStart'
 	| 'chatMessage'
@@ -67,6 +68,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		createStory: { limit: 10, windowSec: 60 },
 		comment: { limit: 20, windowSec: 60 },
 		reaction: { limit: 60, windowSec: 60 },
+		storyReaction: { limit: 60, windowSec: 60 },
 		search: { limit: 60, windowSec: 60 },
 		chatStart: { limit: 10, windowSec: 60 },
 		chatMessage: { limit: 30, windowSec: 60 },
@@ -114,6 +116,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	createStory: 'RATE_LIMIT_CREATE_STORY',
 	comment: 'RATE_LIMIT_COMMENT',
 	reaction: 'RATE_LIMIT_REACTION',
+	storyReaction: 'RATE_LIMIT_STORY_REACTION',
 	search: 'RATE_LIMIT_SEARCH',
 	chatStart: 'RATE_LIMIT_CHAT_START',
 	chatMessage: 'RATE_LIMIT_CHAT_MESSAGE',

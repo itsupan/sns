@@ -12,8 +12,8 @@
 </script>
 
 <div
-	class="break-words [&_p]:m-0 [&_p+p]:mt-3 [&_p+ul]:mt-2 [&_p+ol]:mt-2 [&_ul+p]:mt-2 [&_ol+p]:mt-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_ul]:my-0 [&_ol]:my-0 [&_strong]:font-semibold {className}"
+	class="break-words [&_p]:m-0 [&_p+p]:mt-3 [&_p+ul]:mt-2 [&_p+ol]:mt-2 [&_ul+p]:mt-2 [&_ol+p]:mt-2 [&_ul]:list-disc [&_ol]:list-decimal [&_ul]:pl-5 [&_ol]:pl-5 [&_ul]:my-0 [&_ol]:my-0 [&_strong]:font-semibold [&_.mention]:font-semibold [&_.mention]:text-blue-600 dark:[&_.mention]:text-kizuna-blue [&_.mention]:no-underline hover:[&_.mention]:underline {className}"
 >
-	<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderFormatted escapes all HTML first and only emits a fixed tag whitelist -->
+	<!-- eslint-disable-next-line svelte/no-at-html-tags -- renderFormatted escapes all HTML first and only emits a fixed tag whitelist (mention links have handle-only hrefs) -->
 	{@html html}
 </div>

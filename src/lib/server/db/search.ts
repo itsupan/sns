@@ -1,7 +1,7 @@
 import { stripFormatting } from '$lib/formatting';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '.';
-import { post, postMedia, user } from './schema';
+import { post, postMedia, user, userFollow } from './schema';
 import { notDeleted } from './posts';
 import { displayHandle } from '$lib/utils/format';
 import { searchTermsOf } from '$lib/search';
@@ -136,4 +136,41 @@ export async function searchPosts(
 		createdAt: r.createdAt,
 		author: { ...r.author, handle: displayHandle(r.author.handle, r.author.name) }
 	}));
+}
+
+export interface MentionSuggestion {
+	id: string;
+	name: string;
+	/** Bare handle (no `@`), as it is typed after `@`. */
+	handle: string;
+	image: string | null;
+}
+
+/**
+ * People to tag whose handle starts with `prefix` (lowercase, may be empty): those the viewer
+ * follows first, then the most followed. The handle range keeps it on the unique handle index.
+ */
+export async function suggestMentions(
+	db: Database,
+	viewerId: string,
+	prefix: string,
+	limit: number
+): Promise<MentionSuggestion[]> {
+	const follows = sql<number>`exists (select 1 from ${userFollow} where ${userFollow.followerId} = ${viewerId} and ${userFollow.followingId} = ${user.id})`;
+	const rows = await db
+		.select({ id: user.id, name: user.name, handle: user.handle, image: user.image })
+		.from(user)
+		.where(
+			and(
+				isNotNull(user.handle),
+				prefix
+					? sql`${user.handle} >= ${prefix} and ${user.handle} < ${`${prefix}\uffff`}`
+					: undefined,
+				ne(user.id, viewerId),
+				notBlockedWith(viewerId, user.id)
+			)
+		)
+		.orderBy(desc(follows), desc(user.followersCount), asc(user.handle))
+		.limit(limit);
+	return rows.map((r) => ({ ...r, handle: r.handle ?? '' }));
 }

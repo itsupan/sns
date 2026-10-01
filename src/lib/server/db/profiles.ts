@@ -3,10 +3,10 @@ import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, user } from './schema';
 import { isFollowing } from './follows';
-import { loadPostMedia, loadPostTags, notDeleted } from './posts';
-import { loadViewerPostState } from './post-cards';
+import { loadPostMedia, loadPostTags, loadRecentLikers, notDeleted } from './posts';
+import { backgroundOf, loadViewerPostState } from './post-cards';
 import { formatTimeAgo } from '$lib/utils/format';
-import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 
 export interface ProfileStats {
@@ -80,10 +80,11 @@ export async function loadProfilePosts(
 	if (postRows.length === 0) return [];
 
 	const postIds = postRows.map((p) => p.id);
-	const [mediaByPost, tagsByPost, viewer] = await Promise.all([
+	const [mediaByPost, tagsByPost, viewer, likers] = await Promise.all([
 		loadPostMedia(db, postIds),
 		loadPostTags(db, postIds),
-		loadViewerPostState(db, viewerId, postIds)
+		loadViewerPostState(db, viewerId, postIds),
+		loadRecentLikers(db, viewerId, postIds)
 	]);
 	const handle = author.handle
 		? `@${author.handle.replace(/^@/, '')}`
@@ -109,13 +110,15 @@ export async function loadProfilePosts(
 			mediaType: media[0]?.type || 'none',
 			mediaItems: media,
 			aspectRatio: (p.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
-			postType: p.postType as 'photo' | 'story' | 'article',
+			postType: p.postType as PostType,
+			background: backgroundOf(p),
 			location,
 			cameraMeta: p.cameraMeta || undefined,
 			tags: tagsByPost.get(p.id) ?? [],
 			likes: p.likesCount,
 			commentsCount: p.commentsCount,
 			repostsCount: p.sharesCount,
+			likedBy: likers.get(p.id),
 			liked: viewer.liked.has(p.id),
 			saved: viewer.saved.has(p.id)
 		};

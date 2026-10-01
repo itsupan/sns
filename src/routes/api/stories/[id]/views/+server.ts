@@ -7,7 +7,7 @@ import { loadFollowedIds } from '$lib/server/db/follows';
 import { refreshMediaUrl } from '$lib/server/services/storage';
 import { getStory, listViews, parseStoryId } from '$lib/server/stories';
 
-/** Who watched your story, most recent first. Author only. */
+/** Who watched your story, most recent first, with any reaction they sent. Author only. */
 export const GET: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const currentUser = requireUser(locals);
 	const id = params.id ?? '';
@@ -48,6 +48,7 @@ export const GET: RequestHandler = withApi(async ({ params, locals, platform }) 
 					...person,
 					image: person.image ? await refreshMediaUrl(person.image, platform?.env) : null,
 					viewedAt: v.viewedAt,
+					reaction: v.reaction ?? null,
 					isFollowing: followed.has(v.viewerId)
 				};
 			})

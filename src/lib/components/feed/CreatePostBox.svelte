@@ -12,13 +12,10 @@
 	import type { PostData } from './PostCard.svelte';
 	import PostComposerFields from './PostComposerFields.svelte';
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
+	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
+	import TextPostPicker from './TextPostPicker.svelte';
 	import { formatShortcuts } from '$lib/formatting-editor';
-	import {
-		ASPECT_RATIOS as ratios,
-		MAX_CONTENT_LENGTH,
-		POST_TYPES as types,
-		PostDraft
-	} from './post-draft.svelte';
+	import { ASPECT_RATIOS as ratios, POST_TYPES as types, PostDraft } from './post-draft.svelte';
 
 	export type { PostType, MediaPlate } from './post-draft.svelte';
 
@@ -79,6 +76,8 @@
 
 	function processFiles(files: FileList | File[]) {
 		if (!requireLogin('Please log in to upload media')) return;
+		// Adding a photo to a text post turns it into a photo post.
+		if (draft.isText) draft.selectedType = 'photo';
 		draft.processFiles(files);
 	}
 
@@ -279,14 +278,19 @@
 					use:autogrow
 					use:formatShortcuts
 					rows="2"
-					maxlength={MAX_CONTENT_LENGTH}
+					maxlength={draft.maxLength}
 					placeholder="Share an architectural observation, exhibition note..."
 					aria-label="Post content"
 					class="w-full min-h-16 py-1 px-1 text-[15px] bg-transparent text-slate-900 dark:text-dark-text placeholder:text-slate-400 dark:placeholder:text-dark-subtle border-0 focus:outline-none transition-all duration-150 resize-none leading-relaxed"
 				></textarea>
+				<MentionSuggest target={inlineInput} />
+
+				{#if draft.isText}
+					<TextPostPicker {draft} />
+				{/if}
 
 				<!-- Multiple Media Preview / Sequence Tray (Desktop) -->
-				{#if draft.mediaPlates.length > 0}
+				{#if !draft.isText && draft.mediaPlates.length > 0}
 					<div
 						class="flex flex-col gap-3 p-3.5 bg-slate-50 dark:bg-dark-elevated/40 rounded-2xl border border-slate-100 dark:border-dark-border"
 					>
@@ -540,15 +544,17 @@
 				</div>
 
 				<!-- Add Media Button -->
-				<button
-					type="button"
-					onclick={() => fileInputDesktop?.click()}
-					class="size-7 xl:size-8 rounded-full flex items-center justify-center text-slate-500 hover:text-blue-600 dark:text-dark-muted dark:hover:text-kizuna-blue hover:bg-slate-100 dark:hover:bg-dark-elevated transition border-0 bg-transparent cursor-pointer shrink-0"
-					title="Attach Photos or Videos"
-					aria-label="Add media"
-				>
-					<Icon name="picture" class="text-sm" />
-				</button>
+				{#if !draft.isText}
+					<button
+						type="button"
+						onclick={() => fileInputDesktop?.click()}
+						class="size-7 xl:size-8 rounded-full flex items-center justify-center text-slate-500 hover:text-blue-600 dark:text-dark-muted dark:hover:text-kizuna-blue hover:bg-slate-100 dark:hover:bg-dark-elevated transition border-0 bg-transparent cursor-pointer shrink-0"
+						title="Attach Photos or Videos"
+						aria-label="Add media"
+					>
+						<Icon name="picture" class="text-sm" />
+					</button>
+				{/if}
 
 				<!-- Location Toggle Button -->
 				<button
@@ -583,20 +589,22 @@
 			<div class="flex items-center gap-1.5 xl:gap-2 shrink-0">
 				{#if draft.content.length > 0}
 					<span class="text-[11px] font-mono text-slate-400 dark:text-dark-subtle mr-1">
-						{draft.content.length}/{MAX_CONTENT_LENGTH}
+						{draft.content.length}/{draft.maxLength}
 					</span>
 				{/if}
 
 				<!-- Studio Creation Suite Modal Trigger -->
-				<button
-					type="button"
-					onclick={() => (studioModalOpen = true)}
-					class="size-7 xl:size-8 rounded-full flex items-center justify-center text-slate-400 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-elevated transition border-0 bg-transparent cursor-pointer shrink-0"
-					title="Open Studio Creation Suite"
-					aria-label="Studio mode"
-				>
-					<Icon name="expand" class="text-xs" />
-				</button>
+				{#if !draft.isText}
+					<button
+						type="button"
+						onclick={() => (studioModalOpen = true)}
+						class="size-7 xl:size-8 rounded-full flex items-center justify-center text-slate-400 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-elevated transition border-0 bg-transparent cursor-pointer shrink-0"
+						title="Open Studio Creation Suite"
+						aria-label="Studio mode"
+					>
+						<Icon name="expand" class="text-xs" />
+					</button>
+				{/if}
 
 				<!-- Primary Publish Button -->
 				<button
@@ -839,7 +847,7 @@
 							>
 								CURATORIAL NARRATIVE
 							</label>
-							<span>{draft.content.length} / {MAX_CONTENT_LENGTH.toLocaleString()}</span>
+							<span>{draft.content.length} / {draft.maxLength.toLocaleString()}</span>
 						</div>
 						<FormatToolbar target={studioInput} />
 						<textarea
@@ -848,10 +856,11 @@
 							bind:value={draft.content}
 							use:formatShortcuts
 							rows="5"
-							maxlength={MAX_CONTENT_LENGTH}
+							maxlength={draft.maxLength}
 							placeholder="Examining the monolithic concrete structures erected across during the late twentieth century..."
 							class="w-full resize-none rounded-2xl p-4 text-sm leading-relaxed bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text placeholder:text-slate-400 border-0 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 						></textarea>
+						<MentionSuggest target={studioInput} />
 					</div>
 
 					<!-- Spatial Location -->

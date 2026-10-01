@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { escapeHtml, renderFormatted, stripFormatting } from './formatting';
-import { applyFormat } from './formatting-editor';
+import { escapeHtml, parseMentions, renderFormatted, stripFormatting } from './formatting';
+import { applyFormat, insertMention, mentionAt } from './formatting-editor';
 
 describe('renderFormatted', () => {
 	it('renders plain text as a paragraph', () => {
@@ -76,11 +76,64 @@ describe('renderFormatted', () => {
 			expect(renderFormatted('[x](javascript:alert(1)) https://a.b')).not.toContain('<a');
 		});
 
+		it('builds mention links from handle characters only', () => {
+			const out = renderFormatted('@bob"onclick=x @x<script> @"><img>');
+			expect(out).toBe(
+				'<p><a href="/profile/bob" class="mention">@bob</a>&quot;onclick=x ' +
+					'<a href="/profile/x" class="mention">@x</a>&lt;script&gt; @&quot;&gt;&lt;img&gt;</p>'
+			);
+		});
+
+		it('ignores NUL characters, so input cannot forge a mention placeholder', () => {
+			expect(renderFormatted('a\u00000\u0000b')).toBe('<p>a0b</p>');
+		});
+
 		it('only emits whitelisted tags', () => {
 			const out = renderFormatted('<a>**<x>**_<y>_\n\n- <z>\n1. &amp;');
 			const tags = [...out.matchAll(/<\/?([a-z]+)/g)].map((m) => m[1]);
 			for (const t of tags) expect(['p', 'br', 'strong', 'em', 'u', 'ul', 'ol', 'li']).toContain(t);
 			expect(out).toContain('&amp;amp;');
+		});
+	});
+});
+
+describe('mentions', () => {
+	it('links @handles to profiles, lowercasing the path', () => {
+		expect(renderFormatted('hi @Ana.Lee!')).toBe(
+			'<p>hi <a href="/profile/ana.lee" class="mention">@Ana.Lee</a>!</p>'
+		);
+	});
+
+	it('keeps emphasis markers from splitting a handle, and works inside emphasis', () => {
+		expect(renderFormatted('@_a_ and **@b_c_d**')).toBe(
+			'<p><a href="/profile/_a_" class="mention">@_a_</a> and ' +
+				'<strong><a href="/profile/b_c_d" class="mention">@b_c_d</a></strong></p>'
+		);
+	});
+
+	it('finds each handle once, ignoring emails, trailing punctuation and too-long handles', () => {
+		expect(
+			parseMentions(
+				'@Bob and @bob, mail me@site.com, thanks @carol. @dave- @' + 'x'.repeat(31) + ' @@eve'
+			)
+		).toEqual(['bob', 'carol', 'dave']);
+		expect(parseMentions('no tags here')).toEqual([]);
+	});
+});
+
+describe('mentionAt / insertMention', () => {
+	it('finds the handle being typed before the caret', () => {
+		expect(mentionAt('hi @an', 6)).toEqual({ start: 3, query: 'an' });
+		expect(mentionAt('@', 1)).toEqual({ start: 0, query: '' });
+		expect(mentionAt('mail a@b', 8)).toBeNull();
+		expect(mentionAt('@ana done', 9)).toBeNull();
+	});
+
+	it('replaces the typed handle and moves the caret after it', () => {
+		expect(insertMention('hi @an!', 3, 6, 'ana')).toEqual({
+			value: 'hi @ana !',
+			start: 8,
+			end: 8
 		});
 	});
 });

@@ -2,9 +2,10 @@ import { and, desc, eq, inArray } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postComment, postLike, postSave, user } from './schema';
 import { loadFollowedIds } from './follows';
-import { loadPostMedia, loadPostTags } from './posts';
+import { loadPostMedia, loadPostTags, loadRecentLikers } from './posts';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
-import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import { isTextBackground } from '$lib/post-backgrounds';
+import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
 
 /** A post joined with its author, as the feed, saved and explore queries select it. */
 export interface PostRow {
@@ -50,6 +51,11 @@ export async function loadViewerPostState(
 	};
 }
 
+/** The text-post background stored on a post row, when it is a valid one. */
+export function backgroundOf(row: { postType: string; background: string | null }) {
+	return row.postType === 'text' && isTextBackground(row.background) ? row.background : undefined;
+}
+
 /**
  * Turns post rows into the `PostCard` shape: media, tags, follow state, the viewer's likes and
  * saves, and the latest comment as a preview. Media URLs are not refreshed here.
@@ -62,27 +68,29 @@ export async function toPostCards(
 	if (rows.length === 0) return [];
 	const postIds = rows.map((r) => r.post.id);
 
-	const [mediaByPost, tagsByPost, followedAuthors, viewer, recentComments] = await Promise.all([
-		loadPostMedia(db, postIds),
-		loadPostTags(db, postIds),
-		loadFollowedIds(
-			db,
-			viewerId,
-			rows.map((r) => r.user.id)
-		),
-		loadViewerPostState(db, viewerId, postIds),
-		db
-			.select({
-				postId: postComment.postId,
-				content: postComment.content,
-				authorName: user.name,
-				authorHandle: user.handle
-			})
-			.from(postComment)
-			.innerJoin(user, eq(postComment.userId, user.id))
-			.where(inArray(postComment.postId, postIds))
-			.orderBy(desc(postComment.createdAt))
-	]);
+	const [mediaByPost, tagsByPost, followedAuthors, viewer, likers, recentComments] =
+		await Promise.all([
+			loadPostMedia(db, postIds),
+			loadPostTags(db, postIds),
+			loadFollowedIds(
+				db,
+				viewerId,
+				rows.map((r) => r.user.id)
+			),
+			loadViewerPostState(db, viewerId, postIds),
+			loadRecentLikers(db, viewerId, postIds),
+			db
+				.select({
+					postId: postComment.postId,
+					content: postComment.content,
+					authorName: user.name,
+					authorHandle: user.handle
+				})
+				.from(postComment)
+				.innerJoin(user, eq(postComment.userId, user.id))
+				.where(inArray(postComment.postId, postIds))
+				.orderBy(desc(postComment.createdAt))
+		]);
 
 	const commentPreview = new Map<string, { author: string; content: string }>();
 	for (const c of recentComments) {
@@ -115,13 +123,15 @@ export async function toPostCards(
 			mediaType: media[0]?.type || 'none',
 			mediaItems: media,
 			aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
-			postType: r.post.postType as 'photo' | 'story' | 'article',
+			postType: r.post.postType as PostType,
+			background: backgroundOf(r.post),
 			location,
 			cameraMeta: r.post.cameraMeta || undefined,
 			tags: tagsByPost.get(r.post.id) ?? [],
 			likes: r.post.likesCount,
 			commentsCount: r.post.commentsCount,
 			repostsCount: r.post.sharesCount,
+			likedBy: likers.get(r.post.id),
 			liked: viewer.liked.has(r.post.id),
 			saved: viewer.saved.has(r.post.id),
 			commentPreview: commentPreview.get(r.post.id)
