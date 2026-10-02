@@ -7,6 +7,9 @@ export const MAX_MESSAGE_LENGTH = 2000;
  */
 export const TOO_MANY_SOCKETS_CODE = 4008;
 
+/** Close code for every socket in a conversation that was closed, e.g. by a block. Final. */
+export const CONVERSATION_CLOSED_CODE = 4003;
+
 export interface ChatMessage {
 	id: string;
 	conversationId: string;

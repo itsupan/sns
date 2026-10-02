@@ -10,6 +10,7 @@ import {
 	postLike,
 	postMedia,
 	postSave,
+	postShare,
 	userFollow
 } from './schema';
 import { buildAccountExport } from './account';
@@ -53,6 +54,7 @@ beforeAll(async () => {
 		db.insert(postComment).values({ id: 'c-1', postId: 'p-b', userId: 'alice', content: 'nice' }),
 		db.insert(postLike).values({ id: 'l-1', postId: 'p-b', userId: 'alice' }),
 		db.insert(postSave).values({ postId: 'p-b', userId: 'alice' }),
+		db.insert(postShare).values({ postId: 'p-b', userId: 'alice' }),
 		db.insert(userFollow).values({ followerId: 'alice', followingId: 'bob' }),
 		db.insert(userFollow).values({ followerId: 'carol', followingId: 'alice' }),
 		db.insert(conversation).values({ id: 'cv-1', dmKey: 'alice:bob' }),
@@ -85,6 +87,7 @@ describe('account export on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(data!.comments.map((c) => c.id)).toEqual(['c-1']);
 		expect(data!.likes.map((l) => l.postId)).toEqual(['p-b']);
 		expect(data!.saves.map((s) => s.postId)).toEqual(['p-b']);
+		expect(data!.shares.map((s) => s.postId)).toEqual(['p-b']);
 		expect(data!.following).toMatchObject([{ userId: 'bob', handle: 'bob' }]);
 		expect(data!.followers).toMatchObject([{ userId: 'carol', handle: 'carol' }]);
 		expect(data!.sessions).toMatchObject([{ ipAddress: '203.0.113.7', userAgent: 'Firefox' }]);

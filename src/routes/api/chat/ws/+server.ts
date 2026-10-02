@@ -14,6 +14,10 @@ export const GET: RequestHandler = withApi(async ({ url, request, locals, platfo
 	if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
 		throw new ApiError(426, 'upgrade_required', 'Expected a WebSocket upgrade');
 	}
+	// Browsers send cookies on cross-site WebSocket upgrades; only our own pages may connect.
+	if (request.headers.get('Origin') !== url.origin) {
+		throw new ApiError(403, 'forbidden', 'Cross-origin WebSocket connections are not allowed');
+	}
 	const { conversationId } = await parseQuery(
 		url,
 		v.object({ conversationId: v.pipe(v.string(), v.minLength(1, 'Conversation is required')) })

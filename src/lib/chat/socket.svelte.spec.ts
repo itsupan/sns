@@ -127,6 +127,19 @@ describe('ChatSocket', () => {
 		chat.close();
 	});
 
+	it('stops for good when the conversation is closed, e.g. by a block', () => {
+		const { chat } = make();
+		latest().open();
+
+		latest().readyState = 3;
+		latest().onclose?.(new CloseEvent('close', { code: 4003 }));
+		vi.advanceTimersByTime(120_000);
+		window.dispatchEvent(new Event('online'));
+
+		expect(chat.status).toBe('closed');
+		expect(sockets).toHaveLength(1);
+	});
+
 	it('recycles a connection that stops answering pings', () => {
 		const { chat } = make();
 		const first = latest();

@@ -3,6 +3,8 @@ import { eq } from 'drizzle-orm';
 import type { RequestHandler, RequestEvent } from './$types';
 import { user } from '$lib/server/db/schema';
 import { setBlocked } from '$lib/server/db/blocks';
+import { findDmId } from '$lib/server/db/chat';
+import { closeRoomLater } from '$lib/server/chat/rooms';
 import { ApiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 
 /** Shared by block and unblock: auth, self check, rate limit, target must exist. */
@@ -28,10 +30,16 @@ async function prepare({ params, locals, platform }: RequestEvent) {
 	return { blockerId: currentUser.id, blockedId: targetId };
 }
 
-/** Block `:id`, removing follows in both directions. Idempotent: blocking twice keeps one block. */
+/**
+ * Block `:id`, removing follows in both directions and ending any open live chat between the two.
+ * Idempotent: blocking twice keeps one block.
+ */
 export const POST: RequestHandler = withApi(async (event) => {
 	const { blockerId, blockedId } = await prepare(event);
+	// Looked up first, so nothing can fail after the block is committed.
+	const dmId = await findDmId(event.locals.db, blockerId, blockedId);
 	await setBlocked(event.locals.db, blockerId, blockedId, true);
+	if (dmId) closeRoomLater(event.platform, dmId);
 	return json({ blocked: true });
 });
 

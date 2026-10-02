@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { GET, HEAD, OPTIONS } from './+server';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { GET, OPTIONS } from './+server';
 import { mockStorage } from '$lib/server/services/media-storage';
 
 describe('media proxy endpoint (/api/media/[...key])', () => {
@@ -97,23 +97,51 @@ describe('media proxy endpoint (/api/media/[...key])', () => {
 	});
 
 	describe('HEAD', () => {
-		it('returns media headers without body for HEAD request', async () => {
-			const data = new Uint8Array([1, 2, 3, 4, 5]);
-			mockStorage.set('posts/test.mp4', {
-				buffer: data.buffer,
-				contentType: 'video/mp4'
-			});
+		it('is answered by GET, so it sees every storage backend', async () => {
+			const mod: Record<string, unknown> = await import('./+server');
+			expect(mod.HEAD).toBeUndefined();
 
-			const request = new Request('http://localhost/api/media/posts/test.mp4');
-			const res = await HEAD({
-				params: { key: 'posts/test.mp4' },
-				request,
-				platform: undefined
+			const platform = {
+				env: {
+					KV: {
+						getWithMetadata: vi.fn(async () => ({
+							value: new Uint8Array([1, 2, 3]).buffer,
+							metadata: { contentType: 'image/jpeg' }
+						}))
+					}
+				}
+			};
+			const res = await GET({
+				params: { key: 'posts/user-1/a.jpg' },
+				request: new Request('http://localhost/api/media/posts/user-1/a.jpg', { method: 'HEAD' }),
+				platform
 			} as never);
 
 			expect(res.status).toBe(200);
-			expect(res.headers.get('content-length')).toBe('5');
-			expect(res.headers.get('accept-ranges')).toBe('bytes');
+			expect(res.headers.get('content-length')).toBe('3');
 		});
+	});
+
+	it('returns 502 when the R2 binding fails instead of serving a KV copy', async () => {
+		const kvRead = vi.fn();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		const platform = {
+			env: {
+				R2_BUCKET: {
+					get: vi.fn(async () => {
+						throw new Error('R2 unavailable');
+					})
+				},
+				KV: { getWithMetadata: kvRead }
+			}
+		};
+		const res = await GET({
+			params: { key: 'posts/user-1/a.jpg' },
+			request: new Request('http://localhost/api/media/posts/user-1/a.jpg'),
+			platform
+		} as never);
+
+		expect(res.status).toBe(502);
+		expect(kvRead).not.toHaveBeenCalled();
 	});
 });

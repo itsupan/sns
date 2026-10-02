@@ -136,7 +136,7 @@ export const POST = withApi(async ({ request, locals }) => {
 
 ### Rate limits
 
-Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fixed window stored in the `KV` binding. Limits come from `RATE_LIMIT_*` vars (see [Configuration](#configuration)):
+Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window counted by the `RateLimiter` Durable Object (`src/lib/server/rate-limiter.ts`, one object per limit and user or IP, exported from `worker.ts`). Limits come from `RATE_LIMIT_*` vars (see [Configuration](#configuration)):
 
 | Name            | Var                         | Endpoint                                                | Default   |
 | --------------- | --------------------------- | ------------------------------------------------------- | --------- |
@@ -157,8 +157,14 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fix
 | `accountExport` | `RATE_LIMIT_ACCOUNT_EXPORT` | `GET /api/account/export` (per user)                    | 5 / hour  |
 | `report`        | `RATE_LIMIT_REPORT`         | `POST /api/reports`                                     | 10 / hour |
 | `accountDelete` | `RATE_LIMIT_ACCOUNT_DELETE` | `DELETE /api/account`                                   | 5 / hour  |
+| `signIn`        | `RATE_LIMIT_SIGN_IN`        | `POST /api/auth/sign-in/email` (per IP)                 | 10 / min  |
+| `signUp`        | `RATE_LIMIT_SIGN_UP`        | `POST /api/auth/sign-up/email` (per IP)                 | 5 / hour  |
+| `profileUpdate` | `RATE_LIMIT_PROFILE_UPDATE` | `PATCH /api/users/:id`                                  | 10 / min  |
+| `contentEdit`   | `RATE_LIMIT_CONTENT_EDIT`   | edit / delete a post, delete a comment or story         | 30 / min  |
+| `markRead`      | `RATE_LIMIT_MARK_READ`      | mark notifications or a conversation read               | 120 / min |
+| `storyView`     | `RATE_LIMIT_STORY_VIEW`     | `POST /api/stories/:id/view`                            | 120 / min |
 
-Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }`. KV has no atomic increment and is eventually consistent, so a burst can let a few extra requests through: treat this as abuse protection, not an exact quota. Without a `KV` binding (unit tests) requests are allowed.
+Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }` (the two auth limits answer in better-auth's `{ "code", "message" }` shape). A Durable Object handles one request at a time, so counts are exact, and each object deletes its storage when its window ends. If the limiter is unreachable, the costly writes in `FAIL_CLOSED_LIMITS` answer `503` and the rest are allowed. Without the binding (`vite dev`, unit tests) requests are allowed.
 
 ## Real-time chat
 

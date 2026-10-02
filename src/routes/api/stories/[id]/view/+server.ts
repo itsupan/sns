@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { requireUser, withApi } from '$lib/server/api';
+import { enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 import { recordView } from '$lib/server/stories';
 import { requireVisibleStory } from '$lib/server/story-access';
 
@@ -10,6 +10,7 @@ import { requireVisibleStory } from '$lib/server/story-access';
  */
 export const POST: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const viewer = requireUser(locals);
+	await enforceRateLimit(platform, 'storyView', viewer.id);
 	const { kv, story } = await requireVisibleStory(locals, platform, params.id ?? '', viewer.id);
 	const counted = await recordView(kv, story, viewer.id);
 	return json({ counted });

@@ -115,7 +115,7 @@ describe('direct conversations on real D1', { timeout: REAL_D1_TIMEOUT }, () => 
 				await call(ws, {
 					userId: 'eve',
 					search: `?conversationId=${id}`,
-					headers: { Upgrade: 'websocket' }
+					headers: { Upgrade: 'websocket', Origin: 'http://localhost' }
 				})
 			).status
 		).toBe(404);
@@ -321,7 +321,13 @@ describe('GET /api/chat/ws', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect((await call(ws, { userId: null, search })).status).toBe(401);
 		expect((await call(ws, { userId: 'alice', search })).status).toBe(426);
 		expect(
-			(await call(ws, { userId: 'alice', search, headers: { Upgrade: 'websocket' } })).status
+			(
+				await call(ws, {
+					userId: 'alice',
+					search,
+					headers: { Upgrade: 'websocket', Origin: 'http://localhost' }
+				})
+			).status
 		).toBe(503);
 	});
 });

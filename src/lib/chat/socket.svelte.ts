@@ -1,4 +1,4 @@
-import { TOO_MANY_SOCKETS_CODE, type ChatServerEvent } from './types';
+import { CONVERSATION_CLOSED_CODE, TOO_MANY_SOCKETS_CODE, type ChatServerEvent } from './types';
 
 export type SocketStatus = 'connecting' | 'open' | 'reconnecting' | 'closed';
 
@@ -133,6 +133,11 @@ export class ChatSocket {
 		socket.onclose = (ev) => {
 			if (this.socket !== socket) return;
 			this.socket = null;
+			// The conversation was closed (a block): there is nothing to reconnect to.
+			if (ev?.code === CONVERSATION_CLOSED_CODE) {
+				this.close();
+				return;
+			}
 			// Evicted for a newer tab: reconnecting would evict that one in turn. The view keeps
 			// polling, and coming back online or to the tab connects again.
 			if (ev?.code === TOO_MANY_SOCKETS_CODE) {

@@ -1,6 +1,17 @@
 import { describe, expect, it, vi } from 'vitest';
 import { load } from './+page.server';
 
+// Posts, stats and saves have their own real-D1 specs; this one covers the profile lookup.
+vi.mock('$lib/server/db/profiles', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/server/db/profiles')>();
+	return {
+		...actual,
+		loadProfilePosts: vi.fn(async () => []),
+		loadProfileStats: vi.fn(async () => actual.EMPTY_PROFILE_STATS)
+	};
+});
+vi.mock('$lib/server/db/saves', () => ({ loadSavedPreview: vi.fn(async () => []) }));
+
 type LoadEvent = Parameters<typeof load>[0];
 
 describe('Public Profile +page.server.ts', () => {
@@ -108,5 +119,27 @@ describe('Public Profile +page.server.ts', () => {
 			const errorObj = err as { status?: number; body?: { message?: string } };
 			expect(errorObj.status).toBe(404);
 		}
+	});
+
+	it('surfaces database errors instead of showing placeholder profiles', async () => {
+		const mockDb = {
+			select: vi.fn(() => ({
+				from: vi.fn(() => ({
+					where: vi.fn(() => ({
+						limit: vi.fn(async () => {
+							throw new Error('D1_ERROR: database unavailable');
+						})
+					}))
+				}))
+			}))
+		};
+
+		const mockEvent = {
+			params: { id: 'elena.rostova' },
+			url: new URL('http://localhost:5173/profile/elena.rostova'),
+			locals: { user: null, db: mockDb }
+		} as unknown as LoadEvent;
+
+		await expect(load(mockEvent)).rejects.toThrow('database unavailable');
 	});
 });

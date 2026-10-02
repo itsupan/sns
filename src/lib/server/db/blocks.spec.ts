@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
 import {
@@ -66,8 +66,9 @@ function call(
 	{
 		id = '',
 		userId = null,
-		body
-	}: { id?: string; userId?: string | null; body?: Record<string, unknown> }
+		body,
+		platform
+	}: { id?: string; userId?: string | null; body?: Record<string, unknown>; platform?: unknown }
 ): Promise<Response> {
 	const url = new URL('http://localhost/x');
 	const event = {
@@ -78,7 +79,8 @@ function call(
 			headers: { 'content-type': 'application/json' },
 			body: JSON.stringify(body ?? {})
 		}),
-		locals: { db, user: userId ? { id: userId, name: userId, handle: null, image: null } : null }
+		locals: { db, user: userId ? { id: userId, name: userId, handle: null, image: null } : null },
+		platform
 	};
 	return (handler as Handler)(event as never);
 }
@@ -351,5 +353,25 @@ describe('blocking users on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 			author: '@alice',
 			content: 'first'
 		});
+	});
+
+	it('closes the pair’s live chat room when blocking', async () => {
+		await getOrCreateDm(db, 'alice', 'bob');
+		const closeAll = vi.fn(async () => {});
+		const pending: Promise<unknown>[] = [];
+		const platform = {
+			env: {
+				CHAT_ROOM: { idFromName: (name: string) => name, get: () => ({ closeAll }) }
+			},
+			ctx: { waitUntil: (p: Promise<unknown>) => pending.push(p) }
+		};
+
+		expect((await call(block, { id: 'bob', userId: 'alice', platform })).status).toBe(200);
+		await Promise.all(pending);
+		expect(closeAll).toHaveBeenCalledWith(4003, expect.any(String));
+
+		closeAll.mockClear();
+		await call(block, { id: 'carol', userId: 'alice', platform });
+		expect(closeAll).not.toHaveBeenCalled();
 	});
 });
