@@ -67,6 +67,7 @@ export const FAIL_CLOSED_LIMITS: ReadonlySet<RateLimitName> = new Set<RateLimitN
 	'chatStart',
 	'chatMessage',
 	'uploadPresign',
+	'upload',
 	'follow',
 	'share',
 	'accountExport',

@@ -45,7 +45,7 @@ describe('POST /api/upload/presigned', () => {
 			request: new Request('http://localhost/api/upload/presigned', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ filename: 'file.pdf', contentType: 'application/pdf' })
+				body: JSON.stringify({ filename: 'file.pdf', contentType: 'application/pdf', size: 10 })
 			}),
 			platform: { env: {} }
 		} as unknown as RequestEvent;
@@ -83,7 +83,12 @@ describe('POST /api/upload/presigned', () => {
 				request: new Request('http://localhost/api/upload/presigned', {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ filename: 'clip.mp4', contentType: 'video/mp4', folder })
+					body: JSON.stringify({
+						filename: 'clip.mp4',
+						contentType: 'video/mp4',
+						size: 2048,
+						folder
+					})
 				}),
 				platform: { env: {} }
 			} as unknown as RequestEvent);
@@ -95,5 +100,20 @@ describe('POST /api/upload/presigned', () => {
 		const bad = await call('secrets');
 		expect(bad.status).toBe(400);
 		expect(((await bad.json()) as ApiErrorBody).error.fields).toHaveProperty('folder');
+	});
+
+	it('requires the file size so the upload can be capped', async () => {
+		const response = await POST({
+			locals: { user: { id: 'user-1' } },
+			request: new Request('http://localhost/api/upload/presigned', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ filename: 'a.png', contentType: 'image/png' })
+			}),
+			platform: { env: {} }
+		} as unknown as RequestEvent);
+
+		expect(response.status).toBe(400);
+		expect(((await response.json()) as ApiErrorBody).error.fields).toHaveProperty('size');
 	});
 });

@@ -1,6 +1,17 @@
 // In-memory buffer store for mock uploaded files during local dev / testing
 export const mockStorage = new Map<string, { buffer: ArrayBuffer; contentType: string }>();
 
+/** Uploaded media is user content: never let a browser sniff or run it as a page. */
+export const MEDIA_HEADERS: Record<string, string> = {
+	'Access-Control-Allow-Origin': '*',
+	'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+	'Access-Control-Allow-Headers': 'Range',
+	'Access-Control-Expose-Headers':
+		'Content-Range, Accept-Ranges, Content-Length, Content-Type, ETag',
+	'X-Content-Type-Options': 'nosniff',
+	'Content-Security-Policy': "sandbox; default-src 'none'"
+};
+
 /**
  * Infers the MIME Content-Type based on the object key file extension.
  */

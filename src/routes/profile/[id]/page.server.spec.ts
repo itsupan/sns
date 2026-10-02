@@ -42,6 +42,7 @@ describe('Public Profile +page.server.ts', () => {
 		if (!result) throw new Error('Expected result');
 		expect(result.targetUser.name).toBe('Aoi Tanaka');
 		expect(result.targetUser.handle).toBe('aoi.photo');
+		expect(result.targetUser).not.toHaveProperty('email');
 		expect(result.isOwnProfile).toBe(false);
 		expect(result.canonicalUrl).toBe('http://localhost:5173/profile/@aoi.photo');
 	});

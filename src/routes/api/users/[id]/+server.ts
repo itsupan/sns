@@ -4,6 +4,7 @@ import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { user } from '$lib/server/db/schema';
 import { isFollowing } from '$lib/server/db/follows';
+import { isOwnUpload } from '$lib/server/services/storage';
 import { ApiError, apiError, parseBody, requireUser, withApi } from '$lib/server/api';
 
 /** Optional nullable text field: `null` or `''` clears it, otherwise trimmed and length-checked. */
@@ -66,7 +67,6 @@ export const GET: RequestHandler = withApi(async ({ params, locals }) => {
 		.select({
 			id: user.id,
 			name: user.name,
-			email: user.email,
 			image: user.image,
 			handle: user.handle,
 			bio: user.bio,
@@ -101,7 +101,7 @@ function handleTaken() {
 	});
 }
 
-export const PATCH: RequestHandler = withApi(async ({ params, request, locals }) => {
+export const PATCH: RequestHandler = withApi(async ({ params, request, locals, platform }) => {
 	const targetUserId = params.id;
 	if (!targetUserId) {
 		return apiError(400, 'bad_request', 'User ID is required');
@@ -123,6 +123,15 @@ export const PATCH: RequestHandler = withApi(async ({ params, request, locals })
 
 	if (Object.keys(updates).length === 0) {
 		return apiError(400, 'validation_failed', 'No valid fields provided to update');
+	}
+
+	if (
+		updates.image &&
+		updates.image !== currentUser.image &&
+		!isOwnUpload(updates.image, 'avatars', currentUser.id, platform?.env)
+	) {
+		const message = 'Upload the avatar first';
+		throw new ApiError(400, 'validation_failed', message, { image: message });
 	}
 
 	if (updates.handle) {

@@ -3,7 +3,7 @@ import { desc, eq, inArray } from 'drizzle-orm';
 import * as v from 'valibot';
 import type { RequestHandler } from './$types';
 import { user, userFollow } from '$lib/server/db/schema';
-import { extractR2Key, refreshMediaUrl } from '$lib/server/services/storage';
+import { isOwnUpload, refreshMediaUrl } from '$lib/server/services/storage';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
 	MAX_STORY_AUTHORS,
@@ -52,8 +52,7 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 	const body = await parseBody(request, CreateStoryBody);
 
 	// Only media this user uploaded through the presign flow into their stories folder.
-	const key = extractR2Key(body.mediaUrl);
-	if (!key?.startsWith(`stories/${currentUser.id}/`)) {
+	if (!isOwnUpload(body.mediaUrl, 'stories', currentUser.id, platform?.env)) {
 		const message = 'Upload the story media first';
 		throw new ApiError(400, 'validation_failed', message, { mediaUrl: message });
 	}

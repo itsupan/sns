@@ -7,3 +7,5 @@ overrides:
   # Security patches for dev-only tooling (miniflare, eslint); drop once upstream ships them.
   'undici@>=7.0.0 <7.29.1': 7.29.1
   'brace-expansion@>=4.0.0 <5.0.11': ^5.0.11
+  # devalue advisories GHSA-j22f-vq7h-c4qm / GHSA-mcm9-63f2-9j32 (via @sveltejs/kit, svelte).
+  'devalue@<5.9.3': 5.9.4

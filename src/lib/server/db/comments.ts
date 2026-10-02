@@ -4,7 +4,7 @@ import { commentReaction, post, postComment, user } from './schema';
 import { commentsCountOf, reactionsCountOf, repliesCountOf } from './counters';
 import { encodeCursor, notDeleted, type FeedCursor } from './posts';
 import { notifyStatement, unnotifyReactionStatement } from './notifications';
-import { notBlockedWith } from './blocks';
+import { notBlockedWith, requireNotBlocked } from './blocks';
 import { ApiError } from '$lib/server/api/errors';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import {
@@ -245,7 +245,9 @@ export async function createComment(
 			throw new ApiError(400, 'invalid_parent', 'Replies can only be added to top-level comments');
 		}
 		parentAuthorId = parent.userId;
+		await requireNotBlocked(db, author.id, parent.userId, 'You cannot reply to this comment');
 	}
+	await requireNotBlocked(db, author.id, livePost.userId, 'You cannot comment on this post');
 
 	const id = crypto.randomUUID();
 	const createdAt = new Date();
@@ -387,6 +389,9 @@ export async function toggleReaction(
 	{ commentId, userId, type }: { commentId: string; userId: string; type: CommentReaction }
 ): Promise<{ reacted: boolean; reactions: ReactionSummary }> {
 	const target = await requireComment(db, commentId);
+	for (const ownerId of new Set([target.userId, target.postAuthorId])) {
+		await requireNotBlocked(db, userId, ownerId, 'You cannot react to this comment');
+	}
 	const notice = { actorId: userId, recipientId: target.userId, postId: target.postId, commentId };
 
 	const recount = db

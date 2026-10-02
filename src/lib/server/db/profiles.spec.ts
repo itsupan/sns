@@ -131,8 +131,8 @@ describe('profiles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 			method: 'PATCH',
 			body: {
 				mediaUrls: [
-					{ url: 'https://cdn.example.com/b.mp4' },
-					{ url: 'https://cdn.example.com/a.jpg', type: 'image' }
+					{ url: '/api/media/posts/alice/b.mp4' },
+					{ url: '/api/media/posts/alice/a.jpg', type: 'image' }
 				],
 				aspectRatio: '4:5',
 				postType: 'story'
@@ -142,8 +142,8 @@ describe('profiles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		const { post: edited } = (await res.json()) as { post: Record<string, unknown> };
 		expect(edited).toMatchObject({
 			mediaItems: [
-				{ url: 'https://cdn.example.com/b.mp4', type: 'video' },
-				{ url: 'https://cdn.example.com/a.jpg', type: 'image' }
+				{ url: '/api/media/posts/alice/b.mp4', type: 'video' },
+				{ url: '/api/media/posts/alice/a.jpg', type: 'image' }
 			],
 			mediaType: 'video',
 			aspectRatio: '4:5',
@@ -159,6 +159,23 @@ describe('profiles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(((await removed.json()) as { post: { mediaItems: unknown[] } }).post.mediaItems).toEqual(
 			[]
 		);
+	});
+
+	it('rejects media the author did not upload', async () => {
+		for (const url of [
+			'https://evil.test/pixel.gif',
+			'https://evil.test/posts/alice/pixel.gif',
+			'/api/media/posts/alice/../bob/b.jpg',
+			'/api/media/posts/bob/b.jpg'
+		]) {
+			const res = await call(editPost as Handler, {
+				id: 'a-1',
+				userId: 'alice',
+				method: 'PATCH',
+				body: { mediaUrls: [{ url }] }
+			});
+			expect(res.status).toBe(400);
+		}
 	});
 
 	it('forbids editing or deleting someone else’s post and rejects empty content', async () => {

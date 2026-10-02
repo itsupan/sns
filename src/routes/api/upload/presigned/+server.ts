@@ -1,7 +1,7 @@
 import { json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import type { RequestHandler } from './$types';
-import { generatePresignedUploadUrl } from '$lib/server/services/storage';
+import { UPLOAD_FOLDERS, generatePresignedUploadUrl } from '$lib/server/services/storage';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 
 const PresignRequest = v.object({
@@ -10,13 +10,12 @@ const PresignRequest = v.object({
 		v.string('Content-Type is required'),
 		v.minLength(1, 'Content-Type is required')
 	),
-	size: v.optional(
-		v.pipe(
-			v.number('Size must be a positive number'),
-			v.minValue(0, 'Size must be a positive number')
-		)
+	size: v.pipe(
+		v.number('Size is required'),
+		v.integer('Size must be a whole number of bytes'),
+		v.minValue(1, 'Size must be a positive number')
 	),
-	folder: v.optional(v.picklist(['avatars', 'posts', 'stories'], 'Invalid upload folder'))
+	folder: v.optional(v.picklist(UPLOAD_FOLDERS, 'Invalid upload folder'))
 });
 
 export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {

@@ -4,7 +4,7 @@ import type { RequestHandler } from './$types';
 import { post, postMedia } from '$lib/server/db/schema';
 import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
 import { isTextBackground, type TextBackground } from '$lib/post-backgrounds';
-import { refreshPostMediaUrls } from '$lib/server/services/storage';
+import { isOwnUpload, refreshPostMediaUrls } from '$lib/server/services/storage';
 import { getConfig } from '$lib/server/config';
 import {
 	MAX_CAMERA_META_LENGTH,
@@ -86,6 +86,10 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 
 	if (mediaItems.length > MAX_MEDIA_PER_POST) {
 		const message = `A post can have at most ${MAX_MEDIA_PER_POST} media items`;
+		throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
+	}
+	if (mediaItems.some((m) => !isOwnUpload(m.url, 'posts', currentUser.id, platform?.env))) {
+		const message = 'Upload the media first';
 		throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
 	}
 
