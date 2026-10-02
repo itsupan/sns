@@ -23,7 +23,7 @@ smoke test. Google sign-in is wired on the server (`/api/auth/*`), with no UI ye
 | CI/CD           | GitHub Actions → production                                 |
 | Code review     | CodeRabbit (`.coderabbit.yaml`)                             |
 | Code quality    | SonarCloud (`sonar-project.properties`) + Vitest coverage   |
-| Supply chain    | Aikido Safe Chain (`.aikido`) + `pnpm audit`                |
+| Supply chain    | Aikido Safe Chain (`.aikido`) + `pnpm audit` + Dependabot   |
 | Package manager | pnpm                                                        |
 
 ## Getting started
@@ -50,7 +50,7 @@ _Web application_) with these authorized redirect URIs:
 
 ```sh
 pnpm install
-pnpm db:setup:local   # applies migrations to the local D1 in .wrangler/state
+pnpm db:setup:local   # applies migrations and seed data to the local D1 in .wrangler/state
 pnpm dev
 ```
 
@@ -87,6 +87,7 @@ src/
     page.svelte.e2e.ts   End-to-end test (Playwright)
     api/health/+server.ts  Smoke endpoint: reports D1 and KV reachability
 static/                Files served as-is
+scripts/               CI checks: migration safety, bundle size (budgets in bundle-budgets.json)
 wrangler.jsonc         Worker, D1, KV, vars and required secrets for local / production
 .dev.vars.example      Template for local secrets (copy to .dev.vars)
 drizzle.config.ts      Drizzle Kit — generates SQL only, never talks to D1
@@ -95,6 +96,8 @@ sonar-project.properties  SonarCloud project settings
 .coderabbit.yaml       CodeRabbit review settings
 .aikido                Safe Chain settings (minimum package age)
 .github/workflows/cicd.yml
+.github/dependabot.yml Weekly grouped dependency and GitHub Actions updates
+.github/pull_request_template.md
 ```
 
 ## API conventions
@@ -166,6 +169,8 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }` (the two auth limits answer in better-auth's `{ "code", "message" }` shape). A Durable Object handles one request at a time, so counts are exact, and each object deletes its storage when its window ends. If the limiter is unreachable, the costly writes in `FAIL_CLOSED_LIMITS` answer `503` and the rest are allowed. Without the binding (`vite dev`, unit tests) requests are allowed.
 
+To add a limit, extend `RateLimitName`, `DEFAULT_CONFIG` and `RATE_LIMIT_VARS` in `src/lib/server/config.ts`, add a row to the table above, and add its var to **both** `vars` blocks in `wrangler.jsonc`: the top level (local dev and tests) and `env.production`. Wrangler does not inherit `vars` into an environment, so a var missing from `env.production` silently falls back to its default in production. Add the name to `FAIL_CLOSED_LIMITS` (`src/lib/server/api/rate-limit.ts`) if the endpoint is abuse-sensitive.
+
 ## Real-time chat
 
 Direct messages (`/messages`) store every message in D1 and use a Durable Object only to push
@@ -230,30 +235,36 @@ regenerates the binding types too, so they can never drift from `wrangler.jsonc`
 
 ## Scripts
 
-| Script                       | Does                                                                  |
-| ---------------------------- | --------------------------------------------------------------------- |
-| `pnpm dev`                   | Vite dev server with emulated Cloudflare bindings                     |
-| `pnpm build`                 | Typecheck bindings and build the Worker into `.svelte-kit/cloudflare` |
-| `pnpm preview`               | Serve the built Worker (`worker.ts`) with `wrangler dev`, incl. chat  |
-| `pnpm check`                 | `svelte-check` + verify `worker-configuration.d.ts` is current        |
-| `pnpm lint` / `pnpm format`  | ESLint / Prettier (`pnpm format:check` for a read-only check)         |
-| `pnpm test:unit`             | Vitest (append `--run` for a single pass)                             |
-| `pnpm test:coverage`         | Vitest once, writing `coverage/lcov.info` for SonarCloud              |
-| `pnpm test:e2e`              | Playwright against a real build served by Wrangler                    |
-| `pnpm test`                  | Everything                                                            |
-| `pnpm db:generate`           | Generate a migration from `schema.ts` (`--name <label>` optional)     |
-| `pnpm db:setup:local`        | Apply migrations to local D1                                          |
-| `pnpm db:migrate:production` | Apply migrations to the production D1                                 |
-| `pnpm gen`                   | Regenerate `worker-configuration.d.ts` after editing bindings         |
-| `pnpm auth:schema`           | Regenerate `auth-schema.ts` after changing `auth-options.ts`          |
-| `pnpm audit:deps`            | `pnpm audit`, failing on high or critical advisories                  |
+| Script                        | Does                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| `pnpm dev`                    | Vite dev server with emulated Cloudflare bindings                        |
+| `pnpm build`                  | Build the Worker and client into `.svelte-kit/cloudflare`                |
+| `pnpm preview`                | Serve the built Worker (`worker.ts`) with `wrangler dev`, incl. chat     |
+| `pnpm check`                  | `svelte-check` + verify `worker-configuration.d.ts` is current           |
+| `pnpm lint` / `pnpm format`   | ESLint / Prettier (`pnpm format:check` for a read-only check)            |
+| `pnpm test:unit`              | Vitest (append `--run` for a single pass)                                |
+| `pnpm test:coverage`          | Vitest once, writing `coverage/lcov.info` for SonarCloud                 |
+| `pnpm test:e2e`               | Playwright against a real build served by Wrangler                       |
+| `pnpm test`                   | Everything                                                               |
+| `pnpm db:generate`            | Generate a migration from `schema.ts` (`--name <label>` optional)        |
+| `pnpm db:migrate:local`       | Apply migrations to local D1                                             |
+| `pnpm db:setup:local`         | Apply migrations to local D1, then load `seeds/dev.sql`                  |
+| `pnpm db:migrate:production`  | Apply migrations to the production D1                                    |
+| `pnpm deploy:production`      | Deploy the built Worker (`worker.ts`) to production                      |
+| `pnpm check:migrations <ref>` | Fail on contract statements in migrations added since `<ref>`            |
+| `pnpm check:bundle-size`      | After `pnpm build`, compare gzipped Worker and client with their budgets |
+| `pnpm gen`                    | Regenerate `worker-configuration.d.ts` after editing bindings            |
+| `pnpm auth:schema`            | Regenerate `auth-schema.ts` after changing `auth-options.ts`             |
+| `pnpm audit:deps`             | `pnpm audit`, failing on high or critical advisories                     |
 
 ## Changing the database
 
 1. Edit `src/lib/server/db/schema.ts` (or, for auth tables, change `auth-options.ts` and run
    `pnpm auth:schema`).
 2. `pnpm db:generate --name <what_changed>` — writes `migrations/NNNN_<name>.sql`.
-3. Review the generated SQL, then `pnpm db:setup:local`.
+3. Review the generated SQL: it must be expand-only (see
+   [Migrations: expand, then contract](#migrations-expand-then-contract)). Then
+   `pnpm db:setup:local`.
 4. Commit the schema **and** the migration. CI applies it to production on deploy.
 
 Drizzle only generates SQL here; Wrangler owns applying it, so migration state is tracked
@@ -272,20 +283,21 @@ Drizzle's journal in step) and written by hand. The tables are not in `schema.ts
 - **Trigram tokenizer**: matches any substring of 3+ characters, so it works for prefixes and
   for scripts written without spaces (Khmer, Thai, Chinese). Shorter input returns no results.
   `bm25()` ranks; soft-deleted posts are filtered at query time.
-- **Rebuilding `post` or `user`**: if a future migration recreates either table (Drizzle's
-  `__new_*` copy), the triggers are dropped and rowids change. In that migration, recreate the
-  triggers from 0012 and run `INSERT INTO post_fts(post_fts) VALUES('rebuild')` (and the same
-  for `user_fts`). `search.spec.ts` runs FTS5 `integrity-check` after all migrations to catch it.
+- **Never rebuild `post` or `user`**: Drizzle's `__new_*` table copy drops the original table,
+  which on D1 also deletes every row that cascades from it (see
+  [Migrations: expand, then contract](#migrations-expand-then-contract)), drops the triggers and
+  changes rowids. `search.spec.ts` runs FTS5 `integrity-check` after all migrations to catch a
+  broken index.
 - **Backups**: `wrangler d1 export` cannot export virtual tables. Use D1 Time Travel
   (`wrangler d1 time-travel`) to restore instead.
 
 ## One-time setup
 
-Deployment and the external services are not configured until you do these steps.
+Deployment and the external services need these steps once.
 
-**1. Create the production D1 database and KV namespace** and paste the returned IDs into
-`wrangler.jsonc`, replacing `REPLACE_WITH_PRODUCTION_D1_DATABASE_ID` and
-`REPLACE_WITH_PRODUCTION_KV_NAMESPACE_ID`:
+**1. Create the production D1 database and KV namespace.** `env.production` in
+`wrangler.jsonc` already holds the IDs of `sns-prod` and its `KV` namespace; to start over in
+another account, create them and paste the returned IDs there:
 
 ```sh
 pnpm exec wrangler login
@@ -293,11 +305,13 @@ pnpm exec wrangler d1 create sns-prod
 pnpm exec wrangler kv namespace create KV --env production
 ```
 
-The top-level IDs in `wrangler.jsonc` are placeholders on purpose — local D1 and KV live in
-`.wrangler/state` and never use them.
+The `STORIES` namespace has no ID, so the first deploy creates it. The top-level IDs in
+`wrangler.jsonc` are placeholders on purpose — local D1 and KV live in `.wrangler/state` and
+never use them.
 
-**2. Configure auth for production.** Replace `REPLACE_WITH_PRODUCTION_URL` in
-`wrangler.jsonc` with the site's URL, add
+**2. Configure auth for production.** The site's URL appears three times: `BETTER_AUTH_URL`
+and the custom-domain `routes` entry in `env.production`, and `PRODUCTION_URL` in the workflow
+(the post-deploy health check); change them together. Add
 `<production URL>/api/auth/callback/google` as a redirect URI on the Google OAuth client,
 then set the Worker secrets:
 
@@ -315,9 +329,10 @@ pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET --env production
 | `CLOUDFLARE_ACCOUNT_ID` | Cloudflare dashboard → Workers & Pages → Account ID                                                                 |
 | `SONAR_TOKEN`           | SonarCloud → My Account → Security → Generate token                                                                 |
 
-If you create a GitHub Environment named `production`, the Cloudflare secrets can live there
-instead and you can gate deploys behind a required reviewer. `SONAR_TOKEN` must stay a
-repository secret, because the `ci` job doesn't run in that environment.
+The deploy job runs in the GitHub Environment `production` (GitHub creates it on the first
+deploy), so the Cloudflare secrets can live there instead and you can gate deploys behind a
+required reviewer. `SONAR_TOKEN` must stay a repository secret, because the `ci` job doesn't
+run in that environment.
 
 **4. Connect SonarCloud.** Import the repo at <https://sonarcloud.io>, turn off _Automatic
 Analysis_ (Administration → Analysis Method), and make sure `sonar.organization` and
@@ -334,12 +349,63 @@ to the repo. It reviews every PR using `.coderabbit.yaml`.
 `.github/workflows/cicd.yml`:
 
 - **Every push and PR** to `development` or `main` runs: Safe Chain install → dependency
-  install → `pnpm audit` → format check → lint → typecheck → unit/component tests with
-  coverage → SonarCloud scan → build → end-to-end tests.
-- **Push to `main`** → after CI passes, applies migrations to the production D1 and deploys
-  the `sns` Worker.
+  install → `pnpm audit` → format check → lint → typecheck → migration check → unit/component
+  tests with coverage → SonarCloud scan → build → bundle-size check → end-to-end tests.
+- **Push to `main`** → after CI passes, applies migrations to the production D1, deploys the
+  `sns` Worker, then requests `/api/health` on `PRODUCTION_URL` (with retries) and fails the
+  job unless it answers `200`.
 
-Migrations run _before_ the Worker is deployed, so the new code never meets an old schema.
 The audit fails CI on any high or critical advisory, including in dev-only dependencies.
 
-Deploy manually with `pnpm deploy:production` if you need to.
+Deploy manually with `pnpm deploy:production` if you need to. If the health check fails after
+a deploy, `pnpm exec wrangler rollback --env production` restores the previous Worker. The
+migrations stay applied, which is safe because they never break the previous code (see below).
+
+### Migrations: expand, then contract
+
+Migrations run _before_ the Worker is deployed, so for a while the Worker that is live now
+runs against the new schema, and so does a rolled-back one. Every migration must therefore
+keep the deployed code working (**expand**): new tables, new nullable or defaulted columns,
+indexes, backfills. Removing or renaming something (**contract**) takes two releases: first
+ship code that no longer uses it, then, once that is live, the migration that removes it.
+
+`pnpm check:migrations <ref>` enforces this in CI against the PR base (on a push, against the
+commit the branch pointed to before it). It fails when a migration added since `<ref>`
+contains:
+
+- `DROP TABLE`, or `ALTER TABLE … DROP COLUMN`
+- `ALTER TABLE … RENAME` (a table or a column)
+- a Drizzle table rebuild (a `__new_<table>` copy) or `PRAGMA foreign_keys`
+- `DROP INDEX` of a unique index
+
+D1 always enforces foreign keys and ignores `PRAGMA foreign_keys=OFF`, so `DROP TABLE` runs an
+implicit `DELETE` that fires every `ON DELETE CASCADE`: a rebuild of `user` or `post` deletes
+every row that references them (sessions, posts, likes, comments, messages, …) and drops
+their triggers (search in `0012`, the notification block guard in `0019`). If Drizzle
+generates a rebuild, change the schema so it doesn't.
+
+Dropping a plain index is allowed: it holds no data, the deployed queries still return the
+same rows (at worst more slowly), and Drizzle drops and recreates an index to change it
+(`0004`, `0010`). A unique index is a constraint the deployed code relies on, for idempotent
+inserts (`ON CONFLICT DO NOTHING`) and upsert targets, so dropping one is a contract step. The
+check knows which indexes are unique by replaying the earlier migrations.
+
+For the contract release, add a line `-- contract-ok: <why nothing uses it any more>` to the
+migration; the check then lets it through.
+
+### Bundle size
+
+`pnpm check:bundle-size` (after `pnpm build`) measures the gzipped Worker upload, exactly as
+`wrangler deploy --dry-run` bundles it from `worker.ts` (Durable Objects included), and the
+total of the client JS and CSS under `.svelte-kit/cloudflare/_app/immutable`, each file
+gzipped. CI fails when either exceeds its budget in `scripts/bundle-budgets.json` (KiB, about
+15% above the sizes when the check was added). Raise a budget in the same PR when the growth
+is intended.
+
+### Dependency updates
+
+Dependabot (`.github/dependabot.yml`) opens weekly PRs against `main`: npm minor and patch
+updates grouped into production and development dependencies, each major on its own, and
+GitHub Actions grouped. It waits 3 days after a release, because Safe Chain blocks packages
+younger than 48 hours. Dependabot PRs get no repository secrets, so CI skips the SonarCloud
+scan on them unless `SONAR_TOKEN` is also added as a Dependabot secret.
