@@ -13,6 +13,12 @@ declare global {
 	}
 
 	namespace App {
+		interface Error {
+			message: string;
+			/** Set by `handleError` for unexpected errors; logged with the error. */
+			id?: string;
+		}
+
 		interface Platform {
 			env: Env;
 			ctx: ExecutionContext;

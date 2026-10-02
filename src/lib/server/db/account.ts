@@ -15,13 +15,14 @@ import {
 	postLike,
 	postMedia,
 	postSave,
+	postShare,
 	postTag,
 	tag,
 	userFollow
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 1;
+export const EXPORT_FORMAT_VERSION = 2;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -38,6 +39,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		comments,
 		likes,
 		saves,
+		shares,
 		reactions,
 		following,
 		followers,
@@ -71,6 +73,10 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.select({ postId: postSave.postId, createdAt: postSave.createdAt })
 			.from(postSave)
 			.where(eq(postSave.userId, userId)),
+		db
+			.select({ postId: postShare.postId, createdAt: postShare.createdAt })
+			.from(postShare)
+			.where(eq(postShare.userId, userId)),
 		db
 			.select({
 				commentId: commentReaction.commentId,
@@ -188,6 +194,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		comments,
 		likes,
 		saves,
+		shares,
 		commentReactions: reactions,
 		following,
 		followers,

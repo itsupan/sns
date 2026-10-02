@@ -44,6 +44,17 @@ export class ChatRoom extends DurableObject<Env> {
 		broadcast(this.ctx.getWebSockets(), event);
 	}
 
+	/** RPC from the API when the conversation must stop live updates (a block). */
+	closeAll(code: number, reason: string): void {
+		for (const ws of this.ctx.getWebSockets()) {
+			try {
+				ws.close(code, reason);
+			} catch {
+				// Already closed.
+			}
+		}
+	}
+
 	webSocketMessage(ws: WebSocket, data: string | ArrayBuffer): void {
 		handleClientFrame(ws, data, this.ctx.getWebSockets());
 	}

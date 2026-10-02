@@ -1,10 +1,11 @@
 import type { RequestHandler } from './$types';
-import { ApiError, requireUser, withApi } from '$lib/server/api';
+import { ApiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 import { deleteStory, parseStoryId } from '$lib/server/stories';
 
 /** Deletes one of your own stories (and its views) before it expires. `:id` is `<userId>:<ms>`. */
 export const DELETE: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const currentUser = requireUser(locals);
+	await enforceRateLimit(platform, 'contentEdit', currentUser.id);
 	const id = params.id ?? '';
 	const parsed = parseStoryId(id);
 	if (!parsed) {

@@ -32,7 +32,13 @@ export type RateLimitName =
 	| 'mediaRefresh'
 	| 'accountExport'
 	| 'report'
-	| 'accountDelete';
+	| 'accountDelete'
+	| 'signIn'
+	| 'signUp'
+	| 'profileUpdate'
+	| 'contentEdit'
+	| 'markRead'
+	| 'storyView';
 
 export interface PageSize {
 	defaultPageSize: number;
@@ -83,7 +89,13 @@ export const DEFAULT_CONFIG: AppConfig = {
 		mediaRefresh: { limit: 60, windowSec: 60 },
 		accountExport: { limit: 5, windowSec: 3600 },
 		report: { limit: 10, windowSec: 3600 },
-		accountDelete: { limit: 5, windowSec: 3600 }
+		accountDelete: { limit: 5, windowSec: 3600 },
+		signIn: { limit: 10, windowSec: 60 },
+		signUp: { limit: 5, windowSec: 3600 },
+		profileUpdate: { limit: 10, windowSec: 60 },
+		contentEdit: { limit: 30, windowSec: 60 },
+		markRead: { limit: 120, windowSec: 60 },
+		storyView: { limit: 120, windowSec: 60 }
 	},
 	upload: {
 		maxBytes: 50 * 1024 * 1024,
@@ -132,7 +144,13 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	mediaRefresh: 'RATE_LIMIT_MEDIA_REFRESH',
 	accountExport: 'RATE_LIMIT_ACCOUNT_EXPORT',
 	report: 'RATE_LIMIT_REPORT',
-	accountDelete: 'RATE_LIMIT_ACCOUNT_DELETE'
+	accountDelete: 'RATE_LIMIT_ACCOUNT_DELETE',
+	signIn: 'RATE_LIMIT_SIGN_IN',
+	signUp: 'RATE_LIMIT_SIGN_UP',
+	profileUpdate: 'RATE_LIMIT_PROFILE_UPDATE',
+	contentEdit: 'RATE_LIMIT_CONTENT_EDIT',
+	markRead: 'RATE_LIMIT_MARK_READ',
+	storyView: 'RATE_LIMIT_STORY_VIEW'
 };
 
 const PositiveInt = v.pipe(v.string(), v.trim(), v.regex(/^\d+$/), v.toNumber(), v.minValue(1));

@@ -52,6 +52,16 @@ const toMessage = (m: typeof message.$inferSelect): ChatMessage => ({
 	...(m.storyRef ? { storyRef: m.storyRef } : {})
 });
 
+/** The id of the DM between two users, or null when they never started one. */
+export async function findDmId(db: Database, a: string, b: string): Promise<string | null> {
+	const [row] = await db
+		.select({ id: conversation.id })
+		.from(conversation)
+		.where(eq(conversation.dmKey, dmKey(a, b)))
+		.limit(1);
+	return row?.id ?? null;
+}
+
 /**
  * Returns the DM between `userId` and `otherId`, creating it on first use. Idempotent and safe
  * under concurrency: the unique `dm_key` makes both racers land on the same row. 403 when either

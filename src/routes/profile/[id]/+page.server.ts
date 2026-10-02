@@ -13,87 +13,6 @@ import {
 import { loadSavedPreview } from '$lib/server/db/saves';
 import { blockStatus } from '$lib/server/db/blocks';
 
-const FALLBACK_CURATORS: Record<
-	string,
-	{
-		user: {
-			id: string;
-			name: string;
-			image: string;
-			handle: string;
-			title: string;
-			bio: string;
-			website: string;
-			location: string;
-			cameraGear: string;
-		};
-		posts: GridItem[];
-	}
-> = {
-	'elena.rostova': {
-		user: {
-			id: 'usr_elena_dev',
-			name: 'Elena Rostova',
-			image:
-				'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-			handle: 'elena.rostova',
-			title: 'Architectural & Film Photographer',
-			bio: 'Architectural & Film Photographer capturing silence, light, and brutalist geometries across Scandinavia & Japan.',
-			website: 'elenarostova.art',
-			location: 'Copenhagen, Denmark',
-			cameraGear: 'Leica M6 · Hasselblad 500C/M'
-		},
-		posts: [
-			{
-				id: 'post-1',
-				title: 'Quiet Brutalism: Concrete Light & Shadows',
-				image:
-					'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-				likes: 842,
-				comments: 46,
-				isCarousel: true,
-				cameraMeta: '35mm · ISO 200',
-				description:
-					'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.',
-				tags: ['#MinimalArchitecture', '#LightAndSpace', '#DesignArchive'],
-				date: '3h ago',
-				location: 'Fondazione Prada, Milano'
-			}
-		]
-	},
-	'kai.raw': {
-		user: {
-			id: 'usr_kai_dev',
-			name: 'Kai Takahashi',
-			image:
-				'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-			handle: 'kai.raw',
-			title: 'Ceramicist & Visual Poet',
-			bio: 'Ceramicist & visual poet exploring wabi-sabi aesthetics and tea culture.',
-			website: 'kaitakahashi.jp',
-			location: 'Kyoto, Japan',
-			cameraGear: '50mm · ISO 400'
-		},
-		posts: [
-			{
-				id: 'post-2',
-				title: 'Wabi-Sabi Clay & Stoneware Forms',
-				image:
-					'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=1200&auto=format&fit=crop&q=80',
-				likes: 618,
-				comments: 29,
-				isCarousel: false,
-				cameraMeta: '50mm · ISO 400',
-				description:
-					'Hand-pinched Shigaraki stoneware fired in an anagama kiln over seven days. The ash melt creates an unrepeatable landscape of mineral hues and subtle texture.',
-				tags: ['#KyotoCeramics', '#WabiSabi', '#JapaneseCraft'],
-				date: '5h ago',
-				location: 'Kyoto, Japan'
-			}
-		]
-	}
-};
-
 export const load: PageServerLoad = async ({ params, locals, url, platform }) => {
 	const rawId = params.id;
 	if (!rawId) {
@@ -101,79 +20,47 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	}
 	const cleanId = rawId.startsWith('@') ? rawId.slice(1) : rawId;
 
-	let targetUser: Record<string, unknown> | null = null;
-	let targetPosts: GridItem[] = [];
-	let stats = EMPTY_PROFILE_STATS;
-	// Either way round, a block shows a limited profile: no posts, no follow or message.
-	let block = { blocked: false, blockedBy: false };
-
-	if (locals.db) {
-		try {
-			const rows = await locals.db
-				.select({
-					id: user.id,
-					name: user.name,
-					image: user.image,
-					handle: user.handle,
-					title: user.title,
-					bio: user.bio,
-					website: user.website,
-					location: user.location,
-					cameraGear: user.cameraGear,
-					createdAt: user.createdAt,
-					updatedAt: user.updatedAt
-				})
-				.from(user)
-				.where(or(eq(user.id, cleanId), eq(user.handle, cleanId)))
-				.limit(1);
-
-			const found = rows[0] ?? null;
-			targetUser = found;
-
-			if (found) {
-				const viewerId = locals.user?.id ?? null;
-				if (viewerId && viewerId !== found.id) {
-					block = await blockStatus(locals.db, viewerId, found.id);
-				}
-				const hidden = block.blocked || block.blockedBy;
-				const [posts, loadedStats] = await Promise.all([
-					hidden ? [] : loadProfilePosts(locals.db, found, viewerId),
-					loadProfileStats(locals.db, found.id, viewerId).catch(() => EMPTY_PROFILE_STATS)
-				]);
-				targetPosts = await Promise.all(
-					posts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
-				);
-				stats = loadedStats;
-			}
-		} catch {
-			// Query failed
-		}
-	}
-
-	if (!targetUser) {
-		const fallback =
-			FALLBACK_CURATORS[cleanId] ||
-			(cleanId === 'usr_elena_dev'
-				? FALLBACK_CURATORS['elena.rostova']
-				: cleanId === 'usr_kai_dev'
-					? FALLBACK_CURATORS['kai.raw']
-					: null);
-		if (fallback) {
-			targetUser = fallback.user;
-			targetPosts = fallback.posts;
-			stats = { ...EMPTY_PROFILE_STATS, postsCount: fallback.posts.length };
-		}
-	}
-
+	const [targetUser] = await locals.db
+		.select({
+			id: user.id,
+			name: user.name,
+			image: user.image,
+			handle: user.handle,
+			title: user.title,
+			bio: user.bio,
+			website: user.website,
+			location: user.location,
+			cameraGear: user.cameraGear,
+			createdAt: user.createdAt,
+			updatedAt: user.updatedAt
+		})
+		.from(user)
+		.where(or(eq(user.id, cleanId), eq(user.handle, cleanId)))
+		.limit(1);
 	if (!targetUser) {
 		throw error(404, 'User not found');
 	}
 
-	const isOwnProfile = Boolean(locals.user && locals.user.id === targetUser.id);
+	const viewerId = locals.user?.id ?? null;
+	// Either way round, a block shows a limited profile: no posts, no follow or message.
+	const block =
+		viewerId && viewerId !== targetUser.id
+			? await blockStatus(locals.db, viewerId, targetUser.id)
+			: { blocked: false, blockedBy: false };
+	const hidden = block.blocked || block.blockedBy;
+	const [posts, stats] = await Promise.all([
+		hidden ? [] : loadProfilePosts(locals.db, targetUser, viewerId),
+		loadProfileStats(locals.db, targetUser.id, viewerId).catch(() => EMPTY_PROFILE_STATS)
+	]);
+	const gridPosts = await Promise.all(
+		posts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
+	);
+
+	const isOwnProfile = viewerId === targetUser.id;
 	let saved: GridItem[] = [];
-	if (isOwnProfile && locals.user && locals.db) {
+	if (isOwnProfile) {
 		try {
-			const cards = await loadSavedPreview(locals.db, locals.user.id);
+			const cards = await loadSavedPreview(locals.db, targetUser.id);
 			saved = await Promise.all(
 				cards.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
 			);
@@ -187,36 +74,26 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 			? url.origin
 			: platform?.env?.BETTER_AUTH_URL || url.origin;
 
-	const handleStr = targetUser.handle as string | null | undefined;
-	const canonicalHandle = handleStr ? `@${handleStr.replace(/^@/, '')}` : (targetUser.id as string);
+	const canonicalHandle = targetUser.handle
+		? `@${targetUser.handle.replace(/^@/, '')}`
+		: targetUser.id;
 	const canonicalUrl = `${origin}/profile/${canonicalHandle}`;
-
-	const refreshedImage = targetUser.image
-		? await refreshMediaUrl(targetUser.image as string, platform?.env)
-		: null;
-
-	// DB posts were refreshed above; this covers the fallback curators' plain image URLs.
-	const refreshedPosts = await Promise.all(
-		targetPosts.map(async (p) =>
-			p.post ? p : { ...p, image: p.image ? await refreshMediaUrl(p.image, platform?.env) : '' }
-		)
-	);
 
 	return {
 		targetUser: {
 			id: targetUser.id,
 			name: targetUser.name,
-			image: refreshedImage,
-			handle: (targetUser.handle as string | null | undefined) ?? null,
-			title: (targetUser.title as string | null | undefined) ?? null,
-			bio: (targetUser.bio as string | null | undefined) ?? null,
-			website: (targetUser.website as string | null | undefined) ?? null,
-			location: (targetUser.location as string | null | undefined) ?? null,
-			cameraGear: (targetUser.cameraGear as string | null | undefined) ?? null
+			image: targetUser.image ? await refreshMediaUrl(targetUser.image, platform?.env) : null,
+			handle: targetUser.handle,
+			title: targetUser.title,
+			bio: targetUser.bio,
+			website: targetUser.website,
+			location: targetUser.location,
+			cameraGear: targetUser.cameraGear
 		},
 		isOwnProfile,
 		block,
-		posts: refreshedPosts,
+		posts: gridPosts,
 		saved,
 		stats,
 		canonicalUrl,

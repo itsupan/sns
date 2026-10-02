@@ -57,6 +57,11 @@
 				The page you are looking for doesn't exist, has been removed, or the link may be mistyped.
 			{:else}
 				{page.error?.message || 'An unexpected error occurred. Please try again or return home.'}
+				{#if page.error?.id}
+					<span class="block mt-2 text-xs text-slate-400 dark:text-dark-muted">
+						Reference: {page.error.id}
+					</span>
+				{/if}
 			{/if}
 		</p>
 

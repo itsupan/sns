@@ -141,6 +141,23 @@ export const postSave = sqliteTable(
 	]
 );
 
+/** Who shared a post. `post.shares_count` grows by one per new row, so each sharer counts once. */
+export const postShare = sqliteTable(
+	'post_share',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		postId: text('post_id')
+			.notNull()
+			.references(() => post.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [primaryKey({ columns: [table.userId, table.postId] })]
+);
+
 export const postComment = sqliteTable(
 	'post_comment',
 	{

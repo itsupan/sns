@@ -2,7 +2,7 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { eq, and } from 'drizzle-orm';
 import * as v from 'valibot';
 import { post, postMedia, postTag } from '$lib/server/db/schema';
-import { ApiError, parseBody, requireUser, withApi } from '$lib/server/api';
+import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
 	attachTagsStatements,
 	loadPostMedia,
@@ -72,8 +72,14 @@ const UpdatePostBody = v.object(
 );
 
 /** Loads a live post and checks the current user wrote it; 404 before 403 so ids are not probed. */
-async function requireOwnPost(locals: App.Locals, postId: string | undefined, action: string) {
+async function requireOwnPost(
+	locals: App.Locals,
+	platform: App.Platform | undefined,
+	postId: string | undefined,
+	action: string
+) {
 	const currentUser = requireUser(locals);
+	await enforceRateLimit(platform, 'contentEdit', currentUser.id);
 	if (!postId) {
 		throw new ApiError(400, 'validation_failed', 'Post ID is required');
 	}
@@ -101,7 +107,12 @@ async function requireOwnPost(locals: App.Locals, postId: string | undefined, ac
 }
 
 export const PATCH: RequestHandler = withApi(async ({ params, locals, request, platform }) => {
-	const { currentUser, postId, existingPost } = await requireOwnPost(locals, params.id, 'edit');
+	const { currentUser, postId, existingPost } = await requireOwnPost(
+		locals,
+		platform,
+		params.id,
+		'edit'
+	);
 	const body = await parseBody(request, UpdatePostBody);
 
 	const tags = body.tags === undefined ? undefined : normalizeTags(body.tags);
@@ -255,7 +266,7 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 });
 
 export const DELETE: RequestHandler = withApi(async ({ params, locals, platform }) => {
-	const { currentUser, postId } = await requireOwnPost(locals, params.id, 'delete');
+	const { currentUser, postId } = await requireOwnPost(locals, platform, params.id, 'delete');
 
 	// Collect the post's stored media keys before deleting so the objects can be cleaned up.
 	let mediaKeys: string[] = [];

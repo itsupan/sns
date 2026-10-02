@@ -5,7 +5,14 @@ import * as v from 'valibot';
 import { user } from '$lib/server/db/schema';
 import { isFollowing } from '$lib/server/db/follows';
 import { isOwnUpload } from '$lib/server/services/storage';
-import { ApiError, apiError, parseBody, requireUser, withApi } from '$lib/server/api';
+import {
+	ApiError,
+	apiError,
+	enforceRateLimit,
+	parseBody,
+	requireUser,
+	withApi
+} from '$lib/server/api';
 
 /** Optional nullable text field: `null` or `''` clears it, otherwise trimmed and length-checked. */
 const clearableText = (
@@ -114,6 +121,7 @@ export const PATCH: RequestHandler = withApi(async ({ params, request, locals, p
 	if (currentUser.id !== targetUserId) {
 		return apiError(403, 'forbidden', 'Forbidden: You cannot modify another user profile');
 	}
+	await enforceRateLimit(platform, 'profileUpdate', currentUser.id);
 
 	// 3. Validate body; drop fields that were not sent
 	const parsed = await parseBody(request, UpdateProfile);

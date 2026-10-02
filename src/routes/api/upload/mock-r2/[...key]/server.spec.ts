@@ -85,7 +85,7 @@ describe('mock-r2 storage endpoint', () => {
 				'avatars/user-1/me.jpg',
 				new Uint8Array([10, 20, 30]),
 				{ 'content-type': 'image/jpeg' },
-				{ platform: { env: { KV: { put: kvPut, get: vi.fn().mockResolvedValue(null) } } } }
+				{ platform: { env: { KV: { put: kvPut } } } }
 			);
 
 			expect(res.status).toBe(200);

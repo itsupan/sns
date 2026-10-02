@@ -84,7 +84,12 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 				});
 			}
 		} catch (err) {
-			console.warn('[media-proxy] Error reading from R2 binding:', err);
+			// A bucket outage must not be masked by a stale or missing KV copy.
+			console.error('[media-proxy] Error reading from R2 binding:', err);
+			return new Response('Media storage unavailable', {
+				status: 502,
+				headers: { 'Content-Type': 'text/plain', ...MEDIA_HEADERS }
+			});
 		}
 	}
 
@@ -189,66 +194,6 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 	}
 
 	return new Response(item.buffer, {
-		status: 200,
-		headers: {
-			'Content-Type': item.contentType,
-			'Accept-Ranges': 'bytes',
-			'Content-Length': totalSize.toString(),
-			'Cache-Control': 'public, max-age=3600',
-			...MEDIA_HEADERS
-		}
-	});
-};
-
-export const HEAD: RequestHandler = async ({ params, request }) => {
-	const key = params.key;
-	if (!key) {
-		throw error(400, 'Missing object key');
-	}
-
-	const item = mockStorage.get(key);
-	if (!item) {
-		return new Response(null, {
-			status: 404,
-			headers: {
-				'Content-Type': 'text/plain',
-				...MEDIA_HEADERS
-			}
-		});
-	}
-
-	const totalSize = item.buffer.byteLength;
-	const rangeHeader = request.headers.get('range');
-	const range = parseRange(rangeHeader, totalSize);
-
-	if (range === 'invalid') {
-		return new Response(null, {
-			status: 416,
-			headers: {
-				'Content-Range': `bytes */${totalSize}`,
-				'Accept-Ranges': 'bytes',
-				...MEDIA_HEADERS
-			}
-		});
-	}
-
-	if (range !== null) {
-		const { start, end } = range;
-		const chunkSize = end - start + 1;
-		return new Response(null, {
-			status: 206,
-			headers: {
-				'Content-Type': item.contentType,
-				'Content-Range': `bytes ${start}-${end}/${totalSize}`,
-				'Accept-Ranges': 'bytes',
-				'Content-Length': chunkSize.toString(),
-				'Cache-Control': 'public, max-age=3600',
-				...MEDIA_HEADERS
-			}
-		});
-	}
-
-	return new Response(null, {
 		status: 200,
 		headers: {
 			'Content-Type': item.contentType,

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { POST } from './+server';
+import { fakeRateLimiter } from '$lib/server/testing/rate-limiter';
 
 describe('POST /api/media/refresh', () => {
 	it('returns 400 if body is invalid JSON or urls is not an array', async () => {
@@ -39,8 +40,12 @@ describe('POST /api/media/refresh', () => {
 	});
 
 	it('returns 429 once a signed-out client is over the limit', async () => {
-		// A KV whose counter is already past any limit.
-		const KV = { get: async () => '9999', put: async () => {} };
+		// This IP's window is already past any limit.
+		const { namespace, windows } = fakeRateLimiter();
+		windows.set('mediaRefresh:ip:203.0.113.7', {
+			windowStart: Math.floor(Date.now() / 60_000) * 60,
+			count: 9999
+		});
 		const request = new Request('http://localhost/api/media/refresh', {
 			method: 'POST',
 			headers: { 'content-type': 'application/json' },
@@ -49,7 +54,7 @@ describe('POST /api/media/refresh', () => {
 
 		const res = await POST({
 			request,
-			platform: { env: { KV } },
+			platform: { env: { RATE_LIMITER: namespace } },
 			locals: { user: null },
 			getClientAddress: () => '203.0.113.7'
 		} as never);

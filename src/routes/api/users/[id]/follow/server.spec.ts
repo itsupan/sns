@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { count, eq } from 'drizzle-orm';
 import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
+import { fakeRateLimiter } from '$lib/server/testing/rate-limiter';
 import { user, userFollow } from '$lib/server/db/schema';
 import type { ApiErrorBody } from '$lib/server/api';
 import { loadFollowedIds } from '$lib/server/db/follows';
@@ -121,13 +122,10 @@ describe('POST / DELETE /api/users/:id/follow', { timeout: REAL_D1_TIMEOUT }, ()
 	});
 
 	it('is rate limited per user with the follow rule', async () => {
-		const puts: string[] = [];
+		const { namespace, windows } = fakeRateLimiter();
+		const platform = { env: { RATE_LIMITER: namespace } };
 		// Window already at the 30/min limit for this user.
-		const kv = {
-			get: async (key: string) => (key.startsWith('rl:follow:viewer:') ? '30' : null),
-			put: async (key: string) => void puts.push(key)
-		};
-		const platform = { env: { KV: kv } };
+		windows.set('follow:viewer', { windowStart: Math.floor(Date.now() / 60_000) * 60, count: 30 });
 
 		for (const handler of [follow, unfollow]) {
 			const res = await call(handler as Handler, { id: 'star', userId: 'viewer', platform });
@@ -139,7 +137,7 @@ describe('POST / DELETE /api/users/:id/follow', { timeout: REAL_D1_TIMEOUT }, ()
 		// Another user is unaffected, and the request is counted against the follow bucket.
 		const ok = await call(follow as Handler, { id: 'star', userId: 'fan-0', platform });
 		expect(ok.status).toBe(200);
-		expect(puts.some((k) => k.startsWith('rl:follow:fan-0:'))).toBe(true);
+		expect(windows.get('follow:fan-0')?.count).toBe(1);
 	});
 
 	it('keeps counters equal to rows under concurrent follow/unfollow', async () => {

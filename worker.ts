@@ -6,3 +6,4 @@
  */
 export { default } from './.svelte-kit/cloudflare/_worker.js';
 export { ChatRoom } from './src/lib/server/chat/chat-room';
+export { RateLimiter } from './src/lib/server/rate-limiter';

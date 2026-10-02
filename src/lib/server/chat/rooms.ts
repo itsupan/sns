@@ -1,4 +1,4 @@
-import type { ChatServerEvent } from '$lib/chat/types';
+import { CONVERSATION_CLOSED_CODE, type ChatServerEvent } from '$lib/chat/types';
 import type { ChatRoom } from './chat-room';
 
 /**
@@ -30,4 +30,16 @@ export function broadcastLater(
 		console.warn('[chat] broadcast failed', err);
 	});
 	if (platform?.ctx?.waitUntil) platform.ctx.waitUntil(delivery);
+}
+
+/** Disconnects everyone from the conversation's room after the response is sent. Best effort. */
+export function closeRoomLater(platform: App.Platform | undefined, conversationId: string) {
+	const room = chatRoom(platform, conversationId);
+	if (!room) return;
+	const closing = room
+		.closeAll(CONVERSATION_CLOSED_CODE, 'Conversation closed')
+		.catch((err: unknown) => {
+			console.warn('[chat] closing room failed', err);
+		});
+	if (platform?.ctx?.waitUntil) platform.ctx.waitUntil(closing);
 }

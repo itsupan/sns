@@ -7,53 +7,25 @@ vi.mock('$app/environment', () => ({
 	}
 }));
 
-import { ApiError, RATE_LIMITS, enforceRateLimit, rateLimit } from '.';
+import { ApiError, RATE_LIMITS, enforceRateLimit } from '.';
 import { FAIL_CLOSED_LIMITS } from './rate-limit';
+import { fakeRateLimiter } from '$lib/server/testing/rate-limiter';
 
-function fakeKv() {
-	const store = new Map<string, { value: string; ttl?: number }>();
-	const kv = {
-		get: async (key: string) => store.get(key)?.value ?? null,
-		put: async (key: string, value: string, opts?: { expirationTtl?: number }) => {
-			store.set(key, { value, ttl: opts?.expirationTtl });
+const withLimiter = (namespace: unknown) =>
+	({ env: { RATE_LIMITER: namespace } }) as unknown as App.Platform;
+
+const failingLimiter = {
+	idFromName: (name: string) => name,
+	get: () => ({
+		hit: async () => {
+			throw new Error('Durable Object reset');
 		}
-	};
-	return { kv: kv as unknown as KVNamespace, store };
-}
-
-const rule = { limit: 3, windowSec: 60 };
-const t0 = Date.UTC(2026, 9, 1, 12, 0, 10); // 10s into a minute window
-
-describe('rateLimit', () => {
-	it('allows up to the limit, then returns seconds until reset', async () => {
-		const { kv } = fakeKv();
-		for (let i = 0; i < 3; i++) expect(await rateLimit(kv, 'k', rule, t0)).toBeNull();
-		expect(await rateLimit(kv, 'k', rule, t0)).toBe(50);
-	});
-
-	it('starts a fresh window after the reset', async () => {
-		const { kv } = fakeKv();
-		for (let i = 0; i < 3; i++) await rateLimit(kv, 'k', rule, t0);
-		expect(await rateLimit(kv, 'k', rule, t0 + 50_000)).toBeNull();
-	});
-
-	it('tracks keys independently', async () => {
-		const { kv } = fakeKv();
-		for (let i = 0; i < 3; i++) await rateLimit(kv, 'a', rule, t0);
-		expect(await rateLimit(kv, 'b', rule, t0)).toBeNull();
-	});
-
-	it('never sets a KV TTL below 60 seconds', async () => {
-		const { kv, store } = fakeKv();
-		await rateLimit(kv, 'k', { limit: 5, windowSec: 10 }, t0);
-		expect([...store.values()][0].ttl).toBeGreaterThanOrEqual(60);
-	});
-});
+	})
+};
 
 describe('enforceRateLimit', () => {
 	it('throws a 429 ApiError with Retry-After once the limit is exceeded', async () => {
-		const { kv } = fakeKv();
-		const platform = { env: { KV: kv } } as unknown as App.Platform;
+		const platform = withLimiter(fakeRateLimiter().namespace);
 		for (let i = 0; i < RATE_LIMITS.createPost.limit; i++) {
 			await enforceRateLimit(platform, 'createPost', 'user-1');
 		}
@@ -66,11 +38,23 @@ describe('enforceRateLimit', () => {
 		expect(((await res.json()) as { error: { code: string } }).error.code).toBe('rate_limited');
 	});
 
-	it('does not affect other users', async () => {
-		const { kv } = fakeKv();
-		const platform = { env: { KV: kv } } as unknown as App.Platform;
+	it('counts each limit and subject separately', async () => {
+		const { namespace, windows } = fakeRateLimiter();
+		const platform = withLimiter(namespace);
 		for (let i = 0; i < RATE_LIMITS.like.limit; i++) await enforceRateLimit(platform, 'like', 'a');
 		await expect(enforceRateLimit(platform, 'like', 'b')).resolves.toBeUndefined();
+		await expect(enforceRateLimit(platform, 'save', 'a')).resolves.toBeUndefined();
+		expect([...windows.keys()].sort()).toEqual(['like:a', 'like:b', 'save:a']);
+	});
+
+	it('uses the per-environment rule from RATE_LIMIT_* vars', async () => {
+		const { namespace } = fakeRateLimiter();
+		const platform = {
+			env: { RATE_LIMITER: namespace, RATE_LIMIT_LIKE: '1/60' }
+		} as unknown as App.Platform;
+		await enforceRateLimit(platform, 'like', 'a');
+		const err = await enforceRateLimit(platform, 'like', 'a').catch((e) => e);
+		expect((err as ApiError).status).toBe(429);
 	});
 
 	afterEach(() => {
@@ -79,15 +63,8 @@ describe('enforceRateLimit', () => {
 		vi.restoreAllMocks();
 	});
 
-	const failingKv = {
-		get: async () => {
-			throw new Error('KV get() failed');
-		},
-		put: async () => {}
-	} as unknown as KVNamespace;
-
-	it('fails closed with a 503 for write-heavy limits when KV fails', async () => {
-		const platform = { env: { KV: failingKv } } as unknown as App.Platform;
+	it('fails closed with a 503 for write-heavy limits when the limiter fails', async () => {
+		const platform = withLimiter(failingLimiter);
 		vi.spyOn(console, 'error').mockImplementation(() => {});
 		for (const name of FAIL_CLOSED_LIMITS) {
 			const err = await enforceRateLimit(platform, name, 'a').catch((e) => e);
@@ -101,7 +78,7 @@ describe('enforceRateLimit', () => {
 		}
 	});
 
-	it('fails closed for write-heavy limits when KV is missing outside dev/tests', async () => {
+	it('fails closed for write-heavy limits when the binding is missing outside dev/tests', async () => {
 		env.dev = false;
 		vi.stubEnv('MODE', 'production');
 		vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -111,26 +88,20 @@ describe('enforceRateLimit', () => {
 		await expect(enforceRateLimit(undefined, 'search', 'a')).resolves.toBeUndefined();
 	});
 
-	it('allows write-heavy limits without KV in dev', async () => {
+	it('allows write-heavy limits without the binding in dev', async () => {
 		vi.stubEnv('MODE', 'production');
 		await expect(enforceRateLimit(undefined, 'createPost', 'a')).resolves.toBeUndefined();
 	});
 
-	it('allows requests when KV fails, e.g. once the daily write quota is used up', async () => {
-		const kv = {
-			get: async () => '0',
-			put: async () => {
-				throw new Error('KV put() limit exceeded for the day.');
-			}
-		} as unknown as KVNamespace;
-		const platform = { env: { KV: kv } } as unknown as App.Platform;
+	it('allows other requests when the limiter fails', async () => {
 		const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-		await expect(enforceRateLimit(platform, 'like', 'a')).resolves.toBeUndefined();
+		await expect(
+			enforceRateLimit(withLimiter(failingLimiter), 'like', 'a')
+		).resolves.toBeUndefined();
 		expect(warn).toHaveBeenCalledOnce();
-		warn.mockRestore();
 	});
 
-	it('allows requests when no KV binding is present', async () => {
+	it('allows requests when no binding is present in tests', async () => {
 		await expect(enforceRateLimit(undefined, 'like', 'a')).resolves.toBeUndefined();
 	});
 });
