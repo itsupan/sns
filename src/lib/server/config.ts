@@ -28,6 +28,7 @@ export type RateLimitName =
 	| 'share'
 	| 'follow'
 	| 'uploadPresign'
+	| 'upload'
 	| 'mediaRefresh'
 	| 'accountExport'
 	| 'report'
@@ -78,6 +79,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		share: { limit: 30, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 },
+		upload: { limit: 20, windowSec: 60 },
 		mediaRefresh: { limit: 60, windowSec: 60 },
 		accountExport: { limit: 5, windowSec: 3600 },
 		report: { limit: 10, windowSec: 3600 },
@@ -126,6 +128,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	share: 'RATE_LIMIT_SHARE',
 	follow: 'RATE_LIMIT_FOLLOW',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN',
+	upload: 'RATE_LIMIT_UPLOAD',
 	mediaRefresh: 'RATE_LIMIT_MEDIA_REFRESH',
 	accountExport: 'RATE_LIMIT_ACCOUNT_EXPORT',
 	report: 'RATE_LIMIT_REPORT',

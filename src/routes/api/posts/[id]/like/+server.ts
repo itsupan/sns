@@ -5,6 +5,7 @@ import { post, postLike } from '$lib/server/db/schema';
 import { apiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 import { likesCountOf } from '$lib/server/db/counters';
 import { notDeleted } from '$lib/server/db/posts';
+import { requireNotBlocked } from '$lib/server/db/blocks';
 import { notifyStatement, unnotifyStatement } from '$lib/server/db/notifications';
 
 export const POST: RequestHandler = withApi(async ({ params, locals, platform }) => {
@@ -33,6 +34,14 @@ export const POST: RequestHandler = withApi(async ({ params, locals, platform })
 		.where(ownLike)
 		.limit(1);
 	const liked = existingLike.length === 0;
+	if (liked) {
+		await requireNotBlocked(
+			locals.db,
+			currentUser.id,
+			postRows[0].authorId,
+			'You cannot like this post'
+		);
+	}
 
 	const toggle = liked
 		? locals.db

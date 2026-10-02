@@ -95,16 +95,16 @@ describe('posts API with post_media', { timeout: REAL_D1_TIMEOUT }, () => {
 		const res = await call(createPost as Handler, {
 			content: 'new carousel',
 			mediaUrls: [
-				{ url: 'https://cdn.test/1.jpg', type: 'image' },
-				{ url: 'https://cdn.test/2.webm' }
+				{ url: '/api/media/posts/u-1/1.jpg', type: 'image' },
+				{ url: '/api/media/posts/u-1/2.webm' }
 			]
 		});
 		expect(res.status).toBe(201);
 		const { post } = (await res.json()) as { post: { id: string } };
 
 		expect((await loadPostMedia(t.db, [post.id])).get(post.id)).toEqual([
-			{ url: 'https://cdn.test/1.jpg', type: 'image' },
-			{ url: 'https://cdn.test/2.webm', type: 'video' }
+			{ url: '/api/media/posts/u-1/1.jpg', type: 'image' },
+			{ url: '/api/media/posts/u-1/2.webm', type: 'video' }
 		]);
 
 		const feed = (await (await call(listPosts as Handler)).json()) as {
@@ -112,7 +112,7 @@ describe('posts API with post_media', { timeout: REAL_D1_TIMEOUT }, () => {
 		};
 		const served = feed.posts.find((p) => p.id === post.id)!;
 		expect(served.mediaItems).toHaveLength(2);
-		expect(served.mediaUrl).toBe('https://cdn.test/1.jpg');
+		expect(served.mediaUrl).toBe('/api/media/posts/u-1/1.jpg');
 		expect(served.mediaType).toBe('image');
 
 		const carousel = feed.posts.find((p) => p.id === 'carousel')!;

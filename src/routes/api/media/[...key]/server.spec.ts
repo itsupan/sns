@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { GET, HEAD, PUT, OPTIONS } from './+server';
+import { GET, HEAD, OPTIONS } from './+server';
 import { mockStorage } from '$lib/server/services/media-storage';
 
 describe('media proxy endpoint (/api/media/[...key])', () => {
@@ -15,24 +15,9 @@ describe('media proxy endpoint (/api/media/[...key])', () => {
 		});
 	});
 
-	describe('PUT', () => {
-		it('stores media in memory and returns 200 with ETag', async () => {
-			const data = new Uint8Array([1, 2, 3]);
-			const request = new Request('http://localhost/api/media/posts/test.mp4', {
-				method: 'PUT',
-				headers: { 'content-type': 'video/mp4' },
-				body: data
-			});
-
-			const res = await PUT({
-				params: { key: 'posts/test.mp4' },
-				request,
-				platform: undefined
-			} as never);
-
-			expect(res.status).toBe(200);
-			expect(mockStorage.has('posts/test.mp4')).toBe(true);
-		});
+	it('does not accept uploads', async () => {
+		const mod: Record<string, unknown> = await import('./+server');
+		expect(mod.PUT).toBeUndefined();
 	});
 
 	describe('GET', () => {

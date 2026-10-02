@@ -2,9 +2,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { eq } from 'drizzle-orm';
 import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
 import {
+	commentReaction,
 	conversation,
 	notification,
 	post,
+	postComment,
+	postLike,
+	postSave,
 	postTag,
 	tag,
 	user,
@@ -13,16 +17,19 @@ import {
 } from './schema';
 import { blockStatus, blockedUserIds, listBlockedUsers } from './blocks';
 import { setFollowing } from './follows';
-import { loadFeedPage } from './posts';
+import { loadCommentPreviews, loadFeedPage } from './posts';
 import { loadExplorePage, loadSuggestedCreators, loadTagPage } from './explore';
 import { searchPosts, searchUsers, toFtsQuery } from './search';
-import { createComment, listPostComments } from './comments';
+import { createComment, listPostComments, toggleReaction } from './comments';
 import { countUnreadNotifications, listNotifications, notifyStatement } from './notifications';
 import { getOrCreateDm } from './chat';
 import { DELETE as unblock, POST as block } from '../../../routes/api/users/[id]/block/+server';
 import { POST as follow } from '../../../routes/api/users/[id]/follow/+server';
 import { POST as startDm } from '../../../routes/api/conversations/+server';
 import { POST as sendMessage } from '../../../routes/api/conversations/[id]/messages/+server';
+import { POST as like } from '../../../routes/api/posts/[id]/like/+server';
+import { PUT as save } from '../../../routes/api/posts/[id]/save/+server';
+import { POST as share } from '../../../routes/api/posts/[id]/share/+server';
 
 type Db = Awaited<ReturnType<typeof createTestDb>>['db'];
 type Handler = (event: never) => Promise<Response>;
@@ -260,5 +267,89 @@ describe('blocking users on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(
 			(await call(sendMessage, { id: dm.id, userId: 'alice', body: { content: 'hi' } })).status
 		).toBe(201);
+	});
+
+	it('forbids liking, saving, sharing, commenting and reacting across a block', async () => {
+		await db.batch([
+			db.insert(post).values({ id: 'pa', userId: 'alice', content: 'alice post' }),
+			db.insert(post).values({ id: 'pb', userId: 'bob', content: 'bob post' }),
+			db.insert(postComment).values({ id: 'ca', postId: 'pb', userId: 'alice', content: 'hi' }),
+			db.insert(postComment).values({ id: 'cc', postId: 'pa', userId: 'carol', content: 'hey' })
+		]);
+		await call(block, { id: 'alice', userId: 'bob' });
+
+		for (const [viewer, postId] of [
+			['bob', 'pa'],
+			['alice', 'pb']
+		]) {
+			for (const handler of [like, save, share]) {
+				expect((await call(handler, { id: postId, userId: viewer })).status).toBe(403);
+			}
+			await expect(
+				createComment(db, { postId, author: { id: viewer, name: viewer }, content: 'yo' })
+			).rejects.toMatchObject({ status: 403 });
+		}
+		await expect(
+			createComment(db, {
+				postId: 'pb',
+				author: { id: 'bob', name: 'bob' },
+				content: 'reply',
+				parentCommentId: 'ca'
+			})
+		).rejects.toMatchObject({ status: 403 });
+		// A blocked comment author, then a bystander's comment on the blocked user's post.
+		for (const commentId of ['ca', 'cc']) {
+			await expect(
+				toggleReaction(db, { commentId, userId: 'bob', type: 'like' })
+			).rejects.toMatchObject({ status: 403 });
+		}
+
+		expect(await db.select().from(postLike)).toEqual([]);
+		expect(await db.select().from(postSave)).toEqual([]);
+		expect(await db.select().from(commentReaction)).toEqual([]);
+		const shares = await db.select({ n: post.sharesCount }).from(post);
+		expect(shares.every((r) => r.n === 0)).toBe(true);
+
+		await call(unblock, { id: 'alice', userId: 'bob' });
+		expect((await call(like, { id: 'pa', userId: 'bob' })).status).toBe(200);
+	});
+
+	it('previews the newest visible top-level comment per post', async () => {
+		const at = (min: number) => new Date(Date.UTC(2026, 0, 1, 0, min));
+		await db.insert(post).values({ id: 'pc', userId: 'carol', content: 'hello' });
+		await db.batch([
+			db.insert(postComment).values({
+				id: 'c1',
+				postId: 'pc',
+				userId: 'alice',
+				content: 'first',
+				createdAt: at(1)
+			}),
+			db.insert(postComment).values({
+				id: 'c2',
+				postId: 'pc',
+				userId: 'bob',
+				content: 'second',
+				createdAt: at(2)
+			}),
+			db.insert(postComment).values({
+				id: 'c3',
+				postId: 'pc',
+				userId: 'carol',
+				content: 'a reply',
+				parentCommentId: 'c1',
+				createdAt: at(3)
+			})
+		]);
+		await call(block, { id: 'alice', userId: 'bob' });
+
+		expect((await loadCommentPreviews(db, 'carol', ['pc'])).get('pc')).toEqual({
+			author: '@bob',
+			content: 'second'
+		});
+		expect((await loadCommentPreviews(db, 'alice', ['pc'])).get('pc')).toEqual({
+			author: '@alice',
+			content: 'first'
+		});
 	});
 });

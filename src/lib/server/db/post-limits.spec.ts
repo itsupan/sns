@@ -32,7 +32,7 @@ async function create(body: unknown) {
 const tagsOf = (n: number, len = 8) =>
 	Array.from({ length: n }, (_, i) => `#${String(i).padStart(len, 'x')}`);
 const mediaOf = (n: number) =>
-	Array.from({ length: n }, (_, i) => ({ url: `https://cdn.test/${i}.jpg`, type: 'image' }));
+	Array.from({ length: n }, (_, i) => ({ url: `/api/media/posts/u-1/${i}.jpg`, type: 'image' }));
 
 describe(
 	'post size limits on real D1 (100 bound-variable cap)',

@@ -14,6 +14,7 @@ vi.mock('$lib/server/db/posts', async (importOriginal) => {
 	return {
 		...actual,
 		loadRecentLikers: vi.fn(async () => new Map()),
+		loadCommentPreviews: vi.fn(async () => new Map()),
 		loadPostMedia: vi.fn(
 			async (_db: unknown, ids: string[]) =>
 				new Map(ids.filter((id) => media[id]).map((id) => [id, media[id]]))
@@ -60,14 +61,9 @@ describe('GET /api/posts', () => {
 			select: vi.fn(() => ({
 				from: vi.fn(() => ({
 					innerJoin: vi.fn(() => ({
-						// Feed query: .where(notDeleted).orderBy().limit();
-						// comment previews: .where().orderBy() awaited directly.
+						// Feed query: .where(notDeleted).orderBy().limit().
 						where: vi.fn(() => ({
-							orderBy: vi.fn(() =>
-								Object.assign(Promise.resolve([]), {
-									limit: vi.fn(async () => mockPosts)
-								})
-							)
+							orderBy: vi.fn(() => ({ limit: vi.fn(async () => mockPosts) }))
 						}))
 					})),
 					where: vi.fn(async () => [])
@@ -191,7 +187,7 @@ describe('POST /api/posts', () => {
 				json: async () => ({
 					content: 'New ceramic bowl finished.',
 					title: 'Ceramics',
-					mediaUrl: 'https://example.com/bowl.mp4',
+					mediaUrl: '/api/media/posts/u-1/bowl.mp4',
 					mediaType: 'video',
 					postType: 'photo',
 					tags: ['ceramics', 'pottery']
@@ -244,8 +240,8 @@ describe('POST /api/posts', () => {
 					content: 'Exhibition studies at Neue Biennale.',
 					title: 'Monoliths of Silence',
 					mediaUrls: [
-						{ url: 'https://example.com/plate1.jpg', type: 'image' },
-						{ url: 'https://example.com/plate2.jpg', type: 'image' }
+						{ url: '/api/media/posts/u-elena/plate1.jpg', type: 'image' },
+						{ url: '/api/media/posts/u-elena/plate2.jpg', type: 'image' }
 					],
 					aspectRatio: '4:5',
 					location: 'Fondazione Prada, Milano',

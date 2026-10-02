@@ -13,6 +13,7 @@ import {
 import {
 	deleteMediaObjects,
 	extractR2Key,
+	isOwnUpload,
 	ownedMediaKeys,
 	refreshPostMediaUrls
 } from '$lib/server/services/storage';
@@ -126,6 +127,15 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 			...m,
 			url: storedByKey.get(extractR2Key(m.url) ?? m.url) ?? m.url
 		}));
+		const storedUrls = new Set(storedByKey.values());
+		if (
+			media.some(
+				(m) => !storedUrls.has(m.url) && !isOwnUpload(m.url, 'posts', currentUser.id, platform?.env)
+			)
+		) {
+			const message = 'Upload the media first';
+			throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
+		}
 	}
 
 	// A text post (after this edit) needs a background, no media and short text.

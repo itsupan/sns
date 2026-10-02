@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull, ne, sql } from 'drizzle-orm';
 import type { Database } from '.';
-import { post, postLike, postMedia, postTag, tag, user } from './schema';
+import { post, postComment, postLike, postMedia, postTag, tag, user } from './schema';
 import { MAX_TAGS_PER_POST } from '$lib/constants/post-limits';
 import { notBlockedWith } from './blocks';
 
@@ -242,4 +242,40 @@ export async function loadRecentLikers(
 		.from(ranked)
 		.where(eq(ranked.rank, 1));
 	return new Map(rows.map((r) => [r.postId, r.name]));
+}
+
+/** Each post's newest top-level comment the viewer may see, as the card's preview line. */
+export async function loadCommentPreviews(
+	db: Database,
+	viewerId: string | null | undefined,
+	postIds: string[]
+): Promise<Map<string, { author: string; content: string }>> {
+	if (postIds.length === 0) return new Map();
+	const ranked = db
+		.select({
+			postId: postComment.postId,
+			content: postComment.content,
+			authorName: user.name,
+			authorHandle: user.handle,
+			rank: sql<number>`row_number() over (partition by ${postComment.postId} order by ${postComment.createdAt} desc, ${postComment.id} desc)`.as(
+				'rank'
+			)
+		})
+		.from(postComment)
+		.innerJoin(user, eq(postComment.userId, user.id))
+		.where(
+			and(
+				inArray(postComment.postId, postIds),
+				isNull(postComment.parentCommentId),
+				notBlockedWith(viewerId, postComment.userId)
+			)
+		)
+		.as('ranked');
+	const rows = await db.select().from(ranked).where(eq(ranked.rank, 1));
+	return new Map(
+		rows.map((c) => [
+			c.postId,
+			{ author: c.authorHandle ? `@${c.authorHandle}` : c.authorName, content: c.content }
+		])
+	);
 }

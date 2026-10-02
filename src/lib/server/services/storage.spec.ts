@@ -8,6 +8,7 @@ import {
 	refreshMediaUrl,
 	refreshPostMediaUrls,
 	deleteMediaObjects,
+	isOwnUpload,
 	ownedMediaKeys
 } from './storage';
 
@@ -17,6 +18,7 @@ describe('storage service', () => {
 			generatePresignedUploadUrl(undefined, {
 				filename: 'virus.exe',
 				contentType: 'application/octet-stream',
+				size: 1024,
 				userId: 'user-1'
 			})
 		).rejects.toThrow('Invalid MIME type');
@@ -58,6 +60,7 @@ describe('storage service', () => {
 		const result = await generatePresignedUploadUrl(mockEnv as unknown as Env, {
 			filename: 'test.png',
 			contentType: 'image/png',
+			size: 2048,
 			userId: 'user-456'
 		});
 
@@ -67,6 +70,8 @@ describe('storage service', () => {
 		expect(result.uploadUrl).toContain('X-Amz-Algorithm=AWS4-HMAC-SHA256');
 		expect(result.uploadUrl).toContain('X-Amz-Credential=');
 		expect(result.uploadUrl).toContain('X-Amz-Signature=');
+		const signedHeaders = new URL(result.uploadUrl).searchParams.get('X-Amz-SignedHeaders');
+		expect(signedHeaders?.split(';')).toContain('content-length');
 		expect(result.publicUrl).toMatch(/^https:\/\/cdn\.example\.com\/avatars\/user-456\//);
 		expect(result.key).toMatch(/^avatars\/user-456\/\d+-[a-f0-9-]+\.png$/);
 	});
@@ -80,11 +85,47 @@ describe('storage service', () => {
 						'/api/upload/mock-r2/posts/user-1/a.jpg',
 						'posts/user-2/victim.jpg',
 						'posts/user-10/b.jpg',
+						'/api/media/posts/user-1/../user-2/victim.jpg',
 						'https://example.com/elsewhere.jpg'
 					],
 					'user-1'
 				)
 			).toEqual(['posts/user-1/a.jpg']);
+		});
+	});
+
+	describe('isOwnUpload', () => {
+		const env = { R2_PUBLIC_URL: 'https://cdn.example.com/' } as Partial<Env>;
+
+		it.each([
+			'/api/media/posts/user-1/1-a.jpg',
+			'/api/upload/mock-r2/posts/user-1/1-a.jpg',
+			'https://cdn.example.com/posts/user-1/1-a.jpg'
+		])('accepts the user’s own upload served at %s', (url) => {
+			expect(isOwnUpload(url, 'posts', 'user-1', env)).toBe(true);
+		});
+
+		it.each([
+			'https://evil.test/posts/user-1/1-a.jpg',
+			'https://cdn.example.com.evil.test/posts/user-1/1-a.jpg',
+			'//evil.test/api/media/posts/user-1/1-a.jpg',
+			'https://evil.test/api/media/posts/user-1/1-a.jpg',
+			'/api/media/posts/user-2/1-a.jpg',
+			'/api/media/avatars/user-1/1-a.jpg',
+			'/api/media/posts/user-1/../user-2/1-a.jpg',
+			'/api/media/posts/user-1/%2e%2e/1-a.jpg',
+			'/api/media/posts/user-1/nested/1-a.jpg',
+			'/api/media/posts/user-1/..',
+			'/api/media/posts/user-1/1-a.jpg?track=1',
+			'/api/media/posts/user-1/'
+		])('rejects %s', (url) => {
+			expect(isOwnUpload(url, 'posts', 'user-1', env)).toBe(false);
+		});
+
+		it('only trusts the public bucket URL when one is configured', () => {
+			expect(
+				isOwnUpload('https://cdn.example.com/posts/user-1/1-a.jpg', 'posts', 'user-1', undefined)
+			).toBe(false);
 		});
 	});
 

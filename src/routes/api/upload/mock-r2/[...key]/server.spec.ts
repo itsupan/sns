@@ -49,57 +49,94 @@ describe('mock-r2 storage endpoint', () => {
 	});
 
 	describe('PUT', () => {
-		it('stores arrayBuffer in memory and returns 200 with CORS headers', async () => {
-			const data = new Uint8Array([1, 2, 3, 4, 5]);
-			const request = new Request('http://localhost/api/upload/mock-r2/posts/test.mp4', {
-				method: 'PUT',
-				headers: { 'content-type': 'video/mp4' },
-				body: data
-			});
+		const locals = { user: { id: 'user-1' } };
 
-			const response = await PUT({
-				params: { key: 'posts/test.mp4' },
-				request,
-				platform: undefined
+		function put(
+			key: string,
+			body: BodyInit,
+			headers: Record<string, string>,
+			opts: { locals?: unknown; platform?: unknown } = {}
+		) {
+			return PUT({
+				params: { key },
+				request: new Request(`http://localhost/api/upload/mock-r2/${key}`, {
+					method: 'PUT',
+					headers,
+					body
+				}),
+				locals: opts.locals ?? locals,
+				platform: opts.platform
 			} as never);
+		}
 
-			expect(response.status).toBe(200);
-			expect(response.headers.get('access-control-allow-origin')).toBe('*');
-			expect(mockStorage.has('posts/test.mp4')).toBe(true);
-			const stored = mockStorage.get('posts/test.mp4');
+		it('stores the upload under the uploader’s own key', async () => {
+			const data = new Uint8Array([1, 2, 3, 4, 5]);
+			const res = await put('posts/user-1/clip.mp4', data, { 'content-type': 'video/mp4' });
+
+			expect(res.status).toBe(200);
+			const stored = mockStorage.get('posts/user-1/clip.mp4');
 			expect(stored?.contentType).toBe('video/mp4');
 			expect(new Uint8Array(stored!.buffer)).toEqual(data);
 		});
 
-		it('persists to Cloudflare KV when platform.env.KV is provided', async () => {
-			const mockKvPut = vi.fn().mockResolvedValue(undefined);
-			const mockPlatform = {
-				env: {
-					KV: {
-						put: mockKvPut
-					}
-				}
-			} as unknown as App.Platform;
-
-			const data = new Uint8Array([10, 20, 30]);
-			const request = new Request('http://localhost/api/upload/mock-r2/posts/test.jpg', {
-				method: 'PUT',
-				headers: { 'content-type': 'image/jpeg' },
-				body: data
-			});
-
-			const response = await PUT({
-				params: { key: 'posts/test.jpg' },
-				request,
-				platform: mockPlatform
-			} as never);
-
-			expect(response.status).toBe(200);
-			expect(mockKvPut).toHaveBeenCalledWith(
-				'posts/test.jpg',
-				expect.any(ArrayBuffer),
-				expect.objectContaining({ metadata: { contentType: 'image/jpeg' } })
+		it('persists to KV instead of memory when KV is bound', async () => {
+			const kvPut = vi.fn().mockResolvedValue(undefined);
+			const res = await put(
+				'avatars/user-1/me.jpg',
+				new Uint8Array([10, 20, 30]),
+				{ 'content-type': 'image/jpeg' },
+				{ platform: { env: { KV: { put: kvPut, get: vi.fn().mockResolvedValue(null) } } } }
 			);
+
+			expect(res.status).toBe(200);
+			expect(kvPut).toHaveBeenCalledWith('avatars/user-1/me.jpg', expect.any(ArrayBuffer), {
+				metadata: { contentType: 'image/jpeg' }
+			});
+			expect(mockStorage.has('avatars/user-1/me.jpg')).toBe(false);
+		});
+
+		it('rejects anonymous uploads', async () => {
+			const res = await put(
+				'posts/user-1/a.jpg',
+				'x',
+				{ 'content-type': 'image/jpeg' },
+				{ locals: { user: null } }
+			);
+			expect(res.status).toBe(401);
+			expect(mockStorage.size).toBe(0);
+		});
+
+		it.each([
+			'posts/user-2/a.jpg',
+			'rl:createPost:user-1:0',
+			'posts/user-1/../user-2/a.jpg',
+			'posts/user-1/..',
+			'secrets/user-1/a.jpg',
+			'posts/user-1'
+		])('rejects writes outside the uploader’s own keys: %s', async (key) => {
+			const res = await put(key, 'x', { 'content-type': 'image/jpeg' });
+			expect(res.status).toBe(403);
+			expect(mockStorage.size).toBe(0);
+		});
+
+		it.each(['text/html', 'image/svg+xml', 'application/octet-stream'])(
+			'rejects content type %s',
+			async (type) => {
+				const res = await put('posts/user-1/a.jpg', 'x', { 'content-type': type });
+				expect(res.status).toBe(415);
+				expect(mockStorage.size).toBe(0);
+			}
+		);
+
+		it('rejects files over the upload limit', async () => {
+			const res = await put(
+				'posts/user-1/a.jpg',
+				new Uint8Array(4),
+				{ 'content-type': 'image/jpeg' },
+				{ platform: { env: { UPLOAD_MAX_BYTES: '3' } } }
+			);
+			expect(res.status).toBe(413);
+			expect(mockStorage.size).toBe(0);
 		});
 	});
 
@@ -133,6 +170,8 @@ describe('mock-r2 storage endpoint', () => {
 			expect(response.headers.get('content-type')).toBe('image/webp');
 			expect(response.headers.get('accept-ranges')).toBe('bytes');
 			expect(response.headers.get('content-length')).toBe('8');
+			expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+			expect(response.headers.get('content-security-policy')).toContain('sandbox');
 			const body = new Uint8Array(await response.arrayBuffer());
 			expect(body).toEqual(data);
 		});
@@ -239,6 +278,7 @@ describe('mock-r2 storage endpoint', () => {
 			const response = await OPTIONS({} as never);
 			expect(response.status).toBe(204);
 			expect(response.headers.get('access-control-allow-origin')).toBe('*');
+			expect(response.headers.get('access-control-allow-methods')).not.toContain('PUT');
 		});
 	});
 });

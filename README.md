@@ -152,6 +152,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a per-user fix
 | `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)                                 | 30 / min  |
 | `share`         | `RATE_LIMIT_SHARE`          | `POST /api/posts/:id/share`                             | 30 / min  |
 | `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`                            | 20 / min  |
+| `upload`        | `RATE_LIMIT_UPLOAD`         | `PUT /api/upload/mock-r2/:key` (media upload)           | 20 / min  |
 | `mediaRefresh`  | `RATE_LIMIT_MEDIA_REFRESH`  | `POST /api/media/refresh` (per user, or per IP)         | 60 / min  |
 | `accountExport` | `RATE_LIMIT_ACCOUNT_EXPORT` | `GET /api/account/export` (per user)                    | 5 / hour  |
 | `report`        | `RATE_LIMIT_REPORT`         | `POST /api/reports`                                     | 10 / hour |

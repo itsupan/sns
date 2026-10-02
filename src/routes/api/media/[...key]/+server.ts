@@ -1,80 +1,19 @@
 import { error } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import { mockStorage, inferContentType, parseRange } from '$lib/server/services/media-storage';
+import {
+	MEDIA_HEADERS,
+	mockStorage,
+	inferContentType,
+	parseRange
+} from '$lib/server/services/media-storage';
 import { isValidCredential } from '$lib/server/services/storage';
 import { AwsClient } from 'aws4fetch';
-
-const CORS_HEADERS: Record<string, string> = {
-	'Access-Control-Allow-Origin': '*',
-	'Access-Control-Allow-Methods': 'GET, HEAD, PUT, OPTIONS',
-	'Access-Control-Allow-Headers': 'Content-Type, Range, Authorization',
-	'Access-Control-Expose-Headers':
-		'Content-Range, Accept-Ranges, Content-Length, Content-Type, ETag'
-};
 
 export const OPTIONS: RequestHandler = async () => {
 	return new Response(null, {
 		status: 204,
 		headers: {
-			...CORS_HEADERS
-		}
-	});
-};
-
-export const PUT: RequestHandler = async ({ params, request, platform }) => {
-	const key = params.key;
-	if (!key) {
-		throw error(400, 'Missing object key');
-	}
-
-	const rawContentType = request.headers.get('content-type');
-	const contentType =
-		rawContentType && rawContentType !== 'application/octet-stream'
-			? rawContentType
-			: inferContentType(key);
-
-	const arrayBuffer = await request.arrayBuffer();
-
-	mockStorage.set(key, {
-		buffer: arrayBuffer,
-		contentType
-	});
-
-	const kv = platform?.env?.KV;
-	if (kv && arrayBuffer.byteLength <= 25 * 1024 * 1024) {
-		try {
-			await kv.put(key, arrayBuffer, {
-				metadata: { contentType }
-			});
-		} catch (err) {
-			console.warn('[media-proxy] Failed to persist file to KV:', err);
-		}
-	}
-
-	const r2 =
-		(platform?.env as Record<string, unknown> | undefined)?.R2_BUCKET ||
-		(platform?.env as Record<string, unknown> | undefined)?.MEDIA_BUCKET ||
-		(platform?.env as Record<string, unknown> | undefined)?.BUCKET;
-
-	if (r2 && typeof (r2 as { put?: unknown }).put === 'function') {
-		try {
-			await (r2 as { put: (k: string, b: ArrayBuffer, o?: unknown) => Promise<unknown> }).put(
-				key,
-				arrayBuffer,
-				{
-					httpMetadata: { contentType }
-				}
-			);
-		} catch (err) {
-			console.warn('[media-proxy] Failed to persist file to R2 bucket:', err);
-		}
-	}
-
-	return new Response(null, {
-		status: 200,
-		headers: {
-			ETag: `"media-${Date.now()}"`,
-			...CORS_HEADERS
+			...MEDIA_HEADERS
 		}
 	});
 };
@@ -94,7 +33,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 			headers: {
 				Location: `${env.R2_PUBLIC_URL.replace(/\/$/, '')}/${key}`,
 				'Cache-Control': 'public, max-age=86400',
-				...CORS_HEADERS
+				...MEDIA_HEADERS
 			}
 		});
 	}
@@ -123,7 +62,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 			).get(key, { range: request.headers });
 
 			if (r2Obj) {
-				const responseHeaders = new Headers(CORS_HEADERS);
+				const responseHeaders = new Headers(MEDIA_HEADERS);
 				r2Obj.writeHttpMetadata(responseHeaders);
 				responseHeaders.set('Accept-Ranges', 'bytes');
 				responseHeaders.set('Cache-Control', 'public, max-age=3600');
@@ -181,7 +120,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 				headers: {
 					Location: signed.url,
 					'Cache-Control': 'private, max-age=3600',
-					...CORS_HEADERS
+					...MEDIA_HEADERS
 				}
 			});
 		} catch (err) {
@@ -200,7 +139,6 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 			if (res.value) {
 				const contentType = res.metadata?.contentType || inferContentType(key);
 				item = { buffer: res.value, contentType };
-				mockStorage.set(key, item);
 			}
 		} catch (err) {
 			console.warn('[media-proxy] Error reading from KV:', err);
@@ -212,7 +150,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 			status: 404,
 			headers: {
 				'Content-Type': 'text/plain',
-				...CORS_HEADERS
+				...MEDIA_HEADERS
 			}
 		});
 	}
@@ -227,7 +165,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 			headers: {
 				'Content-Range': `bytes */${totalSize}`,
 				'Accept-Ranges': 'bytes',
-				...CORS_HEADERS
+				...MEDIA_HEADERS
 			}
 		});
 	}
@@ -245,7 +183,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 				'Accept-Ranges': 'bytes',
 				'Content-Length': chunkSize.toString(),
 				'Cache-Control': 'public, max-age=3600',
-				...CORS_HEADERS
+				...MEDIA_HEADERS
 			}
 		});
 	}
@@ -257,7 +195,7 @@ export const GET: RequestHandler = async ({ params, request, platform }) => {
 			'Accept-Ranges': 'bytes',
 			'Content-Length': totalSize.toString(),
 			'Cache-Control': 'public, max-age=3600',
-			...CORS_HEADERS
+			...MEDIA_HEADERS
 		}
 	});
 };
@@ -274,7 +212,7 @@ export const HEAD: RequestHandler = async ({ params, request }) => {
 			status: 404,
 			headers: {
 				'Content-Type': 'text/plain',
-				...CORS_HEADERS
+				...MEDIA_HEADERS
 			}
 		});
 	}
@@ -289,7 +227,7 @@ export const HEAD: RequestHandler = async ({ params, request }) => {
 			headers: {
 				'Content-Range': `bytes */${totalSize}`,
 				'Accept-Ranges': 'bytes',
-				...CORS_HEADERS
+				...MEDIA_HEADERS
 			}
 		});
 	}
@@ -305,7 +243,7 @@ export const HEAD: RequestHandler = async ({ params, request }) => {
 				'Accept-Ranges': 'bytes',
 				'Content-Length': chunkSize.toString(),
 				'Cache-Control': 'public, max-age=3600',
-				...CORS_HEADERS
+				...MEDIA_HEADERS
 			}
 		});
 	}
@@ -317,7 +255,7 @@ export const HEAD: RequestHandler = async ({ params, request }) => {
 			'Accept-Ranges': 'bytes',
 			'Content-Length': totalSize.toString(),
 			'Cache-Control': 'public, max-age=3600',
-			...CORS_HEADERS
+			...MEDIA_HEADERS
 		}
 	});
 };

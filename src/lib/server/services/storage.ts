@@ -2,10 +2,13 @@ import { AwsClient } from 'aws4fetch';
 import { getConfig } from '$lib/server/config';
 import { mockStorage } from './media-storage';
 
+export const UPLOAD_FOLDERS = ['avatars', 'posts', 'stories'] as const;
+export type UploadFolder = (typeof UPLOAD_FOLDERS)[number];
+
 export interface PresignedUrlOptions {
 	filename: string;
 	contentType: string;
-	size?: number;
+	size: number;
 	userId: string;
 	prefix?: string;
 }
@@ -88,9 +91,20 @@ export function extractR2Key(urlOrKey: string | undefined | null): string | null
 }
 
 /**
- * Checks whether an AWS SigV4 / Cloudflare R2 presigned URL is expired or close to expiring.
- * Also marks unauthenticated raw private S3 endpoints as needing a fresh signed URL.
+ * Whether `key` has the exact shape generatePresignedUploadUrl gives `userId`'s uploads,
+ * `<folder>/<userId>/<file>`: one segment each, so no `..` or extra path can slip through.
  */
+export function isUploadKeyOf(key: string, userId: string, folder?: UploadFolder): boolean {
+	const folders: readonly string[] = folder ? [folder] : UPLOAD_FOLDERS;
+	const [keyFolder, owner, file, ...rest] = key.split('/');
+	return (
+		folders.includes(keyFolder) &&
+		owner === userId &&
+		rest.length === 0 &&
+		/^\w[\w.-]*$/.test(file ?? '')
+	);
+}
+
 /**
  * Unique storage keys from post media URLs that sit under `userId`'s own upload prefix
  * (`<prefix>/<userId>/...`, see generatePresignedUploadUrl). Media URLs are author-supplied,
@@ -100,11 +114,33 @@ export function ownedMediaKeys(urls: string[], userId: string): string[] {
 	const keys = new Set<string>();
 	for (const url of urls) {
 		const key = extractR2Key(url);
-		if (key && key.split('/')[1] === userId) keys.add(key);
+		if (key && isUploadKeyOf(key, userId)) keys.add(key);
 	}
 	return [...keys];
 }
 
+/**
+ * Whether `url` is how an object `userId` uploaded into `folder` is served: through our media
+ * routes, or from the configured public bucket URL. Any other host is rejected.
+ */
+export function isOwnUpload(
+	url: string,
+	folder: UploadFolder,
+	userId: string,
+	env: Partial<Env> | undefined
+): boolean {
+	const bases = ['/api/media/', '/api/upload/mock-r2/'];
+	if (env?.R2_PUBLIC_URL && isValidCredential(env.R2_PUBLIC_URL)) {
+		bases.push(`${env.R2_PUBLIC_URL.replace(/\/$/, '')}/`);
+	}
+	const base = bases.find((b) => url.startsWith(b));
+	return base !== undefined && isUploadKeyOf(url.slice(base.length), userId, folder);
+}
+
+/**
+ * Checks whether an AWS SigV4 / Cloudflare R2 presigned URL is expired or close to expiring.
+ * Also marks unauthenticated raw private S3 endpoints as needing a fresh signed URL.
+ */
 export function isPresignedUrlExpired(
 	urlStr: string | undefined | null,
 	marginMs = 60000
@@ -281,8 +317,7 @@ export async function generatePresignedUploadUrl(
 		);
 	}
 
-	// Validate size if provided
-	if (size !== undefined && size > maxBytes) {
+	if (size > maxBytes) {
 		throw new Error(`File size exceeds maximum allowed limit of ${formatMegabytes(maxBytes)}MB`);
 	}
 
@@ -315,14 +350,16 @@ export async function generatePresignedUploadUrl(
 		const request = new Request(s3Endpoint, {
 			method: 'PUT',
 			headers: {
-				'Content-Type': contentType
+				'Content-Type': contentType,
+				'Content-Length': String(size)
 			}
 		});
 
+		// Signing Content-Length makes R2 reject an upload of any other size.
 		const signed = await aws.sign(request, {
 			aws: {
 				signQuery: true,
-				allHeaders: false
+				allHeaders: true
 			}
 		});
 

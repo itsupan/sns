@@ -19,7 +19,6 @@ const FALLBACK_CURATORS: Record<
 		user: {
 			id: string;
 			name: string;
-			email: string;
 			image: string;
 			handle: string;
 			title: string;
@@ -35,7 +34,6 @@ const FALLBACK_CURATORS: Record<
 		user: {
 			id: 'usr_elena_dev',
 			name: 'Elena Rostova',
-			email: 'elena@kizuna.art',
 			image:
 				'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
 			handle: 'elena.rostova',
@@ -67,7 +65,6 @@ const FALLBACK_CURATORS: Record<
 		user: {
 			id: 'usr_kai_dev',
 			name: 'Kai Takahashi',
-			email: 'kai@kizuna.art',
 			image:
 				'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
 			handle: 'kai.raw',
@@ -116,7 +113,6 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 				.select({
 					id: user.id,
 					name: user.name,
-					email: user.email,
 					image: user.image,
 					handle: user.handle,
 					title: user.title,
@@ -210,7 +206,6 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		targetUser: {
 			id: targetUser.id,
 			name: targetUser.name,
-			email: targetUser.email,
 			image: refreshedImage,
 			handle: (targetUser.handle as string | null | undefined) ?? null,
 			title: (targetUser.title as string | null | undefined) ?? null,

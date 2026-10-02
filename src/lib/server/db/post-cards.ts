@@ -1,8 +1,8 @@
-import { and, desc, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import type { Database } from '.';
-import { post, postComment, postLike, postSave, user } from './schema';
+import { post, postLike, postSave, user } from './schema';
 import { loadFollowedIds } from './follows';
-import { loadPostMedia, loadPostTags, loadRecentLikers } from './posts';
+import { loadCommentPreviews, loadPostMedia, loadPostTags, loadRecentLikers } from './posts';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import { isTextBackground } from '$lib/post-backgrounds';
 import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
@@ -68,7 +68,7 @@ export async function toPostCards(
 	if (rows.length === 0) return [];
 	const postIds = rows.map((r) => r.post.id);
 
-	const [mediaByPost, tagsByPost, followedAuthors, viewer, likers, recentComments] =
+	const [mediaByPost, tagsByPost, followedAuthors, viewer, likers, commentPreview] =
 		await Promise.all([
 			loadPostMedia(db, postIds),
 			loadPostTags(db, postIds),
@@ -79,28 +79,8 @@ export async function toPostCards(
 			),
 			loadViewerPostState(db, viewerId, postIds),
 			loadRecentLikers(db, viewerId, postIds),
-			db
-				.select({
-					postId: postComment.postId,
-					content: postComment.content,
-					authorName: user.name,
-					authorHandle: user.handle
-				})
-				.from(postComment)
-				.innerJoin(user, eq(postComment.userId, user.id))
-				.where(inArray(postComment.postId, postIds))
-				.orderBy(desc(postComment.createdAt))
+			loadCommentPreviews(db, viewerId, postIds)
 		]);
-
-	const commentPreview = new Map<string, { author: string; content: string }>();
-	for (const c of recentComments) {
-		if (!commentPreview.has(c.postId)) {
-			commentPreview.set(c.postId, {
-				author: c.authorHandle ? `@${c.authorHandle}` : c.authorName,
-				content: c.content
-			});
-		}
-	}
 
 	return rows.map((r) => {
 		const media = mediaByPost.get(r.post.id) ?? [];

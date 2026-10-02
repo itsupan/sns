@@ -84,6 +84,9 @@ describe('GET /api/users/:id', () => {
 		const body = (await res.json()) as { user?: unknown };
 		// Anonymous viewer: never following.
 		expect(body.user).toEqual({ ...mockUser, isFollowing: false });
+		expect(db.select.mock.calls[0]).toEqual([
+			expect.not.objectContaining({ email: expect.anything() })
+		]);
 	});
 });
 
@@ -218,7 +221,7 @@ describe('PATCH /api/users/:id', () => {
 								handle: 'elena.rostova',
 								title: 'Architectural Photographer',
 								bio: 'Capturing brutalist geometries',
-								image: 'https://cdn.example.com/avatar.jpg'
+								image: '/api/media/avatars/user-1/avatar.jpg'
 							}
 						];
 					})
@@ -236,7 +239,7 @@ describe('PATCH /api/users/:id', () => {
 					handle: '@elena.rostova',
 					title: 'Architectural Photographer',
 					bio: 'Capturing brutalist geometries',
-					image: 'https://cdn.example.com/avatar.jpg'
+					image: '/api/media/avatars/user-1/avatar.jpg'
 				})
 			}),
 			locals: { user: { id: 'user-1' }, db }
@@ -248,6 +251,24 @@ describe('PATCH /api/users/:id', () => {
 		expect(body.success).toBe(true);
 		expect(body.user.name).toBe('Elena Rostova');
 		expect(body.user.handle).toBe('elena.rostova');
-		expect(body.user.image).toBe('https://cdn.example.com/avatar.jpg');
+		expect(body.user.image).toBe('/api/media/avatars/user-1/avatar.jpg');
+	});
+
+	it('rejects an avatar the user did not upload', async () => {
+		const { db } = createMockDb();
+		const event = {
+			params: { id: 'user-1' },
+			request: new Request('http://localhost/api/users/user-1', {
+				method: 'PATCH',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ image: '/api/media/avatars/user-2/avatar.jpg' })
+			}),
+			locals: { user: { id: 'user-1', image: null }, db }
+		} as unknown as RequestEvent;
+
+		const res = await PATCH(event);
+		expect(res.status).toBe(400);
+		expect(((await res.json()) as ApiErrorBody).error.fields?.image).toBeDefined();
+		expect(db.update).not.toHaveBeenCalled();
 	});
 });
