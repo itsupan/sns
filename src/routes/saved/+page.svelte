@@ -1,6 +1,7 @@
 <script lang="ts">
 	import PostCard, { type PostData } from '$lib/components/feed/PostCard.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import type { PageProps } from './$types';
 
@@ -11,7 +12,6 @@
 	let moreCursor = $state<string | null | undefined>(undefined);
 	let loadingMore = $state(false);
 	let loadError = $state<string | null>(null);
-	let sentinelEl = $state<HTMLDivElement | null>(null);
 
 	let posts = $derived.by(() => {
 		const seen = new Set(data.posts.map((p) => p.id));
@@ -39,18 +39,6 @@
 			loadingMore = false;
 		}
 	}
-
-	$effect(() => {
-		if (!sentinelEl || !nextCursor || loadError) return;
-		const observer = new IntersectionObserver(
-			([entry]) => {
-				if (entry?.isIntersecting) loadMore();
-			},
-			{ rootMargin: '350px 0px' }
-		);
-		observer.observe(sentinelEl);
-		return () => observer.disconnect();
-	});
 </script>
 
 <svelte:head>
@@ -82,22 +70,8 @@
 			{/each}
 		</div>
 
-		{#if loadError}
-			<div class="py-6 flex flex-col items-center gap-2 text-center" role="alert">
-				<p class="text-sm text-slate-600 dark:text-slate-300 m-0">{loadError}</p>
-				<button
-					type="button"
-					class="text-xs font-medium underline text-slate-800 dark:text-slate-200 bg-transparent border-0 cursor-pointer"
-					onclick={loadMore}>Try again</button
-				>
-			</div>
-		{:else if nextCursor}
-			<div bind:this={sentinelEl} class="h-8 w-full" aria-hidden="true"></div>
-			{#if loadingMore}
-				<p class="text-center text-xs text-slate-500 dark:text-dark-muted" aria-live="polite">
-					Loading…
-				</p>
-			{/if}
+		{#if nextCursor}
+			<LoadMore onLoad={loadMore} loading={loadingMore} error={loadError} />
 		{/if}
 	{/if}
 </main>

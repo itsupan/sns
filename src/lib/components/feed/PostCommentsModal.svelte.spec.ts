@@ -1,4 +1,5 @@
 import { render } from 'vitest-browser-svelte';
+import { userEvent } from 'vitest/browser';
 import { readable } from 'svelte/store';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import PostCommentsModal, { type CommentItem } from './PostCommentsModal.svelte';
@@ -176,6 +177,23 @@ describe('PostCommentsModal', () => {
 		expect(calls.find((c) => c.key === 'POST /api/comments/c1/reactions')?.body).toEqual({
 			type: 'love'
 		});
+	});
+
+	it('closes an open reaction picker on Escape, then the dialog', async () => {
+		routes['GET /api/posts/post-1/comments'] = page([makeComment('c1')]);
+		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const dialog = screen.getByRole('dialog', { name: 'Comments' });
+
+		await screen.getByRole('button', { name: 'Add reaction' }).click();
+		const picker = screen.getByRole('group', { name: 'Pick a reaction' });
+		await expect.element(picker).toBeVisible();
+
+		await userEvent.keyboard('{Escape}');
+		await expect.element(picker).not.toBeInTheDocument();
+		await expect.element(dialog).toBeVisible();
+
+		await userEvent.keyboard('{Escape}');
+		await expect.element(dialog).not.toBeInTheDocument();
 	});
 
 	it('rolls a reaction back when the server rejects it', async () => {
