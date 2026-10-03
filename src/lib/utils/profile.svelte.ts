@@ -1,7 +1,8 @@
 export interface ProfileData {
 	id?: string;
 	name: string;
-	handle: string;
+	/** Without the `@`; null until the user picks one. */
+	handle: string | null;
 	title: string;
 	bio: string;
 	website: string;
@@ -13,7 +14,6 @@ export interface ProfileData {
 	followersCount: number;
 	followingCount: number;
 	impressionsCount: number;
-	isVerified: boolean;
 	isFollowing: boolean;
 	isOwnProfile?: boolean;
 }
@@ -33,7 +33,6 @@ export const defaultProfile: ProfileData = {
 	followersCount: 18400,
 	followingCount: 620,
 	impressionsCount: 94200,
-	isVerified: true,
 	isFollowing: true,
 	isOwnProfile: false
 };
@@ -107,17 +106,10 @@ export function resolveProfile(
 		};
 	}
 
-	const rawHandle =
-		(user.handle as string) ||
-		((user.email as string)?.split('@')[0] ??
-			(user.name as string)?.toLowerCase().replace(/\s+/g, '.') ??
-			'user');
-	const cleanHandle = rawHandle.startsWith('@') ? rawHandle.slice(1) : rawHandle;
-
 	return {
 		id: (user.id as string) || custom?.id,
 		name: (user.name as string) || custom?.name || 'User',
-		handle: cleanHandle || custom?.handle || 'user',
+		handle: (user.handle as string | null)?.replace(/^@/, '') || custom?.handle || null,
 		avatar: (user.image as string) ?? custom?.avatar ?? '',
 		title: (user.title as string) ?? custom?.title ?? '',
 		bio: (user.bio as string) ?? custom?.bio ?? '',
@@ -125,7 +117,6 @@ export function resolveProfile(
 		location: (user.location as string) ?? custom?.location ?? '',
 		cameraGear: (user.cameraGear as string) ?? custom?.cameraGear ?? '',
 		badgeText: (user.badgeText as string) ?? custom?.badgeText ?? '',
-		isVerified: Boolean(user.isVerified || user.emailVerified || custom?.isVerified),
 		postsCount: countOr(user.postsCount, custom?.postsCount),
 		followersCount: countOr(user.followersCount, custom?.followersCount),
 		followingCount: countOr(user.followingCount, custom?.followingCount),

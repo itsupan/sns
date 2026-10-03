@@ -52,6 +52,7 @@
 	import { readApiError } from '$lib/utils/api-error';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import Modal from '$lib/components/shared/Modal.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { untrack } from 'svelte';
@@ -109,10 +110,11 @@
 		confirmingDelete = null;
 	}
 
+	// Escape closes an open reaction picker before the dialog.
 	function handleKeydown(e: KeyboardEvent) {
-		if (e.key !== 'Escape' || !open) return;
-		if (pickerFor) pickerFor = null;
-		else close();
+		if (e.key !== 'Escape' || !pickerFor) return;
+		e.preventDefault();
+		pickerFor = null;
 	}
 
 	const isPostAuthor = (c: CommentItem) => !!post.author.id && c.author.id === post.author.id;
@@ -362,8 +364,6 @@
 	}
 </script>
 
-<svelte:window onkeydown={handleKeydown} />
-
 {#snippet commentRow(comment: CommentItem)}
 	{@const reactionTypes = COMMENT_REACTIONS.filter((t) => comment.reactions.counts[t])}
 	<div class="flex items-start gap-3 group" data-testid="comment-{comment.id}">
@@ -494,186 +494,172 @@
 	</div>
 {/snippet}
 
-{#if open}
+<Modal bind:open label="Comments" onclose={close} onkeydown={handleKeydown}>
 	<div
-		class="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150"
-		role="dialog"
-		aria-modal="true"
-		aria-labelledby="comments-title"
+		class="w-full max-w-lg bg-white dark:bg-dark-card border border-slate-200/80 dark:border-dark-border rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
 	>
-		<div class="fixed inset-0" onclick={close} aria-hidden="true"></div>
-
 		<div
-			class="relative w-full max-w-lg bg-white dark:bg-dark-card border border-slate-200/80 dark:border-dark-border rounded-3xl shadow-2xl flex flex-col max-h-[85vh] z-10 animate-in zoom-in-95 duration-150 overflow-hidden"
+			class="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-dark-border"
 		>
-			<div
-				class="flex items-center justify-between px-5 py-4 border-b border-slate-100 dark:border-dark-border"
+			<div class="flex items-center gap-2.5">
+				<Icon name="comment" class="text-lg text-slate-700 dark:text-dark-text" />
+				<h3 class="text-base font-bold text-slate-950 dark:text-white m-0 tracking-tight">
+					Comments ({total})
+				</h3>
+			</div>
+			<button
+				type="button"
+				onclick={close}
+				class="size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated transition cursor-pointer border-0 bg-transparent"
+				aria-label="Close comments"
 			>
-				<div class="flex items-center gap-2.5">
-					<Icon name="comment" class="text-lg text-slate-700 dark:text-dark-text" />
-					<h3
-						id="comments-title"
-						class="text-base font-bold text-slate-950 dark:text-white m-0 tracking-tight"
-					>
-						Comments ({total})
-					</h3>
+				<Icon name="cross" class="text-sm" />
+			</button>
+		</div>
+
+		<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
+			{#if !top.loaded && top.loading}
+				<div class="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
+					<span
+						class="size-6 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin"
+					></span>
+					<span class="text-xs">Loading comments…</span>
 				</div>
-				<button
-					type="button"
-					onclick={close}
-					class="size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated transition cursor-pointer border-0 bg-transparent"
-					aria-label="Close comments"
-				>
-					<Icon name="cross" class="text-sm" />
-				</button>
-			</div>
-
-			<div class="flex-1 overflow-y-auto p-5 flex flex-col gap-4">
-				{#if !top.loaded && top.loading}
-					<div class="py-12 flex flex-col items-center justify-center text-slate-400 gap-2">
-						<span
-							class="size-6 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin"
-						></span>
-						<span class="text-xs">Loading comments…</span>
-					</div>
-				{:else if !top.loaded && loadError}
-					<div class="py-12 flex flex-col items-center justify-center gap-3 text-center">
-						<p class="text-sm text-slate-500 dark:text-dark-muted m-0">{loadError}</p>
-						<button
-							type="button"
-							onclick={() => loadTop(true)}
-							class="h-9 px-4 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold border-0 cursor-pointer"
-						>
-							Try again
-						</button>
-					</div>
-				{:else if visible(top).length === 0}
-					<div
-						class="py-12 flex flex-col items-center justify-center text-slate-400 dark:text-dark-muted gap-2 text-center"
-					>
-						<Icon name="comment" class="text-3xl opacity-40" />
-						<p class="text-sm font-medium m-0">No comments yet</p>
-						<p class="text-xs text-slate-400 m-0">Be the first to share your thoughts.</p>
-					</div>
-				{:else}
-					{#each visible(top) as comment (comment.id)}
-						{@const thread = replies[comment.id]}
-						<div class="flex flex-col gap-2">
-							{@render commentRow(comment)}
-
-							{#if thread?.open}
-								{@const more = moreReplies(comment, thread)}
-								{#if visible(thread).length > 0}
-									<div
-										class="ml-11 pl-3 border-l border-slate-100 dark:border-dark-border/60 flex flex-col gap-3"
-									>
-										{#each visible(thread) as reply (reply.id)}
-											{@render commentRow(reply)}
-										{/each}
-									</div>
-								{/if}
-								<div class="ml-11 flex items-center gap-3">
-									{#if thread.loading}
-										<span class="text-[11px] text-slate-400">Loading replies…</span>
-									{:else if more > 0}
-										<button
-											type="button"
-											onclick={() => loadReplies(comment.id)}
-											class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
-										>
-											View {more} more {more === 1 ? 'reply' : 'replies'}
-										</button>
-									{/if}
-									{#if visible(thread).length > 0}
-										<button
-											type="button"
-											onclick={() => (thread.open = false)}
-											class="text-[11px] font-semibold text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
-										>
-											Hide replies
-										</button>
-									{/if}
-								</div>
-							{:else if comment.repliesCount > 0}
-								<button
-									type="button"
-									onclick={() => showReplies(comment.id)}
-									class="ml-11 self-start text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
-								>
-									View {comment.repliesCount}
-									{comment.repliesCount === 1 ? 'reply' : 'replies'}
-								</button>
-							{/if}
-						</div>
-					{/each}
-
-					{#if top.nextCursor}
-						<button
-							type="button"
-							onclick={() => loadTop()}
-							disabled={top.loading}
-							class="self-center h-8 px-4 rounded-full border border-slate-200 dark:border-dark-border bg-transparent text-xs font-semibold text-slate-600 dark:text-dark-muted cursor-pointer disabled:opacity-50"
-						>
-							{top.loading ? 'Loading…' : 'Load more comments'}
-						</button>
-					{/if}
-					{#if loadError && top.loaded}
-						<p class="text-xs text-center text-rose-600 m-0">{loadError}</p>
-					{/if}
-				{/if}
-			</div>
-
-			{#if replyingTo}
-				<div
-					class="px-4 py-2 bg-slate-100/90 dark:bg-dark-elevated text-xs text-slate-600 dark:text-dark-muted flex items-center justify-between border-t border-slate-200 dark:border-dark-border"
-				>
-					<span class="flex items-center gap-1.5 truncate">
-						<Icon name="reply" class="text-xs text-blue-600 dark:text-kizuna-blue shrink-0" />
-						<span class="truncate">
-							Replying to <strong class="text-slate-900 dark:text-white"
-								>{replyingTo.author.name}</strong
-							>
-							<span class="text-slate-500 dark:text-dark-subtle">{replyingTo.author.handle}</span>
-						</span>
-					</span>
+			{:else if !top.loaded && loadError}
+				<div class="py-12 flex flex-col items-center justify-center gap-3 text-center">
+					<p class="text-sm text-slate-500 dark:text-dark-muted m-0">{loadError}</p>
 					<button
 						type="button"
-						onclick={cancelReply}
-						class="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer border-0 bg-transparent text-xs p-1 shrink-0"
-						aria-label="Cancel reply"
+						onclick={() => loadTop(true)}
+						class="h-9 px-4 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold border-0 cursor-pointer"
 					>
-						✕
+						Try again
 					</button>
 				</div>
-			{/if}
-
-			<form
-				onsubmit={handleSubmit}
-				class="p-3 sm:p-4 bg-slate-50 dark:bg-dark-elevated border-t border-slate-100 dark:border-dark-border flex items-center gap-3"
-			>
-				<Avatar src={currentUser.image} name={currentUser.name || 'You'} size="sm" />
-				<div class="flex-1 relative">
-					<input
-						bind:this={inputElement}
-						type="text"
-						bind:value={commentText}
-						maxlength={1000}
-						placeholder={replyingTo
-							? `Reply to ${replyingTo.author.handle}...`
-							: 'Add a comment...'}
-						aria-label="Add a comment"
-						disabled={submitting}
-						class="w-full h-10 px-4 text-xs bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-full text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none focus:ring-1.5 focus:ring-slate-900 dark:focus:ring-white transition"
-					/>
-				</div>
-				<button
-					type="submit"
-					disabled={!commentText.trim() || submitting}
-					class="h-10 px-4 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-xs border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
+			{:else if visible(top).length === 0}
+				<div
+					class="py-12 flex flex-col items-center justify-center text-slate-400 dark:text-dark-muted gap-2 text-center"
 				>
-					{submitting ? 'Posting…' : 'Post'}
-				</button>
-			</form>
+					<Icon name="comment" class="text-3xl opacity-40" />
+					<p class="text-sm font-medium m-0">No comments yet</p>
+					<p class="text-xs text-slate-400 m-0">Be the first to share your thoughts.</p>
+				</div>
+			{:else}
+				{#each visible(top) as comment (comment.id)}
+					{@const thread = replies[comment.id]}
+					<div class="flex flex-col gap-2">
+						{@render commentRow(comment)}
+
+						{#if thread?.open}
+							{@const more = moreReplies(comment, thread)}
+							{#if visible(thread).length > 0}
+								<div
+									class="ml-11 pl-3 border-l border-slate-100 dark:border-dark-border/60 flex flex-col gap-3"
+								>
+									{#each visible(thread) as reply (reply.id)}
+										{@render commentRow(reply)}
+									{/each}
+								</div>
+							{/if}
+							<div class="ml-11 flex items-center gap-3">
+								{#if thread.loading}
+									<span class="text-[11px] text-slate-400">Loading replies…</span>
+								{:else if more > 0}
+									<button
+										type="button"
+										onclick={() => loadReplies(comment.id)}
+										class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
+									>
+										View {more} more {more === 1 ? 'reply' : 'replies'}
+									</button>
+								{/if}
+								{#if visible(thread).length > 0}
+									<button
+										type="button"
+										onclick={() => (thread.open = false)}
+										class="text-[11px] font-semibold text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
+									>
+										Hide replies
+									</button>
+								{/if}
+							</div>
+						{:else if comment.repliesCount > 0}
+							<button
+								type="button"
+								onclick={() => showReplies(comment.id)}
+								class="ml-11 self-start text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
+							>
+								View {comment.repliesCount}
+								{comment.repliesCount === 1 ? 'reply' : 'replies'}
+							</button>
+						{/if}
+					</div>
+				{/each}
+
+				{#if top.nextCursor}
+					<button
+						type="button"
+						onclick={() => loadTop()}
+						disabled={top.loading}
+						class="self-center h-8 px-4 rounded-full border border-slate-200 dark:border-dark-border bg-transparent text-xs font-semibold text-slate-600 dark:text-dark-muted cursor-pointer disabled:opacity-50"
+					>
+						{top.loading ? 'Loading…' : 'Load more comments'}
+					</button>
+				{/if}
+				{#if loadError && top.loaded}
+					<p class="text-xs text-center text-rose-600 m-0">{loadError}</p>
+				{/if}
+			{/if}
 		</div>
+
+		{#if replyingTo}
+			<div
+				class="px-4 py-2 bg-slate-100/90 dark:bg-dark-elevated text-xs text-slate-600 dark:text-dark-muted flex items-center justify-between border-t border-slate-200 dark:border-dark-border"
+			>
+				<span class="flex items-center gap-1.5 truncate">
+					<Icon name="reply" class="text-xs text-blue-600 dark:text-kizuna-blue shrink-0" />
+					<span class="truncate">
+						Replying to <strong class="text-slate-900 dark:text-white"
+							>{replyingTo.author.name}</strong
+						>
+						<span class="text-slate-500 dark:text-dark-subtle">{replyingTo.author.handle}</span>
+					</span>
+				</span>
+				<button
+					type="button"
+					onclick={cancelReply}
+					class="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer border-0 bg-transparent text-xs p-1 shrink-0"
+					aria-label="Cancel reply"
+				>
+					✕
+				</button>
+			</div>
+		{/if}
+
+		<form
+			onsubmit={handleSubmit}
+			class="p-3 sm:p-4 bg-slate-50 dark:bg-dark-elevated border-t border-slate-100 dark:border-dark-border flex items-center gap-3"
+		>
+			<Avatar src={currentUser.image} name={currentUser.name || 'You'} size="sm" />
+			<div class="flex-1 relative">
+				<input
+					bind:this={inputElement}
+					type="text"
+					bind:value={commentText}
+					maxlength={1000}
+					placeholder={replyingTo ? `Reply to ${replyingTo.author.handle}...` : 'Add a comment...'}
+					aria-label="Add a comment"
+					disabled={submitting}
+					class="w-full h-10 px-4 text-xs bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-full text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none focus:ring-1.5 focus:ring-slate-900 dark:focus:ring-white transition"
+				/>
+			</div>
+			<button
+				type="submit"
+				disabled={!commentText.trim() || submitting}
+				class="h-10 px-4 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-xs border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
+			>
+				{submitting ? 'Posting…' : 'Post'}
+			</button>
+		</form>
 	</div>
-{/if}
+</Modal>

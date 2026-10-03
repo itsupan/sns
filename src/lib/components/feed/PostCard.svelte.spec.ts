@@ -1,5 +1,5 @@
 import { render } from 'vitest-browser-svelte';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readable } from 'svelte/store';
 import PostCard, { type PostData } from './PostCard.svelte';
@@ -271,6 +271,32 @@ describe('PostCard component', () => {
 		id: 'other-1',
 		author: { id: 'author-9', name: 'Aoi', handle: '@aoi', avatar: '', isFollowing: false }
 	};
+
+	it('mounts no dialogs, and listens to no window keys, until one is opened', async () => {
+		const listen = vi.spyOn(window, 'addEventListener');
+		const screen = render(PostCard, { props: { post: otherPost } });
+		await expect.element(screen.getByText('Original caption')).toBeVisible();
+		expect(document.querySelector('dialog')).toBeNull();
+		expect(listen.mock.calls.map(([type]) => type as string)).not.toContain('keydown');
+		listen.mockRestore();
+	});
+
+	it('hands off from the options sheet to the share dialog with the page locked throughout', async () => {
+		const screen = render(PostCard, { props: { post: otherPost } });
+		const options = screen.getByRole('button', { name: 'Post options' });
+		await options.click();
+		await screen.getByRole('button', { name: 'Share', exact: true }).click();
+
+		const share = screen.getByRole('dialog', { name: 'Share Post' });
+		await expect.element(share).toBeVisible();
+		expect(screen.getByRole('dialog', { name: 'Post options' }).query()).toBeNull();
+		expect(getComputedStyle(document.documentElement).overflow).toBe('hidden');
+
+		await userEvent.keyboard('{Escape}');
+		await expect.element(share).not.toBeInTheDocument();
+		expect(document.activeElement).toBe(options.element());
+		expect(getComputedStyle(document.documentElement).overflow).toBe('visible');
+	});
 
 	it('links the author to their profile, and your own posts to /profile', async () => {
 		const other = render(PostCard, { props: { post: otherPost } });

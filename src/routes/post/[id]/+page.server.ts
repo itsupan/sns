@@ -2,7 +2,7 @@ import { error } from '@sveltejs/kit';
 import { eq, desc, and, sql } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 import { post, postComment, user } from '$lib/server/db/schema';
-import { formatTimeAgo } from '$lib/utils/format';
+import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import { loadFollowedIds } from '$lib/server/db/follows';
 import { loadSuggestions } from '$lib/server/explore';
 import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
@@ -180,9 +180,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 					author: {
 						id: r.user.id,
 						name: r.user.name,
-						handle: r.user.handle
-							? `@${r.user.handle.replace(/^@/, '')}`
-							: `@${r.user.name.toLowerCase().replace(/\s+/g, '')}`,
+						handle: displayHandle(r.user.handle, r.user.name),
 						avatar: r.user.image || '',
 						location: r.post.location || r.user.location || undefined,
 						timeAgo: formatTimeAgo(r.post.createdAt),

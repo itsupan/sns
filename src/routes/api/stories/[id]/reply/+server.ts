@@ -27,7 +27,7 @@ export const POST: RequestHandler = withApi(async ({ params, request, locals, pl
 	const viewer = requireUser(locals);
 	await enforceRateLimit(platform, 'chatMessage', viewer.id);
 	const { content } = await parseBody(request, ReplyBody);
-	const { story } = await requireVisibleStory(locals, platform, params.id ?? '', viewer.id);
+	const story = await requireVisibleStory(locals, params.id ?? '', viewer.id);
 	if (story.userId === viewer.id) {
 		throw new ApiError(400, 'validation_failed', 'You cannot reply to your own story');
 	}

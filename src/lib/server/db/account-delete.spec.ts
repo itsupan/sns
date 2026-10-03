@@ -15,6 +15,8 @@ import {
 	postMedia,
 	postSave,
 	report,
+	story,
+	storyView,
 	userBlock,
 	userFollow
 } from './schema';
@@ -191,7 +193,26 @@ describe('account deletion on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 				targetType: 'post',
 				targetId: `${bob}-p`,
 				reason: 'spam'
-			})
+			}),
+			// alice's long-expired story still has media on R2; she watched bob's live one.
+			db.insert(story).values({
+				id: 'alice:1',
+				userId: 'alice',
+				mediaUrl: '/api/media/stories/alice/s.jpg',
+				mediaType: 'image',
+				createdAt: new Date(1),
+				expiresAt: new Date(2)
+			}),
+			db.insert(story).values({
+				id: `${bob}:1`,
+				userId: bob,
+				mediaUrl: `/api/media/stories/${bob}/s.jpg`,
+				mediaType: 'image',
+				viewsCount: 1,
+				createdAt: now(),
+				expiresAt: new Date(Date.now() + 86_400_000)
+			}),
+			db.insert(storyView).values({ storyId: `${bob}:1`, viewerId: 'alice' })
 		]);
 		const bucket = mockBucket();
 
@@ -201,7 +222,8 @@ describe('account deletion on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(bucket.delete).toHaveBeenCalledTimes(1);
 		expect([...bucket.delete.mock.calls[0][0]].sort()).toEqual([
 			'avatars/alice/me.jpg',
-			'posts/alice/one.jpg'
+			'posts/alice/one.jpg',
+			'stories/alice/s.jpg'
 		]);
 
 		expect(await exists('alice')).toBe(false);
@@ -220,6 +242,12 @@ describe('account deletion on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 				.where(inArray(userBlock.blockerId, ['alice', carol]))
 		).toEqual([]);
 		expect(await db.select().from(report).where(eq(report.reporterId, 'alice'))).toEqual([]);
+		expect(await db.select().from(story).where(eq(story.userId, 'alice'))).toEqual([]);
+		const [bobStory] = await db
+			.select({ viewsCount: story.viewsCount })
+			.from(story)
+			.where(eq(story.id, `${bob}:1`));
+		expect(bobStory).toEqual({ viewsCount: 0 });
 		// The DM is gone, bob's side included; bob's account stays.
 		expect(await db.select().from(conversation).where(eq(conversation.id, 'alice-dm'))).toEqual([]);
 		expect(
