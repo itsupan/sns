@@ -1,8 +1,11 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
 	import TextPostPicker from './TextPostPicker.svelte';
+	import PollEditor from './PollEditor.svelte';
+	import MediaAltFields from './MediaAltFields.svelte';
 	import { formatShortcuts } from '$lib/formatting-editor';
 	import { ASPECT_RATIOS, POST_TYPES, type PostDraft } from './post-draft.svelte';
 
@@ -13,11 +16,23 @@
 		onsubmit: () => void;
 		/** Show the title field for every post type (edit form, when the post already has one). */
 		alwaysShowTitle?: boolean;
+		/** Offer a poll on text posts (new posts only: a poll cannot be edited). */
+		allowPoll?: boolean;
 		/** Called before opening the file picker; return false to block (e.g. signed out). */
 		beforeAddMedia?: () => boolean;
+		/** Shown under the text, e.g. the post being quoted. */
+		attachment?: Snippet;
 	}
 
-	let { draft, id, onsubmit, alwaysShowTitle = false, beforeAddMedia }: Props = $props();
+	let {
+		draft,
+		id,
+		onsubmit,
+		alwaysShowTitle = false,
+		allowPoll = false,
+		beforeAddMedia,
+		attachment
+	}: Props = $props();
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let contentInput = $state<HTMLTextAreaElement | null>(null);
@@ -84,6 +99,9 @@
 
 	{#if draft.isText}
 		<TextPostPicker {draft} />
+		{#if allowPoll}
+			<PollEditor {draft} />
+		{/if}
 	{/if}
 
 	<!-- Multiple Media Sequence Tray (Mockup 0) -->
@@ -151,6 +169,10 @@
 		</div>
 	{/if}
 
+	{#if !draft.isText}
+		<MediaAltFields {draft} />
+	{/if}
+
 	<!-- Canvas Ratio Selector (Only when media attached) -->
 	{#if !draft.isText && draft.mediaPlates.length > 0}
 		<div
@@ -207,6 +229,8 @@
 		></textarea>
 		<MentionSuggest target={contentInput} />
 	</div>
+
+	{@render attachment?.()}
 
 	<!-- Interactive Tags List -->
 	{#if draft.tags.length > 0}

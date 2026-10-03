@@ -3,7 +3,7 @@ import { eq, sql, and } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import { post, postShare } from '$lib/server/db/schema';
 import { apiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
-import { notDeleted } from '$lib/server/db/posts';
+import { notDeleted, requireVisiblePost } from '$lib/server/db/posts';
 import { requireNotBlocked } from '$lib/server/db/blocks';
 
 export const POST: RequestHandler = withApi(async ({ params, locals, platform }) => {
@@ -15,14 +15,7 @@ export const POST: RequestHandler = withApi(async ({ params, locals, platform })
 		return apiError(400, 'bad_request', 'Post ID is required');
 	}
 
-	const [target] = await locals.db
-		.select({ authorId: post.userId, sharesCount: post.sharesCount })
-		.from(post)
-		.where(and(eq(post.id, postId), notDeleted))
-		.limit(1);
-	if (!target) {
-		return apiError(404, 'not_found', 'Post not found');
-	}
+	const target = await requireVisiblePost(locals.db, currentUser.id, postId);
 	await requireNotBlocked(locals.db, currentUser.id, target.authorId, 'You cannot share this post');
 
 	// Only a user's first share of a post counts. One batch (one transaction): `changes()` is the

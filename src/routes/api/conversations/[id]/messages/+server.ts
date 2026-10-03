@@ -13,6 +13,7 @@ import { getConfig } from '$lib/server/config';
 import { listMessages, requireMembership, sendMessage } from '$lib/server/db/chat';
 import { requireNotBlocked } from '$lib/server/db/blocks';
 import { broadcastLater } from '$lib/server/chat/rooms';
+import { pushMessageLater } from '$lib/server/push/messages';
 import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
 
 const SendMessage = v.object({
@@ -50,7 +51,8 @@ export const GET: RequestHandler = withApi(async ({ params, url, locals, platfor
 });
 
 /**
- * Stores a message (201), or returns it again for a retried `id` (200), then pushes it live.
+ * Stores a message (201), or returns it again for a retried `id` (200), then sends it live and
+ * as a push notification.
  * 403 when either member blocked the other.
  */
 export const POST: RequestHandler = withApi(async ({ params, request, locals, platform }) => {
@@ -66,7 +68,10 @@ export const POST: RequestHandler = withApi(async ({ params, request, locals, pl
 		senderId: viewer.id,
 		content
 	});
-	// A replayed send was already broadcast the first time.
-	if (created) broadcastLater(platform, params.id, { type: 'message', message });
+	// A replayed send was already broadcast and pushed the first time.
+	if (created) {
+		broadcastLater(platform, params.id, { type: 'message', message });
+		pushMessageLater(platform, locals.db, other.id, viewer.name, message);
+	}
 	return json({ message }, { status: created ? 201 : 200 });
 });

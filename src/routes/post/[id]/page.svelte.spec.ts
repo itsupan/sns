@@ -18,7 +18,7 @@ const mockPost: PostData = {
 	tags: ['#Architecture'],
 	likes: 42,
 	commentsCount: 5,
-	repostsCount: 2
+	sharesCount: 2
 };
 
 describe('Post Page Component', () => {
@@ -26,6 +26,7 @@ describe('Post Page Component', () => {
 		const screen = render(Page, {
 			props: {
 				data: {
+					imageTransforms: false,
 					post: mockPost,
 					postUrl: 'https://sns.ecoapsara.com/post/post-test-42',
 					origin: 'https://sns.ecoapsara.com',

@@ -4,7 +4,9 @@
 	import ProfileGrid from '$lib/components/profile/ProfileGrid.svelte';
 	import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 	import type { TabId, ViewMode } from '$lib/components/profile/ProfileTabs.svelte';
+	import Icon from '$lib/components/shared/Icon.svelte';
 	import { resolveProfile } from '$lib/utils/profile.svelte';
+	import { displayHandle } from '$lib/utils/format';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -32,7 +34,7 @@
 
 	const pageTitle = $derived(
 		currentProfile.name
-			? `${currentProfile.name} (@${currentProfile.handle}) — Kizuna`
+			? `${currentProfile.name} (${displayHandle(currentProfile.handle, currentProfile.name)}) — Kizuna`
 			: 'Curator Profile — Kizuna'
 	);
 	const metaDescription = $derived(
@@ -106,6 +108,7 @@
 				isOwnProfile: data.isOwnProfile
 			}}
 			block={data.block}
+			muted={data.muted}
 		/>
 
 		{#if data.block.blocked || data.block.blockedBy}
@@ -116,6 +119,18 @@
 					? 'You blocked this user. Unblock them to see their posts.'
 					: "This profile isn't available."}
 			</p>
+		{:else if data.isLocked}
+			<div
+				class="mx-4 sm:mx-0 mt-6 p-8 rounded-2xl border border-slate-100 dark:border-dark-border flex flex-col items-center gap-2 text-center"
+			>
+				<Icon name="lock" class="text-2xl text-slate-400 dark:text-dark-muted" />
+				<p class="m-0 text-sm font-semibold text-slate-900 dark:text-dark-text">
+					This account is private
+				</p>
+				<p class="m-0 text-xs text-slate-500 dark:text-dark-muted">
+					Follow {currentProfile.name} to see their posts.
+				</p>
+			</div>
 		{:else}
 			<!-- Tabs Bar -->
 			<ProfileTabs bind:activeTab bind:viewMode showSaved={data.isOwnProfile} />
@@ -126,11 +141,9 @@
 				savedPosts={data.saved}
 				{viewMode}
 				items={userPosts}
-				user={{
-					name: currentProfile.name,
-					handle: currentProfile.handle,
-					image: currentProfile.avatar
-				}}
+				userName={currentProfile.name}
+				userId={data.targetUser.id}
+				nextCursor={data.nextCursor}
 				isOwnProfile={data.isOwnProfile}
 			/>
 		{/if}

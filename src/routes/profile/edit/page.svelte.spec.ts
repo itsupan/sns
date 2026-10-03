@@ -7,6 +7,7 @@ describe('Profile Edit Page', () => {
 		const screen = render(ProfileEditPage, {
 			props: {
 				data: {
+					imageTransforms: false,
 					user: {
 						id: 'user-1',
 						name: 'Elena Rostova',

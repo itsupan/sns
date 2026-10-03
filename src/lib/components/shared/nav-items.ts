@@ -1,13 +1,14 @@
 import { tick } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import type { IconName } from './icons';
 
 export type NavId = 'home' | 'explore' | 'create' | 'activity' | 'saved' | 'profile';
 
 export interface NavItem {
 	id: NavId;
 	label: string;
-	icon: string;
+	icon: IconName;
 	href: string;
 }
 
