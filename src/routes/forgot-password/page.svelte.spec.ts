@@ -20,7 +20,8 @@ describe('Forgot password page', () => {
 			.toHaveTextContent("If an account exists for ada@example.com, we've sent it a link");
 		expect(requestPasswordReset).toHaveBeenCalledWith({
 			email: 'ada@example.com',
-			redirectTo: '/reset-password'
+			redirectTo: '/reset-password',
+			fetchOptions: { headers: { 'x-captcha-response': '' } }
 		});
 		await expect
 			.element(screen.getByRole('link', { name: 'Back to log in' }))

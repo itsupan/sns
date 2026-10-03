@@ -7,3 +7,5 @@ R2_ACCESS_KEY_ID=replace-me
 R2_SECRET_ACCESS_KEY=replace-me
 R2_BUCKET_NAME=sns-media
 R2_PUBLIC_URL=https://replace-me.r2.dev
+TURNSTILE_SITE_KEY=
+TURNSTILE_SECRET_KEY=

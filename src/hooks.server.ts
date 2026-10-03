@@ -5,7 +5,10 @@ import { createAuth } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
 import { ApiError, enforceRateLimit, rateLimitSubject, type RateLimitName } from '$lib/server/api';
 
-/** better-auth endpoints limited per client IP: password guessing, signup spam, email floods. */
+/**
+ * better-auth endpoints limited per client IP: password and two-factor code guessing, signup spam,
+ * email floods.
+ */
 const AUTH_RATE_LIMITS: Record<string, RateLimitName> = {
 	'/api/auth/sign-in/email': 'signIn',
 	'/api/auth/sign-up/email': 'signUp',
@@ -13,7 +16,9 @@ const AUTH_RATE_LIMITS: Record<string, RateLimitName> = {
 	'/api/auth/send-verification-email': 'authEmail',
 	'/api/auth/change-email': 'authEmail',
 	'/api/auth/reset-password': 'passwordChange',
-	'/api/auth/change-password': 'passwordChange'
+	'/api/auth/change-password': 'passwordChange',
+	'/api/auth/two-factor/verify-totp': 'twoFactor',
+	'/api/auth/two-factor/verify-backup-code': 'twoFactor'
 };
 
 /** Added to every response that does not set them itself (media routes send a stricter CSP). */

@@ -1,6 +1,8 @@
 import type { BetterAuthOptions } from 'better-auth';
 import { APIError } from 'better-auth/api';
+import { captcha } from 'better-auth/plugins';
 import { admin } from 'better-auth/plugins/admin';
+import { twoFactor } from 'better-auth/plugins/two-factor';
 import { getConfig, normalizeEmail } from './config';
 import {
 	createEmailSender,
@@ -20,6 +22,7 @@ export function authOptions(env: Env) {
 	const sendEmail = createEmailSender(env);
 	const isBlocked = (email: string) =>
 		getConfig(env).auth.blockedSignupEmails.has(normalizeEmail(email));
+	const turnstileSecretKey = getConfig(env).turnstileSiteKey && env.TURNSTILE_SECRET_KEY;
 
 	return {
 		appName: 'Kizuna',
@@ -102,7 +105,20 @@ export function authOptions(env: Env) {
 				isPrivate: { type: 'boolean', required: true, defaultValue: false, input: false }
 			}
 		},
-		// Adds `role` and the ban fields, and refuses to create a session for a banned user.
-		plugins: [admin({ ac: accessControl, roles: pluginRoles })]
+		plugins: [
+			// Adds `role` and the ban fields, and refuses to create a session for a banned user.
+			admin({ ac: accessControl, roles: pluginRoles }),
+			// Asked for after an email/password sign-in only; Google sign-ins skip it.
+			twoFactor(),
+			...(turnstileSecretKey
+				? [
+						captcha({
+							provider: 'cloudflare-turnstile',
+							secretKey: turnstileSecretKey,
+							endpoints: ['/sign-up/email', '/request-password-reset']
+						})
+					]
+				: [])
+		]
 	} satisfies BetterAuthOptions;
 }

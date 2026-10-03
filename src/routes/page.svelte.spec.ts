@@ -19,6 +19,7 @@ describe('home page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					posts: [],
 					hasMore: false,
 					nextCursor: null,
@@ -41,6 +42,7 @@ describe('home page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					posts: [],
 					hasMore: false,
 					nextCursor: null,
@@ -60,6 +62,7 @@ describe('home page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					posts: [
 						{
 							id: 'post-test-1',
@@ -104,6 +107,7 @@ describe('home page', () => {
 				props: {
 					data: {
 						imageTransforms: false,
+						turnstileSiteKey: null,
 						posts: [makePost('page-1')],
 						hasMore: true,
 						nextCursor: '1700_p1',
@@ -129,6 +133,7 @@ describe('home page', () => {
 				props: {
 					data: {
 						imageTransforms: false,
+						turnstileSiteKey: null,
 						posts: [makePost('page-1')],
 						hasMore: true,
 						nextCursor: 'bad',
