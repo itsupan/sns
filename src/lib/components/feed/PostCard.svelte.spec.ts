@@ -1,12 +1,12 @@
 import { render } from 'vitest-browser-svelte';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { readable } from 'svelte/store';
 import PostCard, { type PostData } from './PostCard.svelte';
 // Tailwind's line-clamp must apply for "See more" to measure a real overflow.
 import '../../../app.css';
 
-// Signed in as `owner-1`; the default demo post has no author id, so it is never "own".
+// Signed in as `owner-1`; `otherPost` has no author id, so it is never "own".
 vi.mock('$lib/auth-client', () => ({
 	authClient: {
 		useSession: () =>
@@ -23,14 +23,38 @@ const ownPost: PostData = {
 	tags: ['#Film'],
 	likes: 0,
 	commentsCount: 0,
-	repostsCount: 0
+	sharesCount: 0
+};
+
+const otherPost: PostData = {
+	id: 'post-1',
+	author: {
+		name: 'Elena Rostova',
+		handle: '@elena.rostova',
+		avatar: '',
+		location: 'Copenhagen, Denmark',
+		timeAgo: '3h ago'
+	},
+	title: 'Quiet Brutalism: Concrete Light & Shadows',
+	description: 'A study on natural dawn illumination across raw exposed concrete.',
+	image: 'https://cdn.test/1.jpg',
+	mediaItems: [1, 2, 3, 4].map((n) => ({
+		url: `https://cdn.test/${n}.jpg`,
+		type: 'image' as const
+	})),
+	aspectRatio: '4:5',
+	location: 'Fondazione Prada, Milano',
+	tags: ['#MinimalArchitecture'],
+	likes: 842,
+	commentsCount: 46,
+	sharesCount: 12
 };
 
 afterEach(() => vi.unstubAllGlobals());
 
 describe('PostCard component', () => {
 	it('renders author info, title, and location', async () => {
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 
 		await expect.element(screen.getByText('Elena Rostova')).toBeInTheDocument();
 		await expect
@@ -42,7 +66,7 @@ describe('PostCard component', () => {
 	it('toggles like button on click', async () => {
 		const like = vi.fn(async () => Response.json({ liked: true, likesCount: 843 }));
 		vi.stubGlobal('fetch', like);
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 
 		const likeButton = screen.getByRole('button', { name: 'Like post' });
 		await expect.element(likeButton).toBeInTheDocument();
@@ -84,7 +108,7 @@ describe('PostCard component', () => {
 			'fetch',
 			vi.fn(async () => Response.json({ error: { code: 'rate_limited' } }, { status: 429 }))
 		);
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 
 		await screen.getByRole('button', { name: 'Like post' }).click();
 		await expect.element(screen.getByRole('button', { name: 'Like post' })).toBeInTheDocument();
@@ -95,7 +119,7 @@ describe('PostCard component', () => {
 		let release!: (res: Response) => void;
 		const like = vi.fn(() => new Promise<Response>((resolve) => (release = resolve)));
 		vi.stubGlobal('fetch', like);
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 
 		const likeButton = screen.getByRole('button', { name: 'Like post' });
 		await likeButton.click();
@@ -154,7 +178,7 @@ describe('PostCard component', () => {
 				return Response.json({ saved: init?.method === 'PUT' });
 			})
 		);
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 
 		await screen.getByRole('button', { name: 'Save bookmark' }).click();
 		// While the save is in flight: unsave, then save again.
@@ -171,7 +195,7 @@ describe('PostCard component', () => {
 			Response.json({ error: { code: 'not_found', message: 'Post not found' } }, { status: 404 })
 		);
 		vi.stubGlobal('fetch', save);
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 
 		await screen.getByRole('button', { name: 'Save bookmark' }).click();
 		await vi.waitFor(() => expect(save).toHaveBeenCalledTimes(1));
@@ -179,7 +203,7 @@ describe('PostCard component', () => {
 	});
 
 	it('renders multi-image carousel counter and navigates slides', async () => {
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 
 		await expect.element(screen.getByText('1/4')).toBeInTheDocument();
 
@@ -191,7 +215,7 @@ describe('PostCard component', () => {
 	});
 
 	it('hides edit and delete from people who did not write the post', async () => {
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 		await screen.getByRole('button', { name: 'Post options' }).click();
 		await expect.element(screen.getByText('Report')).toBeInTheDocument();
 		expect(screen.getByText('Edit post').query()).toBeNull();
@@ -199,7 +223,7 @@ describe('PostCard component', () => {
 	});
 
 	it('opens the report sheet for the post from its options', async () => {
-		const screen = render(PostCard);
+		const screen = render(PostCard, { post: otherPost });
 		await screen.getByRole('button', { name: 'Post options' }).click();
 		await screen.getByText('Report').click();
 		await expect.element(screen.getByRole('dialog', { name: 'Report post' })).toBeInTheDocument();
@@ -272,6 +296,32 @@ describe('PostCard component', () => {
 		author: { id: 'author-9', name: 'Aoi', handle: '@aoi', avatar: '', isFollowing: false }
 	};
 
+	it('mounts no dialogs, and listens to no window keys, until one is opened', async () => {
+		const listen = vi.spyOn(window, 'addEventListener');
+		const screen = render(PostCard, { props: { post: otherPost } });
+		await expect.element(screen.getByText('Original caption')).toBeVisible();
+		expect(document.querySelector('dialog')).toBeNull();
+		expect(listen.mock.calls.map(([type]) => type as string)).not.toContain('keydown');
+		listen.mockRestore();
+	});
+
+	it('hands off from the options sheet to the share dialog with the page locked throughout', async () => {
+		const screen = render(PostCard, { props: { post: otherPost } });
+		const options = screen.getByRole('button', { name: 'Post options' });
+		await options.click();
+		await screen.getByRole('button', { name: 'Share', exact: true }).click();
+
+		const share = screen.getByRole('dialog', { name: 'Share Post' });
+		await expect.element(share).toBeVisible();
+		expect(screen.getByRole('dialog', { name: 'Post options' }).query()).toBeNull();
+		expect(getComputedStyle(document.documentElement).overflow).toBe('hidden');
+
+		await userEvent.keyboard('{Escape}');
+		await expect.element(share).not.toBeInTheDocument();
+		expect(document.activeElement).toBe(options.element());
+		expect(getComputedStyle(document.documentElement).overflow).toBe('visible');
+	});
+
 	it('links the author to their profile, and your own posts to /profile', async () => {
 		const other = render(PostCard, { props: { post: otherPost } });
 		await expect
@@ -292,7 +342,7 @@ describe('PostCard component', () => {
 
 	it('follows and unfollows the author, keeping every card by them in sync', async () => {
 		const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
-			Response.json({ following: init?.method === 'POST', followersCount: 1 })
+			Response.json({ status: init?.method === 'POST' ? 'following' : 'none', followersCount: 1 })
 		);
 		vi.stubGlobal('fetch', fetchMock);
 		const screen = render(PostCard, { props: { post: otherPost } });

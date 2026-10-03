@@ -9,6 +9,7 @@ import {
 	primaryKey
 } from 'drizzle-orm/sqlite-core';
 import { user } from './auth-schema';
+import { STORY_AUDIENCES } from '../../stories';
 
 export * from './auth-schema';
 
@@ -24,7 +25,7 @@ export const post = sqliteTable(
 		aspectRatio: text('aspect_ratio').default('1:1'), // '1:1' | '4:5' | '16:9'
 		location: text('location'), // e.g. "Fondazione Prada, Milano"
 		cameraMeta: text('camera_meta'),
-		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article' | 'text'
+		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article' | 'text' | 'repost'
 		// Text posts only: a key of TEXT_BACKGROUNDS ($lib/post-backgrounds).
 		background: text('background'),
 		likesCount: integer('likes_count').default(0).notNull(),
@@ -32,6 +33,16 @@ export const post = sqliteTable(
 		sharesCount: integer('shares_count').default(0).notNull(),
 		// Times the post page was opened by someone other than the author; summed into profile impressions.
 		viewsCount: integer('views_count').default(0).notNull(),
+		// A repost (post type 'repost', empty content) of this post; it goes with the original.
+		repostOfId: text('repost_of_id').references((): AnySQLiteColumn => post.id, {
+			onDelete: 'cascade'
+		}),
+		// A quote post embeds this one; the quote outlives it and then shows it as unavailable.
+		quoteOfId: text('quote_of_id').references((): AnySQLiteColumn => post.id, {
+			onDelete: 'set null'
+		}),
+		// Live reposts of this post; grows and shrinks by one with each repost and undo.
+		repostsCount: integer('reposts_count').default(0).notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
@@ -39,13 +50,24 @@ export const post = sqliteTable(
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
 		// Soft delete: set instead of removing the row; feed and profile queries filter it out.
-		deletedAt: integer('deleted_at', { mode: 'timestamp_ms' })
+		deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+		// Set while the post is pinned to the top of its author's profile (see MAX_PINNED_POSTS).
+		pinnedAt: integer('pinned_at', { mode: 'timestamp_ms' })
 	},
 	(table) => [
 		// Feed keyset pagination: ORDER BY created_at DESC, id DESC.
 		index('post_createdAt_id_idx').on(table.createdAt, table.id),
 		// Profile grid: WHERE user_id = ? ORDER BY created_at DESC (also serves user_id lookups).
-		index('post_userId_createdAt_idx').on(table.userId, table.createdAt)
+		index('post_userId_createdAt_idx').on(table.userId, table.createdAt),
+		// Pinned posts: WHERE user_id = ? AND pinned_at IS NOT NULL ORDER BY pinned_at DESC.
+		index('post_userId_pinnedAt_idx').on(table.userId, table.pinnedAt),
+		// One live repost per user and post; also serves the viewer's "reposted" lookup.
+		uniqueIndex('post_userId_repostOfId_unique')
+			.on(table.userId, table.repostOfId)
+			.where(sql`repost_of_id is not null and deleted_at is null`),
+		// The foreign keys' cascade and set null when an original is removed.
+		index('post_repostOfId_idx').on(table.repostOfId),
+		index('post_quoteOfId_idx').on(table.quoteOfId)
 	]
 );
 
@@ -60,13 +82,19 @@ export const postMedia = sqliteTable(
 		type: text('type', { enum: ['image', 'video'] }).notNull(),
 		width: integer('width'),
 		height: integer('height'),
+		// Author-written description for screen readers.
+		alt: text('alt'),
 		// 0-based order within the post's carousel.
 		position: integer('position').notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull()
 	},
-	(table) => [uniqueIndex('post_media_postId_position_unique').on(table.postId, table.position)]
+	(table) => [
+		uniqueIndex('post_media_postId_position_unique').on(table.postId, table.position),
+		// Whether a deleted draft's uploads are still used by a post: WHERE url IN (...).
+		index('post_media_url_idx').on(table.url)
+	]
 );
 
 export const tag = sqliteTable('tag', {
@@ -249,6 +277,35 @@ export const userFollow = sqliteTable(
 	]
 );
 
+/**
+ * A pending request from `requesterId` to follow the private account `targetId`. Approving it
+ * moves it to `user_follow`, so follow lists and counters only ever see accepted follows.
+ */
+export const followRequest = sqliteTable(
+	'follow_request',
+	{
+		requesterId: text('requester_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		targetId: text('target_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes requesting idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.requesterId, table.targetId] }),
+		// Incoming requests: WHERE target_id = ? ORDER BY created_at DESC, requester_id DESC.
+		index('follow_request_targetId_createdAt_idx').on(
+			table.targetId,
+			table.createdAt,
+			table.requesterId
+		)
+	]
+);
+
 /** A block: `blockerId` blocked `blockedId`. Blocks hide both users from each other everywhere. */
 export const userBlock = sqliteTable(
 	'user_block',
@@ -268,6 +325,99 @@ export const userBlock = sqliteTable(
 		primaryKey({ columns: [table.blockerId, table.blockedId] }),
 		// "Who blocked me": WHERE blocked_id = ?.
 		index('user_block_blockedId_idx').on(table.blockedId)
+	]
+);
+
+/**
+ * A mute: `muterId` muted `mutedId`. One-way and silent: it hides `mutedId`'s posts, stories and
+ * comments from `muterId`'s feeds and their notifications, but a profile opened directly still
+ * shows everything.
+ */
+export const userMute = sqliteTable(
+	'user_mute',
+	{
+		muterId: text('muter_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		mutedId: text('muted_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes mute idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.muterId, table.mutedId] }),
+		// Cascading the muted user's account deletion: WHERE muted_id = ?.
+		index('user_mute_mutedId_idx').on(table.mutedId)
+	]
+);
+
+/** `friendId` is on `userId`'s close friends list: they see `userId`'s close friends stories. */
+export const closeFriend = sqliteTable(
+	'close_friend',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		friendId: text('friend_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes adding idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.userId, table.friendId] }),
+		// Cascading the friend's account deletion: WHERE friend_id = ?.
+		index('close_friend_friendId_idx').on(table.friendId)
+	]
+);
+
+/** A word or phrase `userId` muted: posts containing it stay out of their feeds. Stored lowercased. */
+export const mutedKeyword = sqliteTable(
+	'muted_keyword',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		keyword: text('keyword').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [primaryKey({ columns: [table.userId, table.keyword] })]
+);
+
+/**
+ * A post being written: a composer payload (the body `POST /api/posts` takes, as JSON) saved
+ * for later. With `publish_at` set, the publish-drafts cron posts it then and deletes the draft;
+ * when that fails it keeps the draft, clears `publish_at` and records why in `last_error`.
+ */
+export const postDraft = sqliteTable(
+	'post_draft',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		payload: text('payload').notNull(),
+		publishAt: integer('publish_at', { mode: 'timestamp_ms' }),
+		lastError: text('last_error'),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// Drafts page: WHERE user_id = ? ORDER BY updated_at DESC.
+		index('post_draft_userId_updatedAt_idx').on(table.userId, table.updatedAt),
+		// Cron: WHERE publish_at <= now ORDER BY publish_at.
+		index('post_draft_publishAt_idx').on(table.publishAt)
 	]
 );
 
@@ -408,6 +558,61 @@ export const message = sqliteTable(
 	]
 );
 
+/**
+ * A story: visible to the author's followers (or, by `audience`, only those on their close friends
+ * list) until `expires_at`, 24 hours after it was shared.
+ */
+export const story = sqliteTable(
+	'story',
+	{
+		// `<userId>:<createdAtMs>`, the format `message.story_ref` and `isStoryExpired` read.
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		mediaUrl: text('media_url').notNull(),
+		mediaType: text('media_type', { enum: ['image', 'video'] }).notNull(),
+		caption: text('caption'),
+		location: text('location'),
+		audience: text('audience', { enum: STORY_AUDIENCES }).default('everyone').notNull(),
+		// Viewers other than the author; grows by one per new `story_view` row.
+		viewsCount: integer('views_count').default(0).notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(table) => [
+		// Tray and author checks: WHERE user_id = ? AND expires_at > now.
+		index('story_userId_expiresAt_idx').on(table.userId, table.expiresAt),
+		// Pruning views of long-expired stories.
+		index('story_expiresAt_idx').on(table.expiresAt)
+	]
+);
+
+/** Who watched a story (once per viewer) and the reaction they sent, if any. */
+export const storyView = sqliteTable(
+	'story_view',
+	{
+		storyId: text('story_id')
+			.notNull()
+			.references(() => story.id, { onDelete: 'cascade' }),
+		viewerId: text('viewer_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		viewedAt: integer('viewed_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		// One of STORY_REACTIONS ($lib/reactions); validated at the API layer.
+		reaction: text('reaction')
+	},
+	(table) => [
+		primaryKey({ columns: [table.storyId, table.viewerId] }),
+		// Viewers list: WHERE story_id = ? ORDER BY viewed_at DESC, viewer_id DESC.
+		index('story_view_storyId_viewedAt_idx').on(table.storyId, table.viewedAt, table.viewerId),
+		// Account deletion: the stories a user watched.
+		index('story_view_viewerId_idx').on(table.viewerId)
+	]
+);
+
 export const NOTIFICATION_TYPES = [
 	'like',
 	'comment',
@@ -415,7 +620,11 @@ export const NOTIFICATION_TYPES = [
 	'reaction',
 	'follow',
 	'mention',
-	'story_reaction'
+	'story_reaction',
+	'follow_request',
+	'follow_accepted',
+	'repost',
+	'quote'
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 
@@ -458,6 +667,24 @@ export const notificationRead = sqliteTable('notification_read', {
 	readAt: integer('read_at', { mode: 'timestamp_ms' }).notNull()
 });
 
+/**
+ * Notification types a user turned off. The `notification_opt_out_guard` trigger skips inserts of
+ * those types, so every path that notifies respects the preference.
+ */
+export const notificationOptOut = sqliteTable(
+	'notification_opt_out',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		type: text('type', { enum: NOTIFICATION_TYPES }).notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [primaryKey({ columns: [table.userId, table.type] })]
+);
+
 export const REPORT_TARGET_TYPES = ['post', 'comment', 'user', 'message'] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
@@ -475,6 +702,10 @@ export const REPORT_REASONS = [
 export type ReportReason = (typeof REPORT_REASONS)[number];
 
 export const REPORT_STATUSES = ['open', 'resolved', 'dismissed'] as const;
+
+/** How a moderator closed a report; `dismissed` reports get status `dismissed`, the rest `resolved`. */
+export const REPORT_RESOLUTIONS = ['dismissed', 'content_removed', 'user_suspended'] as const;
+export type ReportResolution = (typeof REPORT_RESOLUTIONS)[number];
 
 /** Max length of a report's optional free-text details. */
 export const REPORT_DETAILS_MAX = 500;
@@ -497,7 +728,11 @@ export const report = sqliteTable(
 		status: text('status', { enum: REPORT_STATUSES }).default('open').notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
-			.notNull()
+			.notNull(),
+		// Set when a moderator closes the report; kept when that moderator's account is deleted.
+		resolvedBy: text('resolved_by').references(() => user.id, { onDelete: 'set null' }),
+		resolvedAt: integer('resolved_at', { mode: 'timestamp_ms' }),
+		resolution: text('resolution', { enum: REPORT_RESOLUTIONS })
 	},
 	(table) => [
 		// Moderation: all reports about one target.
@@ -505,6 +740,49 @@ export const report = sqliteTable(
 		// One open report per reporter per target; reporting again after it is closed is allowed.
 		uniqueIndex('report_reporter_target_open_unique')
 			.on(table.reporterId, table.targetType, table.targetId)
-			.where(sql`status = 'open'`)
+			.where(sql`status = 'open'`),
+		// Moderation queue: open reports grouped by target, with their newest report time.
+		index('report_open_target_createdAt_idx')
+			.on(table.targetType, table.targetId, table.createdAt)
+			.where(sql`status = 'open'`),
+		// Account deletion nulls the moderator's `resolved_by`.
+		index('report_resolvedBy_idx').on(table.resolvedBy)
+	]
+);
+
+export const MODERATION_ACTIONS = [
+	'dismiss',
+	'remove_content',
+	'suspend_user',
+	'unsuspend_user',
+	'grant_moderator',
+	'revoke_moderator'
+] as const;
+export type ModerationAction = (typeof MODERATION_ACTIONS)[number];
+
+/**
+ * Audit trail: one row per moderator or admin action. `target_id` is not a foreign key, so the
+ * record outlives the post, comment, message or user it was about.
+ */
+export const moderationAction = sqliteTable(
+	'moderation_action',
+	{
+		id: text('id').primaryKey(),
+		moderatorId: text('moderator_id').references(() => user.id, { onDelete: 'set null' }),
+		action: text('action', { enum: MODERATION_ACTIONS }).notNull(),
+		targetType: text('target_type', { enum: REPORT_TARGET_TYPES }).notNull(),
+		targetId: text('target_id').notNull(),
+		// The newest report the action resolved; null for actions not taken from the queue.
+		reportId: text('report_id').references(() => report.id, { onDelete: 'set null' }),
+		note: text('note'),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// Account export, and nulling `moderator_id` on account deletion.
+		index('moderation_action_moderatorId_idx').on(table.moderatorId),
+		// Nulling `report_id` when the report goes with its reporter's account.
+		index('moderation_action_reportId_idx').on(table.reportId)
 	]
 );

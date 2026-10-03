@@ -12,6 +12,8 @@
 
 	"vars": {
 		"BETTER_AUTH_URL": "http://localhost:5173",
+		// Resend's shared test sender: delivers only to your own Resend account's address.
+		"EMAIL_FROM": "Kizuna <onboarding@resend.dev>",
 		// App tuning (parsed by src/lib/server/config.ts; invalid values fall back to defaults)
 		"RATE_LIMIT_CREATE_POST": "10/60",
 		"RATE_LIMIT_COMMENT": "20/60",
@@ -24,16 +26,24 @@
 		"RATE_LIMIT_LIKE": "60/60",
 		"RATE_LIMIT_SAVE": "60/60",
 		"RATE_LIMIT_SHARE": "30/60",
+		"RATE_LIMIT_REPOST": "30/60",
 		"RATE_LIMIT_FOLLOW": "30/60",
+		"RATE_LIMIT_MUTE": "30/60",
 		"RATE_LIMIT_CREATE_STORY": "10/60",
+		"RATE_LIMIT_DRAFT": "30/60",
 		"RATE_LIMIT_UPLOAD_PRESIGN": "20/60",
 		"RATE_LIMIT_UPLOAD": "20/60",
 		"RATE_LIMIT_MEDIA_REFRESH": "60/60",
 		"RATE_LIMIT_ACCOUNT_EXPORT": "5/3600",
 		"RATE_LIMIT_REPORT": "10/3600",
+		"RATE_LIMIT_MODERATION": "120/60",
 		"RATE_LIMIT_ACCOUNT_DELETE": "5/3600",
 		"RATE_LIMIT_SIGN_IN": "10/60",
 		"RATE_LIMIT_SIGN_UP": "5/3600",
+		"RATE_LIMIT_AUTH_EMAIL": "5/3600",
+		"RATE_LIMIT_PASSWORD_CHANGE": "10/3600",
+		"RATE_LIMIT_TWO_FACTOR": "5/300",
+		"RATE_LIMIT_SESSION_REVOKE": "30/60",
 		"RATE_LIMIT_PROFILE_UPDATE": "10/60",
 		"RATE_LIMIT_CONTENT_EDIT": "30/60",
 		"RATE_LIMIT_MARK_READ": "120/60",
@@ -52,15 +62,23 @@
 		"ACTIVITY_MAX_PAGE_SIZE": "50",
 		"EXPLORE_PAGE_SIZE": "18",
 		"EXPLORE_MAX_PAGE_SIZE": "36",
+		"PROFILE_PAGE_SIZE": "18",
+		"PROFILE_MAX_PAGE_SIZE": "36",
+		"STORY_VIEWERS_PAGE_SIZE": "20",
+		"STORY_VIEWERS_MAX_PAGE_SIZE": "50",
 		"CHAT_PAGE_SIZE": "30",
 		"CHAT_MAX_PAGE_SIZE": "100",
 		"INBOX_PAGE_SIZE": "20",
 		"INBOX_MAX_PAGE_SIZE": "50",
 		"MEDIA_URL_TTL_SECONDS": "604800",
-		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
+		// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
+		"IMAGE_TRANSFORMS": "off",
+		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com",
+		// Turnstile on signup and password reset, with the TURNSTILE_SECRET_KEY secret (see README).
+		"TURNSTILE_SITE_KEY": ""
 	},
 	"secrets": {
-		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY"]
 	},
 	"d1_databases": [
 		{
@@ -74,12 +92,6 @@
 		{
 			"binding": "KV",
 			"id": "00000000000000000000000000000000"
-		},
-		// Stories: one key per story (`story:<userId>:<ts>`) written with a 24h expirationTtl,
-		// so KV deletes them itself. Local dev simulates it; the id is a placeholder.
-		{
-			"binding": "STORIES",
-			"id": "00000000000000000000000000000001"
 		}
 	],
 
@@ -96,11 +108,16 @@
 		{ "tag": "v2", "new_sqlite_classes": ["RateLimiter"] }
 	],
 
+	// Every minute: worker.ts `scheduled` publishes due drafts, and at 03:00 UTC prunes the views
+	// of long-expired stories.
+	"triggers": { "crons": ["* * * * *"] },
+
 	"env": {
 		"production": {
 			"name": "sns",
 			"vars": {
 				"BETTER_AUTH_URL": "https://sns.ecoapsara.com",
+				"EMAIL_FROM": "Kizuna <no-reply@sns.ecoapsara.com>",
 				// App tuning (parsed by src/lib/server/config.ts; invalid values fall back to defaults)
 				"RATE_LIMIT_CREATE_POST": "10/60",
 				"RATE_LIMIT_COMMENT": "20/60",
@@ -113,16 +130,24 @@
 				"RATE_LIMIT_LIKE": "60/60",
 				"RATE_LIMIT_SAVE": "60/60",
 				"RATE_LIMIT_SHARE": "30/60",
+				"RATE_LIMIT_REPOST": "30/60",
 				"RATE_LIMIT_FOLLOW": "30/60",
+				"RATE_LIMIT_MUTE": "30/60",
 				"RATE_LIMIT_CREATE_STORY": "10/60",
+				"RATE_LIMIT_DRAFT": "30/60",
 				"RATE_LIMIT_UPLOAD_PRESIGN": "20/60",
 				"RATE_LIMIT_UPLOAD": "20/60",
 				"RATE_LIMIT_MEDIA_REFRESH": "60/60",
 				"RATE_LIMIT_ACCOUNT_EXPORT": "5/3600",
 				"RATE_LIMIT_REPORT": "10/3600",
+				"RATE_LIMIT_MODERATION": "120/60",
 				"RATE_LIMIT_ACCOUNT_DELETE": "5/3600",
 				"RATE_LIMIT_SIGN_IN": "10/60",
 				"RATE_LIMIT_SIGN_UP": "5/3600",
+				"RATE_LIMIT_AUTH_EMAIL": "5/3600",
+				"RATE_LIMIT_PASSWORD_CHANGE": "10/3600",
+				"RATE_LIMIT_TWO_FACTOR": "5/300",
+				"RATE_LIMIT_SESSION_REVOKE": "30/60",
 				"RATE_LIMIT_PROFILE_UPDATE": "10/60",
 				"RATE_LIMIT_CONTENT_EDIT": "30/60",
 				"RATE_LIMIT_MARK_READ": "120/60",
@@ -141,16 +166,29 @@
 				"ACTIVITY_MAX_PAGE_SIZE": "50",
 				"EXPLORE_PAGE_SIZE": "18",
 				"EXPLORE_MAX_PAGE_SIZE": "36",
+				"PROFILE_PAGE_SIZE": "18",
+				"PROFILE_MAX_PAGE_SIZE": "36",
+				"STORY_VIEWERS_PAGE_SIZE": "20",
+				"STORY_VIEWERS_MAX_PAGE_SIZE": "50",
 				"CHAT_PAGE_SIZE": "30",
 				"CHAT_MAX_PAGE_SIZE": "100",
 				"INBOX_PAGE_SIZE": "20",
 				"INBOX_MAX_PAGE_SIZE": "50",
 				"MEDIA_URL_TTL_SECONDS": "604800",
-				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
+				// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
+				"IMAGE_TRANSFORMS": "off",
+				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com",
+				// Turnstile on signup and password reset, with the TURNSTILE_SECRET_KEY secret (see README).
+				"TURNSTILE_SITE_KEY": ""
 			},
 			"routes": [{ "pattern": "sns.ecoapsara.com", "custom_domain": true }],
 			"secrets": {
-				"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+				"required": [
+					"BETTER_AUTH_SECRET",
+					"GOOGLE_CLIENT_ID",
+					"GOOGLE_CLIENT_SECRET",
+					"RESEND_API_KEY"
+				]
 			},
 			"d1_databases": [
 				{
@@ -164,12 +202,6 @@
 				{
 					"binding": "KV",
 					"id": "fa46fc4c9e684fbbb1f38509a177509b"
-				},
-				// No id: `wrangler deploy` auto-provisions this namespace on first deploy. To pin an
-				// existing one instead, run `wrangler kv namespace create STORIES --env production`
-				// and paste the printed id here.
-				{
-					"binding": "STORIES"
 				}
 			],
 			"durable_objects": {

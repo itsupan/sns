@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { formatCount } from '$lib/utils/format';
+	import { GRID_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { TEXT_BACKGROUNDS } from '$lib/post-backgrounds';
 	import type { ExploreTile } from '$lib/explore/types';
 
@@ -20,9 +21,12 @@
 				{#if tile.cover?.type === 'image'}
 					<img
 						src={tile.cover.url}
-						alt=""
+						alt={tile.cover.alt ?? ''}
+						srcset={imageSrcset(tile.cover.url, GRID_IMAGE_WIDTHS)}
+						sizes="(min-width: 768px) 256px, 33vw"
 						class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
 						loading={i < 6 ? 'eager' : 'lazy'}
+						decoding="async"
 					/>
 				{:else if tile.cover?.type === 'video'}
 					<video

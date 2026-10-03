@@ -1,10 +1,12 @@
 <script lang="ts">
+	import { ICONS, OUTLINE_ONLY, type IconName } from './icons';
+
 	interface Props {
-		/** Name of the uicon (e.g. "user", "lock", "eye", "sun", or full "fi-rr-lock") */
-		name: string;
-		/** Weight/style: 'rr' regular rounded (default), 'rs' regular straight, 'sr' solid rounded */
-		type?: 'rr' | 'rs' | 'sr';
-		/** Size preset or pixel number */
+		/** A name from the registry in `icons.ts` */
+		name: IconName;
+		/** 'rr' outline (default), 'sr' solid: filled, or drawn bolder where a fill would hide it */
+		type?: 'rr' | 'sr';
+		/** Size preset or pixel number; the icon is 1em square, so a text-size class sizes it too */
 		size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | number;
 		/** Additional CSS classes */
 		class?: string;
@@ -21,15 +23,18 @@
 		xl: 'text-xl'
 	};
 
-	let iconClass = $derived(name.startsWith('fi-') ? name : `fi-${type}-${name}`);
+	let Glyph = $derived(ICONS[name]);
+	let solid = $derived(type === 'sr');
+	let filled = $derived(solid && !OUTLINE_ONLY.has(name));
 </script>
 
-<i
-	class="fi {iconClass} inline-flex items-center justify-center leading-none select-none {typeof size ===
-	'string'
-		? sizeClasses[size] || ''
-		: ''} {className}"
+<Glyph
+	width="1em"
+	height="1em"
+	fill={filled ? 'currentColor' : 'none'}
+	strokeWidth={solid && !filled ? 2.75 : 2}
+	class="shrink-0 select-none {typeof size === 'string' ? sizeClasses[size] || '' : ''} {className}"
 	style={typeof size === 'number' ? `font-size: ${size}px;` : undefined}
 	aria-hidden="true"
 	{...restProps}
-></i>
+/>

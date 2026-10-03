@@ -2,7 +2,7 @@
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { authClient } from '$lib/auth-client';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import { FOLLOW_LABELS, followActionLabel, followStore } from '$lib/utils/follow.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
@@ -37,7 +37,7 @@
 			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
 			return;
 		}
-		const next = !followStore.isFollowing(curator.id);
+		const next = followStore.status(curator.id) === 'none';
 		try {
 			await followStore.set(curator.id, next);
 		} catch (err) {
@@ -69,7 +69,7 @@
 
 			<div class="flex flex-col gap-3 xl:gap-3.5">
 				{#each curators as curator (curator.id)}
-					{@const following = followStore.isFollowing(curator.id)}
+					{@const status = followStore.status(curator.id)}
 					<div class="flex items-center justify-between gap-2 xl:gap-3">
 						<a
 							href={resolve('/profile/[id]', { id: curator.slug })}
@@ -92,15 +92,16 @@
 
 						<button
 							type="button"
-							class="text-[11px] xl:text-xs font-semibold px-2.5 xl:px-4 py-1 xl:py-1.5 rounded-full border transition-all duration-150 cursor-pointer shrink-0 disabled:opacity-50 {following
+							class="text-[11px] xl:text-xs font-semibold px-2.5 xl:px-4 py-1 xl:py-1.5 rounded-full border transition-all duration-150 cursor-pointer shrink-0 disabled:opacity-50 {status !==
+							'none'
 								? 'bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted border-slate-200 dark:border-dark-border'
 								: 'bg-white dark:bg-dark-card text-slate-900 dark:text-dark-text border-slate-200 dark:border-dark-border hover:bg-slate-50 dark:hover:bg-dark-hover shadow-2xs'}"
 							disabled={followStore.isPending(curator.id)}
-							aria-pressed={following}
-							aria-label="{following ? 'Unfollow' : 'Follow'} {curator.name}"
+							aria-pressed={status !== 'none'}
+							aria-label={followActionLabel(status, curator.name)}
 							onclick={() => toggleFollow(curator)}
 						>
-							{following ? 'Following' : 'Follow'}
+							{FOLLOW_LABELS[status]}
 						</button>
 					</div>
 				{/each}

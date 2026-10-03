@@ -1,19 +1,15 @@
 import { json } from '@sveltejs/kit';
-import { desc, eq, inArray } from 'drizzle-orm';
 import * as v from 'valibot';
 import type { RequestHandler } from './$types';
-import { user, userFollow } from '$lib/server/db/schema';
+import { STORY_AUDIENCES } from '$lib/stories';
 import { isOwnUpload, refreshMediaUrl } from '$lib/server/services/storage';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
-	MAX_STORY_AUTHORS,
 	MAX_STORY_CAPTION,
 	MAX_STORY_LOCATION,
-	getSeenStoryIds,
-	getViewerReactions,
-	listStoriesByUser,
-	listViews,
-	putStory
+	createStory,
+	loadTrayStories,
+	type TrayStory
 } from '$lib/server/stories';
 
 const VIDEO_URL = /\.(mp4|webm|mov)(\?.*)?$/i;
@@ -36,16 +32,13 @@ const CreateStoryBody = v.object(
 		mediaUrl: v.pipe(v.string('Media is required'), v.trim(), v.minLength(1, 'Media is required')),
 		mediaType: v.optional(v.picklist(['image', 'video'], 'Invalid media type')),
 		caption: optionalText('Caption', MAX_STORY_CAPTION),
-		location: optionalText('Location', MAX_STORY_LOCATION)
+		location: optionalText('Location', MAX_STORY_LOCATION),
+		audience: v.optional(v.picklist(STORY_AUDIENCES, 'Invalid audience'), 'everyone')
 	},
 	'Request body must be an object'
 );
 
-function storiesKv(platform: App.Platform | undefined): KVNamespace | null {
-	return platform?.env?.STORIES ?? null;
-}
-
-/** Shares a story that disappears after 24 hours (KV expirationTtl). */
+/** Shares a story that disappears after 24 hours, with all followers or only close friends. */
 export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
 	const currentUser = requireUser(locals);
 	await enforceRateLimit(platform, 'createStory', currentUser.id);
@@ -57,22 +50,17 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		throw new ApiError(400, 'validation_failed', message, { mediaUrl: message });
 	}
 
-	const kv = storiesKv(platform);
-	if (!kv) {
-		// Bindings are read at startup: a dev server started before STORIES was added lacks it.
-		console.error(
-			'STORIES KV binding is missing. Check wrangler.jsonc and restart the dev server.'
-		);
-		throw new ApiError(503, 'stories_unavailable', 'Stories are not available right now');
-	}
-
-	const story = await putStory(kv, {
+	const story = await createStory(locals.db, {
 		userId: currentUser.id,
 		mediaUrl: body.mediaUrl,
 		mediaType: body.mediaType ?? (VIDEO_URL.test(body.mediaUrl) ? 'video' : 'image'),
 		caption: body.caption,
-		location: body.location
+		location: body.location,
+		audience: body.audience
 	});
+	if (!story) {
+		throw new ApiError(409, 'duplicate_story', 'A story was just shared. Try again.');
+	}
 
 	return json(
 		{ story: { ...story, mediaUrl: await refreshMediaUrl(story.mediaUrl, platform?.env) } },
@@ -86,64 +74,35 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
  */
 export const GET: RequestHandler = withApi(async ({ locals, platform }) => {
 	const viewer = locals.user;
-	const kv = storiesKv(platform);
-	if (!viewer || !kv) return json({ groups: [] });
-
-	// Most recently followed first, so the cap keeps the people you care about most.
-	const followed = await locals.db
-		.select({ id: userFollow.followingId })
-		.from(userFollow)
-		.where(eq(userFollow.followerId, viewer.id))
-		.orderBy(desc(userFollow.createdAt))
-		.limit(MAX_STORY_AUTHORS - 1);
-
-	const byUser = await listStoriesByUser(kv, [viewer.id, ...followed.map((f) => f.id)]);
-	if (byUser.size === 0) return json({ groups: [] });
-
-	// One read for the viewer's watched stories; view counts only for their own (few) stories.
-	const [seen, ownViewCounts] = await Promise.all([
-		getSeenStoryIds(kv, viewer.id),
-		Promise.all(
-			(byUser.get(viewer.id) ?? []).map(
-				async (s) => [s.id, (await listViews(kv, s.id)).length] as const
-			)
-		).then((pairs) => new Map(pairs))
-	]);
-
-	// Only a watched story can carry the viewer's reaction, so only those are read.
-	const reactions = await getViewerReactions(
-		kv,
-		[...byUser.entries()].flatMap(([userId, stories]) =>
-			userId === viewer.id ? [] : stories.filter((s) => seen.has(s.id)).map((s) => s.id)
-		),
-		viewer.id
-	);
-
-	const authors = await locals.db
-		.select({ id: user.id, name: user.name, handle: user.handle, image: user.image })
-		.from(user)
-		.where(inArray(user.id, [...byUser.keys()]));
+	if (!viewer) return json({ groups: [] });
 
 	const env = platform?.env;
+	const byUser = new Map<
+		string,
+		{ user: TrayStory['author']; stories: Omit<TrayStory, 'author'>[] }
+	>();
+	for (const { author, ...story } of await loadTrayStories(locals.db, viewer.id)) {
+		const group = byUser.get(author.id) ?? { user: author, stories: [] };
+		group.stories.push(story);
+		byUser.set(author.id, group);
+	}
+
 	const groups = await Promise.all(
-		authors.map(async (author) => {
-			const stories = byUser.get(author.id) ?? [];
+		[...byUser.values()].map(async ({ user, stories }) => {
+			const isSelf = user.id === viewer.id;
+			// Loaded newest first; viewing order is oldest first.
+			stories.reverse();
 			return {
-				user: {
-					...author,
-					image: author.image ? await refreshMediaUrl(author.image, env) : null
-				},
-				isSelf: author.id === viewer.id,
+				user: { ...user, image: user.image ? await refreshMediaUrl(user.image, env) : null },
+				isSelf,
 				latestAt: stories.at(-1)?.createdAt ?? 0,
 				stories: await Promise.all(
-					stories.map(async (s) => ({
+					stories.map(async ({ viewsCount, seen, reaction, ...s }) => ({
 						...s,
 						mediaUrl: await refreshMediaUrl(s.mediaUrl, env),
 						// Your own stories always count as watched.
-						seen: author.id === viewer.id || seen.has(s.id),
-						...(author.id === viewer.id
-							? { viewCount: ownViewCounts.get(s.id) ?? 0 }
-							: { reaction: reactions.get(s.id) ?? null })
+						seen: isSelf || seen,
+						...(isSelf ? { viewCount: viewsCount } : { reaction })
 					}))
 				)
 			};

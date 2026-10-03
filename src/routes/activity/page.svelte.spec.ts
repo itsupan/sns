@@ -2,6 +2,7 @@ import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
 import type { ActivityItem } from '$lib/activity/types';
+import { stubIntersectionObserver } from '../../test/intersection-observer';
 
 const person = (id: string) => ({ id, name: id, handle: `@${id}`, slug: id, image: null });
 const post = { id: 'p1', thumbnail: null };
@@ -72,12 +73,34 @@ describe('/activity', () => {
 		expect(calls).toEqual([]);
 	});
 
-	it('loads more with the cursor', async () => {
+	it('loads the next page with the cursor when scrolled to the end, then stops', async () => {
+		stubIntersectionObserver();
 		const screen = renderPage([item('n1', 'like', 'Bob', { post })], 'next');
-		await screen.getByRole('button', { name: 'Load more' }).click();
 		await expect.element(screen.getByText('Zed')).toBeVisible();
-		expect(calls[0].url).toBe('/api/notifications?cursor=next');
-		await expect.element(screen.getByRole('button', { name: 'Load more' })).not.toBeInTheDocument();
+		expect(calls.map((c) => c.url)).toEqual(['/api/notifications?cursor=next']);
+	});
+
+	it('shows a failed page with a retry', async () => {
+		stubIntersectionObserver();
+		let fail = true;
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () =>
+				fail
+					? Response.json(
+							{ error: { code: 'internal', message: 'Server hiccup' } },
+							{ status: 500 }
+						)
+					: Response.json({ items: [item('n9', 'follow', 'Zed')], nextCursor: null })
+			)
+		);
+		const screen = renderPage([item('n1', 'like', 'Bob', { post })], 'next');
+		await expect.element(screen.getByRole('alert')).toHaveTextContent('Server hiccup');
+
+		fail = false;
+		await screen.getByRole('button', { name: 'Try again' }).click();
+		await expect.element(screen.getByText('Zed')).toBeVisible();
+		await expect.element(screen.getByRole('alert')).not.toBeInTheDocument();
 	});
 
 	it('shows an empty state', async () => {

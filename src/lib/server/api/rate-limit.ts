@@ -34,6 +34,7 @@ export function rateLimitSubject(event: {
 export const FAIL_CLOSED_LIMITS: ReadonlySet<RateLimitName> = new Set<RateLimitName>([
 	'createPost',
 	'createStory',
+	'draft',
 	'storyReaction',
 	'comment',
 	'chatStart',
@@ -42,9 +43,12 @@ export const FAIL_CLOSED_LIMITS: ReadonlySet<RateLimitName> = new Set<RateLimitN
 	'upload',
 	'follow',
 	'share',
+	'repost',
 	'accountExport',
 	'report',
-	'signUp'
+	'signUp',
+	'authEmail',
+	'twoFactor'
 ]);
 
 /** A missing limiter is only acceptable in local dev (`vite dev`) and unit tests. */
