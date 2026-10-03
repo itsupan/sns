@@ -2,17 +2,21 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
-	import FormattedText from '$lib/components/shared/FormattedText.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import { TEXT_BACKGROUNDS } from '$lib/post-backgrounds';
 	import { stripFormatting } from '$lib/formatting';
 	import PostCard, { type PostData } from '$lib/components/feed/PostCard.svelte';
 	import { formatCount } from '$lib/utils/format';
+	import { readApiError } from '$lib/utils/api-error';
+	import { GRID_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import type { TabId, ViewMode } from './ProfileTabs.svelte';
 
 	export interface GridItem {
 		id: string;
 		title: string;
 		image: string;
+		/** Alt text of `image`, when the author wrote one. */
+		alt?: string;
 		/** Type of `image`; 'none' for text-only posts. Inferred from the URL when missing. */
 		mediaType?: 'image' | 'video' | 'none';
 		likes: number;
@@ -23,8 +27,8 @@
 		tags?: string[];
 		date?: string;
 		location?: string;
-		/** Full post for real (database) items: list view renders it with `PostCard`. */
-		post?: PostData;
+		/** List view renders the full post with `PostCard`. */
+		post: PostData;
 	}
 
 	interface Props {
@@ -32,166 +36,56 @@
 		activeTab?: TabId;
 		viewMode?: ViewMode;
 		class?: string;
-		onSelectItem?: (item: GridItem) => void;
-		user?: {
-			name?: string;
-			handle?: string;
-			image?: string | null;
-		};
+		/** Whose profile this is, for the empty state. */
+		userName?: string;
 		isOwnProfile?: boolean;
 		/** The viewer's most recently saved posts (own profile only); "See all" opens /saved. */
 		savedPosts?: GridItem[];
+		/** Whose posts `items` are, and the cursor of the page after them; null when there is none. */
+		userId?: string;
+		nextCursor?: string | null;
 	}
 
-	const defaultItems: GridItem[] = [
-		{
-			id: 'g1',
-			title: 'Brutalist Spiral Staircase Atrium',
-			image:
-				'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-			likes: 1420,
-			comments: 89,
-			isCarousel: true,
-			cameraMeta: '35mm · ISO 200 · f/2.0',
-			description:
-				'Continuous cast concrete helical staircase with natural zenital light pouring through the overhead skylight. Shot on Hasselblad 500C/M.',
-			tags: ['#Brutalism', '#HelicalStaircase', '#Architecture'],
-			date: 'Oct 2025',
-			location: 'Copenhagen, Denmark'
-		},
-		{
-			id: 'g2',
-			title: 'Scandinavian Light-Filled Kitchen Atrium',
-			image:
-				'https://images.unsplash.com/photo-1556911220-e15b29be8c8f?w=1200&auto=format&fit=crop&q=80',
-			likes: 954,
-			comments: 42,
-			cameraMeta: '50mm · ISO 400 · f/2.8',
-			description:
-				'Sunlight pouring across marble surfaces and custom timber joinery. Natural spatial harmony.',
-			tags: ['#InteriorDesign', '#KitchenAtrium', '#NordicLiving'],
-			date: 'Sep 2025',
-			location: 'Stockholm, Sweden'
-		},
-		{
-			id: 'g3',
-			title: 'Water Temple Reflection',
-			image:
-				'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=80',
-			likes: 1205,
-			comments: 76,
-			cameraMeta: '28mm · ISO 100 · f/5.6',
-			description:
-				'Smooth water plane mirroring architectural mass at twilight. Concrete formwork holes aligned precisely on 45cm grid.',
-			tags: ['#TadaoAndo', '#WaterMirror', '#Minimalism'],
-			date: 'Aug 2025',
-			location: 'Awaji Island, Japan'
-		},
-		{
-			id: 'g4',
-			title: 'Curved Glass High-Rise Horizon',
-			image:
-				'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=80',
-			likes: 812,
-			comments: 31,
-			cameraMeta: '80mm · ISO 200 · f/4.0',
-			description:
-				'Curvilinear curtain wall reflections catching overcast evening stratocumulus clouds.',
-			tags: ['#GlassFacade', '#UrbanStudy', '#ScandinavianDesign'],
-			date: 'Jul 2025',
-			location: 'Helsinki, Finland'
-		},
-		{
-			id: 'g5',
-			title: 'Shou Sugi Ban Charred Wood Texture',
-			image:
-				'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?w=1200&auto=format&fit=crop&q=80',
-			likes: 673,
-			comments: 24,
-			isCarousel: true,
-			cameraMeta: '80mm Planar · ISO 160 · f/2.8',
-			description:
-				'Carbonized cedar exterior cladding with subtle window reveals. Texture tactile and mineral-like.',
-			tags: ['#Yakisugi', '#JapaneseCraft', '#WoodTexture'],
-			date: 'Jun 2025',
-			location: 'Kyoto, Japan'
-		},
-		{
-			id: 'g6',
-			title: 'Solitary Walk on Sea Wall',
-			image:
-				'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200&auto=format&fit=crop&q=80',
-			likes: 1120,
-			comments: 58,
-			cameraMeta: '35mm · ISO 400 · f/8.0',
-			description:
-				'Minimalist figure silhouetted against sea mist on brutalist breakwater concrete rampart.',
-			tags: ['#Monochrome', '#SeaWall', '#Solitude'],
-			date: 'May 2025',
-			location: 'Gotland, Sweden'
-		},
-		{
-			id: 'g7',
-			title: 'Geometric Wire Chairs & Concrete Shadows',
-			image:
-				'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=1200&auto=format&fit=crop&q=80',
-			likes: 745,
-			comments: 19,
-			cameraMeta: '50mm · ISO 100 · f/2.0',
-			description:
-				'Bertoia wire chair diamond mesh projecting complex geometric shadows onto lime-plaster wall.',
-			tags: ['#MidCentury', '#ShadowPlay', '#InteriorDesign'],
-			date: 'Apr 2025',
-			location: 'Stockholm, Sweden'
-		},
-		{
-			id: 'g8',
-			title: 'Tower Facade Fenestration Rhythm',
-			image:
-				'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=80',
-			likes: 890,
-			comments: 37,
-			cameraMeta: '135mm · ISO 100 · f/5.6',
-			description:
-				'Repetitive pre-cast concrete facade elements creating rhythmic optical compression.',
-			tags: ['#PrecastConcrete', '#Fenestration', '#TowerFacade'],
-			date: 'Mar 2025',
-			location: 'London, UK'
-		},
-		{
-			id: 'g9',
-			title: 'Curator Plate on Raw Concrete',
-			image:
-				'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-			likes: 1042,
-			comments: 63,
-			cameraMeta: '50mm · ISO 200 · f/2.8',
-			description:
-				'Gallery archive signage mounted flush against textured board-formed concrete surface.',
-			tags: ['#Typography', '#GallerySignage', '#BoardFormed'],
-			date: 'Feb 2025',
-			location: 'Copenhagen, Denmark'
-		}
-	];
-
 	let {
-		items = defaultItems,
+		items = [],
 		activeTab = 'grid',
 		viewMode = 'grid',
 		class: className = '',
-		onSelectItem,
-		user,
+		userName,
 		isOwnProfile = true,
-		savedPosts = []
+		savedPosts = [],
+		userId,
+		nextCursor = null
 	}: Props = $props();
 
-	let activeModalItem = $state<GridItem | null>(null);
+	/** How wide a grid cell renders: a third of the page, which stops growing at 1152px. */
+	const GRID_CELL_SIZES = '(min-width: 1152px) 360px, 33vw';
 	// Posts the author deleted or edited from list view, so grid and compact views match.
 	let removedIds = $state<Record<string, boolean>>({});
 	let updatedPosts = $state<Record<string, PostData>>({});
 
+	/** Pages loaded while scrolling, appended after the server-rendered first page. */
+	let more = $state<GridItem[]>([]);
+	let moreCursor = $state<string | null | undefined>(undefined);
+	let loadingMore = $state(false);
+	let loadError = $state<string | null>(null);
+	// SvelteKit reuses this component between profiles; drop the previous one's pages.
+	$effect.pre(() => {
+		void userId;
+		more = [];
+		moreCursor = undefined;
+		loadError = null;
+	});
+
+	let cursor = $derived(moreCursor === undefined ? nextCursor : moreCursor);
+
+	let allItems = $derived.by(() => {
+		const seen = new Set(items.map((item) => item.id));
+		return [...items, ...more.filter((item) => !seen.has(item.id))];
+	});
+
 	let visibleItems = $derived<GridItem[]>(
-		items
+		allItems
 			.filter((item) => !removedIds[item.id])
 			.map((item): GridItem => {
 				const updated = updatedPosts[item.id];
@@ -224,36 +118,47 @@
 	function handleUpdated(next: PostData) {
 		updatedPosts[next.id] = next;
 	}
-	function openItem(item: GridItem) {
-		onSelectItem?.(item);
-		// Real posts open their own page (comments, edit, delete); demo items use the lightbox.
-		if (item.post) {
-			goto(resolve('/post/[id]', { id: item.id }));
-			return;
+
+	async function loadMore() {
+		if (!userId || !cursor || loadingMore) return;
+		loadingMore = true;
+		loadError = null;
+		try {
+			const res = await fetch(
+				`/api/users/${encodeURIComponent(userId)}/posts?cursor=${encodeURIComponent(cursor)}`
+			);
+			const body = await res.json().catch(() => null);
+			if (!res.ok) {
+				loadError = readApiError(body, 'Could not load more posts').message;
+				return;
+			}
+			const page = body as { posts: GridItem[]; nextCursor: string | null };
+			more = [...more, ...page.posts];
+			moreCursor = page.nextCursor;
+		} catch {
+			loadError = 'Could not load more posts';
+		} finally {
+			loadingMore = false;
 		}
-		activeModalItem = item;
 	}
 
-	// A native modal <dialog> gives Escape, a focus trap and focus restore for free.
-	function showModal(node: HTMLDialogElement) {
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = 'hidden';
-		node.showModal();
-		return () => {
-			document.body.style.overflow = previousOverflow;
-		};
+	function openItem(item: GridItem) {
+		goto(resolve('/post/[id]', { id: item.id }));
 	}
 </script>
 
 <!-- Square/portrait preview for any post: photo, first video frame, or its text. -->
-{#snippet preview(item: GridItem, textSize: string)}
+{#snippet preview(item: GridItem, textSize: string, sizes: string)}
 	{@const kind = kindOf(item)}
 	{#if kind === 'image'}
 		<img
 			src={item.image}
-			alt={item.title}
+			alt={item.alt || item.title}
+			srcset={imageSrcset(item.image, GRID_IMAGE_WIDTHS)}
+			{sizes}
 			class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
 			loading="lazy"
+			decoding="async"
 		/>
 	{:else if kind === 'video'}
 		<video
@@ -270,7 +175,7 @@
 		>
 			<Icon name="play" type="sr" class="text-[10px]" />
 		</div>
-	{:else if item.post?.background}
+	{:else if item.post.background}
 		<div
 			class="w-full h-full flex items-center justify-center p-3 sm:p-5 text-center text-white font-semibold {TEXT_BACKGROUNDS[
 				item.post.background
@@ -284,7 +189,7 @@
 		<div
 			class="w-full h-full flex flex-col items-center justify-center gap-1 p-3 sm:p-5 bg-slate-200/70 dark:bg-dark-elevated text-center"
 		>
-			{#if item.post?.title}
+			{#if item.post.title}
 				<span
 					class="font-semibold text-slate-900 dark:text-white line-clamp-2 leading-snug {textSize}"
 				>
@@ -313,7 +218,7 @@
 					{#if isOwnProfile}
 						When you share photos or architectural studies, they will appear here on your profile.
 					{:else}
-						{user?.name || 'This user'} hasn't shared any posts yet.
+						{userName || 'This user'} hasn't shared any posts yet.
 					{/if}
 				</p>
 				{#if isOwnProfile}
@@ -336,7 +241,7 @@
 						onclick={() => openItem(item)}
 						aria-label={`View post ${item.title}`}
 					>
-						{@render preview(item, 'text-[11px] sm:text-sm')}
+						{@render preview(item, 'text-[11px] sm:text-sm', GRID_CELL_SIZES)}
 
 						<!-- Multi-photo Carousel Indicator Icon -->
 						{#if item.isCarousel}
@@ -344,7 +249,7 @@
 								class="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 rounded-md bg-black/50 backdrop-blur-xs text-white"
 								aria-hidden="true"
 							>
-								<Icon name="copy-alt" class="text-xs sm:text-sm drop-shadow-xs" />
+								<Icon name="copy" class="text-xs sm:text-sm drop-shadow-xs" />
 							</div>
 						{/if}
 
@@ -370,114 +275,12 @@
 		{:else if viewMode === 'feed'}
 			<div class="flex flex-col max-w-2xl mx-auto w-full pt-2 sm:pt-4">
 				{#each visibleItems as item (item.id)}
-					{#if item.post}
-						<PostCard
-							post={item.post}
-							showFollow={false}
-							onDelete={handleDeleted}
-							onUpdate={handleUpdated}
-						/>
-					{:else}
-						<article
-							class="mb-2 lg:mb-6 mx-3 sm:mx-0 bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xs dark:shadow-none transition-colors"
-						>
-							<!-- Header -->
-							<div class="flex items-center justify-between mb-3.5">
-								<div class="flex items-center gap-3">
-									<div
-										class="size-10 rounded-full overflow-hidden bg-slate-100 dark:bg-dark-elevated flex items-center justify-center shrink-0"
-									>
-										{#if user?.image}
-											<img
-												src={user.image}
-												alt={user.name || 'User'}
-												class="w-full h-full object-cover"
-											/>
-										{:else}
-											<span
-												class="font-bold text-xs text-slate-600 dark:text-dark-text select-none"
-											>
-												{(user?.name || 'U').slice(0, 1).toUpperCase()}
-											</span>
-										{/if}
-									</div>
-									<div class="flex flex-col">
-										<div class="flex items-center gap-1.5 leading-tight">
-											<span class="font-semibold text-sm text-slate-900 dark:text-white">
-												{user?.name || 'User'}
-											</span>
-											<span class="text-xs text-slate-400">@{user?.handle || 'user'}</span>
-										</div>
-										<span class="text-xs text-slate-400 mt-0.5">
-											{[item.location, item.date].filter(Boolean).join(' • ')}
-										</span>
-									</div>
-								</div>
-							</div>
-
-							<!-- Title -->
-							<h2 class="text-lg font-bold text-slate-950 dark:text-white mb-3">
-								{item.title}
-							</h2>
-
-							<!-- Image with camera badge -->
-							<button
-								type="button"
-								class="relative w-full aspect-[16/10] rounded-xl sm:rounded-2xl overflow-hidden bg-slate-100 dark:bg-dark-elevated mb-4 group cursor-pointer border-0 p-0 text-left block"
-								onclick={() => openItem(item)}
-								aria-label={`View post ${item.title}`}
-							>
-								<img
-									src={item.image}
-									alt={item.title}
-									class="w-full h-full object-cover group-hover:scale-[1.01] transition-transform duration-300"
-									loading="lazy"
-								/>
-								{#if item.cameraMeta}
-									<div
-										class="absolute bottom-3 right-3 bg-black/75 backdrop-blur-xs text-white text-[11px] font-mono px-3 py-1 rounded-md tracking-wider"
-									>
-										{item.cameraMeta}
-									</div>
-								{/if}
-							</button>
-
-							<!-- Description -->
-							{#if item.description}
-								<FormattedText
-									text={item.description}
-									class="text-sm leading-relaxed text-slate-700 dark:text-dark-muted mb-3.5 break-words"
-								/>
-							{/if}
-
-							<!-- Tags -->
-							{#if item.tags}
-								<div class="flex items-center gap-2 flex-wrap mb-4">
-									{#each item.tags as tag (tag)}
-										<span
-											class="text-xs font-medium px-3 py-1 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted"
-										>
-											{tag}
-										</span>
-									{/each}
-								</div>
-							{/if}
-
-							<!-- Counters (demo items have no post to like, save or share) -->
-							<div
-								class="flex items-center gap-5 pt-3 border-t border-slate-100 dark:border-dark-border text-xs text-slate-600 dark:text-dark-muted"
-							>
-								<span class="flex items-center gap-1.5">
-									<Icon name="heart" class="text-base" />
-									{formatCount(item.likes)}
-								</span>
-								<span class="flex items-center gap-1.5">
-									<Icon name="comment-alt" class="text-base" />
-									{formatCount(item.comments)}
-								</span>
-							</div>
-						</article>
-					{/if}
+					<PostCard
+						post={item.post}
+						showFollow={false}
+						onDelete={handleDeleted}
+						onUpdate={handleUpdated}
+					/>
 				{/each}
 			</div>
 
@@ -498,7 +301,7 @@
 							<div
 								class="group relative size-12 sm:size-14 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-dark-elevated"
 							>
-								{@render preview(item, 'text-[8px]')}
+								{@render preview(item, 'text-[8px]', '56px')}
 							</div>
 							<div class="flex flex-col min-w-0">
 								<span class="font-semibold text-sm text-slate-900 dark:text-white truncate">
@@ -545,6 +348,10 @@
 			</div>
 		{/if}
 
+		{#if userId && cursor}
+			<LoadMore onLoad={loadMore} loading={loadingMore} error={loadError} />
+		{/if}
+
 		<!-- 2. SAVED TAB -->
 	{:else if activeTab === 'saved'}
 		{#if savedPosts.length === 0}
@@ -568,7 +375,7 @@
 						onclick={() => openItem(item)}
 						aria-label={`View saved post ${item.title}`}
 					>
-						{@render preview(item, 'text-[11px] sm:text-sm')}
+						{@render preview(item, 'text-[11px] sm:text-sm', GRID_CELL_SIZES)}
 						<div class="absolute top-2 right-2 text-white drop-shadow-md">
 							<Icon name="bookmark" class="text-sm text-blue-500" />
 						</div>
@@ -582,85 +389,5 @@
 				See all saved posts
 			</a>
 		{/if}
-	{/if}
-
-	<!-- LIGHTBOX MODAL -->
-	{#if activeModalItem}
-		<dialog
-			{@attach showModal}
-			class="fixed inset-0 z-50 m-0 size-full max-w-none max-h-none border-0 bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150"
-			aria-label={activeModalItem.title}
-			onclose={() => (activeModalItem = null)}
-			onclick={(e) => {
-				if (e.target === e.currentTarget) e.currentTarget.close();
-			}}
-		>
-			<div
-				class="relative max-w-4xl w-full bg-white dark:bg-dark-card rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row max-h-[90vh]"
-			>
-				<!-- Modal Image -->
-				<div class="flex-1 bg-black flex items-center justify-center min-h-[300px]">
-					<img
-						src={activeModalItem.image}
-						alt={activeModalItem.title}
-						class="w-full h-full max-h-[85vh] object-contain"
-					/>
-				</div>
-
-				<!-- Modal Info Sidebar -->
-				<div
-					class="w-full md:w-80 p-5 flex flex-col justify-between border-t md:border-t-0 md:border-l border-slate-100 dark:border-dark-border"
-				>
-					<div>
-						<div
-							class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-dark-border"
-						>
-							<span class="font-bold text-sm text-slate-900 dark:text-white">
-								{user?.name || 'User'}
-							</span>
-							<button
-								type="button"
-								class="size-8 rounded-full flex items-center justify-center text-slate-500 hover:text-black dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-hover transition-colors cursor-pointer border-0 bg-transparent"
-								onclick={(e) => e.currentTarget.closest('dialog')?.close()}
-								aria-label="Close dialog"
-							>
-								✕
-							</button>
-						</div>
-
-						<h3 class="text-base font-bold text-slate-950 dark:text-white mt-4 mb-2">
-							{activeModalItem.title}
-						</h3>
-						{#if activeModalItem.description}
-							<FormattedText
-								text={activeModalItem.description}
-								class="text-xs text-slate-600 dark:text-dark-muted leading-relaxed break-words"
-							/>
-						{/if}
-
-						{#if activeModalItem.cameraMeta}
-							<div
-								class="mt-3 py-2 px-3 rounded-lg bg-slate-50 dark:bg-dark-elevated text-[11px] font-mono text-slate-600 dark:text-dark-muted"
-							>
-								{activeModalItem.cameraMeta}
-							</div>
-						{/if}
-					</div>
-
-					<div
-						class="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-dark-border text-xs text-slate-600 dark:text-dark-muted font-medium"
-					>
-						<div class="flex items-center gap-1.5">
-							<Icon name="heart" class="text-rose-500 text-sm" />
-							<span>{activeModalItem.likes} likes</span>
-						</div>
-						<div class="flex items-center gap-1.5">
-							<Icon name="comment-alt" class="text-sm" />
-							<span>{activeModalItem.comments} comments</span>
-						</div>
-					</div>
-				</div>
-			</div>
-		</dialog>
 	{/if}
 </div>

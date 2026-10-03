@@ -19,3 +19,18 @@ describe('AuthCard signup consent', () => {
 		await expect.element(screen.getByRole('checkbox')).toBeInTheDocument();
 	});
 });
+
+describe('AuthCard forgot password link', () => {
+	it('links to password reset from the log in tab only', async () => {
+		const screen = render(AuthCard, { mode: 'login' });
+		await expect
+			.element(screen.getByRole('link', { name: 'Forgot password?' }))
+			.toHaveAttribute('href', '/forgot-password');
+
+		screen.unmount();
+		const signup = render(AuthCard, { mode: 'signup' });
+		await expect
+			.element(signup.getByRole('link', { name: 'Forgot password?' }))
+			.not.toBeInTheDocument();
+	});
+});

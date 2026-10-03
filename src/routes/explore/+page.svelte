@@ -4,8 +4,8 @@
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import TileGrid from '$lib/components/explore/TileGrid.svelte';
-	import LoadMore from '$lib/components/explore/LoadMore.svelte';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
+	import { FOLLOW_LABELS, followActionLabel, followStore } from '$lib/utils/follow.svelte';
 	import { formatCount } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
@@ -55,7 +55,7 @@
 			await goto(`${resolve('/login')}?redirectTo=${encodeURIComponent('/explore')}`);
 			return;
 		}
-		const next = !followStore.isFollowing(creator.id);
+		const next = followStore.status(creator.id) === 'none';
 		try {
 			await followStore.set(creator.id, next);
 		} catch (err) {
@@ -109,7 +109,7 @@
 			</h2>
 			<ul class="flex gap-3 overflow-x-auto no-scrollbar list-none m-0 p-0">
 				{#each data.suggestions as creator (creator.id)}
-					{@const following = followStore.isFollowing(creator.id)}
+					{@const status = followStore.status(creator.id)}
 					<li
 						class="shrink-0 first:ml-4 last:mr-4 w-36 rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card p-3 flex flex-col items-center gap-2 text-center"
 					>
@@ -129,15 +129,16 @@
 						</a>
 						<button
 							type="button"
-							class="w-full h-8 rounded-full text-xs font-semibold border-0 cursor-pointer disabled:opacity-50 {following
+							class="w-full h-8 rounded-full text-xs font-semibold border-0 cursor-pointer disabled:opacity-50 {status !==
+							'none'
 								? 'bg-slate-100 text-slate-800 dark:bg-dark-elevated dark:text-dark-text'
 								: 'bg-slate-950 text-white dark:bg-white dark:text-slate-950'}"
 							disabled={followStore.isPending(creator.id)}
-							aria-pressed={following}
-							aria-label="{following ? 'Unfollow' : 'Follow'} {creator.name}"
+							aria-pressed={status !== 'none'}
+							aria-label={followActionLabel(status, creator.name)}
 							onclick={() => toggleFollow(creator)}
 						>
-							{following ? 'Following' : 'Follow'}
+							{FOLLOW_LABELS[status]}
 						</button>
 					</li>
 				{/each}
