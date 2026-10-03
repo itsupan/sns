@@ -4,10 +4,12 @@
 	import Avatar from './Avatar.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
 	import SearchBox from './SearchBox.svelte';
+	import Modal from './Modal.svelte';
 	import { untrack } from 'svelte';
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
 	import { badges } from '$lib/utils/badges.svelte';
+	import { displayHandle } from '$lib/utils/format';
 
 	interface Props {
 		class?: string;
@@ -22,7 +24,9 @@
 
 	let currentUser = $derived({
 		name: $session.data?.user?.name || '',
-		handle: $session.data?.user?.email ? `@${$session.data.user.email.split('@')[0]}` : '',
+		handle: $session.data?.user
+			? displayHandle($session.data.user.handle, $session.data.user.name)
+			: '',
 		image: $session.data?.user?.image || null
 	});
 
@@ -71,6 +75,12 @@
 		window.addEventListener('scroll', onScroll, { passive: true });
 		return () => window.removeEventListener('scroll', onScroll);
 	});
+
+	// A search input takes Escape for itself (it clears the text), so the dialog never sees a close
+	// request; close here unless the suggestions already used the key.
+	function closeSearchOnEscape(event: KeyboardEvent) {
+		if (event.key === 'Escape' && !event.defaultPrevented) mobileSearchOpen = false;
+	}
 
 	const iconButton =
 		'size-11 sm:size-9 rounded-full flex items-center justify-center text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-hover active:scale-95 active:bg-slate-100 dark:active:bg-dark-hover transition duration-150 cursor-pointer border-0 bg-transparent';
@@ -182,31 +192,25 @@
 	</div>
 </header>
 
-{#if mobileSearchOpen}
+<Modal
+	bind:open={mobileSearchOpen}
+	label="Search"
+	variant="fullscreen"
+	closeOnBackdrop={false}
+	class="flex-col bg-white dark:bg-dark-card pt-safe"
+	onkeydown={closeSearchOnEscape}
+>
 	<div
-		class="sm:hidden fixed inset-0 z-[60] bg-white dark:bg-dark-card pt-safe flex flex-col"
-		role="dialog"
-		aria-modal="true"
-		aria-label="Search"
+		class="flex items-center gap-2 px-2 h-14 border-b border-slate-200/80 dark:border-dark-border"
 	>
-		<div
-			class="flex items-center gap-2 px-2 h-14 border-b border-slate-200/80 dark:border-dark-border"
+		<button
+			type="button"
+			class={iconButton}
+			aria-label="Close search"
+			onclick={() => (mobileSearchOpen = false)}
 		>
-			<button
-				type="button"
-				class={iconButton}
-				aria-label="Close search"
-				onclick={() => (mobileSearchOpen = false)}
-			>
-				<Icon name="angle-left" class="text-xl" />
-			</button>
-			<SearchBox autofocus onNavigate={() => (mobileSearchOpen = false)} class="flex-1" />
-		</div>
+			<Icon name="angle-left" class="text-xl" />
+		</button>
+		<SearchBox autofocus onNavigate={() => (mobileSearchOpen = false)} class="flex-1" />
 	</div>
-{/if}
-
-<svelte:window
-	onkeydown={(e) => {
-		if (e.key === 'Escape' && mobileSearchOpen) mobileSearchOpen = false;
-	}}
-/>
+</Modal>

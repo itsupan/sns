@@ -11,7 +11,7 @@
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
-	import { formatCount } from '$lib/utils/format';
+	import { displayHandle, formatCount } from '$lib/utils/format';
 	import { followStore } from '$lib/utils/follow.svelte';
 
 	import { profileStore, resolveProfile, type ProfileData } from '$lib/utils/profile.svelte';
@@ -340,7 +340,7 @@
 
 				<!-- Desktop Handle & Subtitle -->
 				<div class="hidden sm:flex items-center gap-2 text-sm text-slate-500 dark:text-dark-muted">
-					<span>@{profile.handle}</span>
+					<span>{displayHandle(profile.handle, profile.name)}</span>
 					{#if profile.title}
 						<span>•</span>
 						<span class="font-medium text-slate-700 dark:text-dark-text">{profile.title}</span>
@@ -440,6 +440,8 @@
 									role="menuitem"
 									onclick={() => {
 										desktopDropdownOpen = false;
+										// The menu unmounts; the share dialog hands focus back to its button.
+										settingsButtonRef?.focus();
 										handleShare();
 									}}
 								>

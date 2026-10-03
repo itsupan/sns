@@ -27,6 +27,7 @@ import {
 } from '$lib/server/db/posts';
 import { toPostCards } from '$lib/server/db/post-cards';
 import { syncMentionsStatements } from '$lib/server/db/mentions';
+import { displayHandle } from '$lib/utils/format';
 
 // Kept loose on purpose: the handler below tolerates legacy/partial media and tag payloads.
 const CreatePostBody = v.record(v.string(), v.unknown(), 'Request body must be an object');
@@ -201,9 +202,7 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		author: {
 			id: currentUser.id,
 			name: currentUser.name,
-			handle: currentUser.handle
-				? `@${currentUser.handle.replace(/^@/, '')}`
-				: `@${currentUser.name.toLowerCase().replace(/\s+/g, '')}`,
+			handle: displayHandle(currentUser.handle, currentUser.name),
 			avatar: currentUser.image || '',
 			location: location || currentUser.location || undefined,
 			timeAgo: 'Just now'

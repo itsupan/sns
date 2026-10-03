@@ -906,37 +906,42 @@
 	</article>
 {/if}
 
-<BottomSheet bind:open={optionsOpen} title="Post options">
-	{#if isOwner}
-		<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+<!-- Mounted only while open: a feed of idle cards carries no dialogs. -->
+{#if optionsOpen}
+	<BottomSheet bind:open={optionsOpen} title="Post options">
+		{#if isOwner}
+			<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+			<SheetAction
+				icon="trash"
+				label="Delete post"
+				danger
+				onclick={() => {
+					optionsOpen = false;
+					confirmDeleteOpen = true;
+				}}
+			/>
+		{/if}
 		<SheetAction
-			icon="trash"
-			label="Delete post"
-			danger
+			icon="bookmark"
+			label={isSaved ? 'Remove from saved' : 'Save'}
 			onclick={() => {
 				optionsOpen = false;
-				confirmDeleteOpen = true;
+				toggleSave();
 			}}
 		/>
-	{/if}
-	<SheetAction
-		icon="bookmark"
-		label={isSaved ? 'Remove from saved' : 'Save'}
-		onclick={() => {
-			optionsOpen = false;
-			toggleSave();
-		}}
-	/>
-	<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
-	<SheetAction icon="link" label="Copy link" onclick={copyLink} />
-	{#if !isOwner}
-		<SheetAction icon="flag" label="Report" danger onclick={openReport} />
-	{/if}
-</BottomSheet>
+		<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
+		<SheetAction icon="link" label="Copy link" onclick={copyLink} />
+		{#if !isOwner}
+			<SheetAction icon="flag" label="Report" danger onclick={openReport} />
+		{/if}
+	</BottomSheet>
+{/if}
 
-{#if isOwner}
+{#if editOpen}
 	<EditPostModal bind:open={editOpen} {post} onSaved={handleEdited} />
+{/if}
 
+{#if confirmDeleteOpen}
 	<BottomSheet bind:open={confirmDeleteOpen} title="Delete post?" showTitle>
 		<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
 			This removes the post from your profile and everyone's feed. You can't undo this.
@@ -963,14 +968,19 @@
 	</BottomSheet>
 {/if}
 
-{#if !isOwner}
+{#if reportOpen}
 	<ReportSheet bind:open={reportOpen} targetType="post" targetId={post.id} />
 {/if}
 
-<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
-<PostCommentsModal
-	bind:open={commentsOpen}
-	{post}
-	onCommentAdded={handleCommentAdded}
-	onCommentDeleted={handleCommentDeleted}
-/>
+{#if shareOpen}
+	<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
+{/if}
+
+{#if commentsOpen}
+	<PostCommentsModal
+		bind:open={commentsOpen}
+		{post}
+		onCommentAdded={handleCommentAdded}
+		onCommentDeleted={handleCommentDeleted}
+	/>
+{/if}

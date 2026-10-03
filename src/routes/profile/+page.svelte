@@ -6,6 +6,7 @@
 	import type { TabId, ViewMode } from '$lib/components/profile/ProfileTabs.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { profileStore, resolveProfile } from '$lib/utils/profile.svelte';
+	import { displayHandle } from '$lib/utils/format';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -39,7 +40,7 @@
 
 	const pageTitle = $derived(
 		currentProfile.name
-			? `${currentProfile.name} (@${currentProfile.handle}) — Kizuna`
+			? `${currentProfile.name} (${displayHandle(currentProfile.handle, currentProfile.name)}) — Kizuna`
 			: 'Profile — Kizuna'
 	);
 	const metaDescription = $derived(
@@ -85,11 +86,7 @@
 			savedPosts={data?.saved ?? []}
 			{viewMode}
 			items={userPosts}
-			user={{
-				name: currentProfile.name,
-				handle: currentProfile.handle,
-				image: currentProfile.avatar
-			}}
+			userName={currentProfile.name}
 		/>
 	</div>
 </main>

@@ -1,7 +1,8 @@
 export interface ProfileData {
 	id?: string;
 	name: string;
-	handle: string;
+	/** Without the `@`; null until the user picks one. */
+	handle: string | null;
 	title: string;
 	bio: string;
 	website: string;
@@ -107,17 +108,10 @@ export function resolveProfile(
 		};
 	}
 
-	const rawHandle =
-		(user.handle as string) ||
-		((user.email as string)?.split('@')[0] ??
-			(user.name as string)?.toLowerCase().replace(/\s+/g, '.') ??
-			'user');
-	const cleanHandle = rawHandle.startsWith('@') ? rawHandle.slice(1) : rawHandle;
-
 	return {
 		id: (user.id as string) || custom?.id,
 		name: (user.name as string) || custom?.name || 'User',
-		handle: cleanHandle || custom?.handle || 'user',
+		handle: (user.handle as string | null)?.replace(/^@/, '') || custom?.handle || null,
 		avatar: (user.image as string) ?? custom?.avatar ?? '',
 		title: (user.title as string) ?? custom?.title ?? '',
 		bio: (user.bio as string) ?? custom?.bio ?? '',
