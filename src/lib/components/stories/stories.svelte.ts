@@ -1,5 +1,6 @@
 import { readApiError } from '$lib/utils/api-error';
 import type { StoryReaction } from '$lib/reactions';
+import type { StoryAudience } from '$lib/stories';
 
 /** One story as returned by `/api/stories` (media URL already signed for viewing). */
 export interface Story {
@@ -9,6 +10,7 @@ export interface Story {
 	mediaType: 'image' | 'video';
 	caption: string | null;
 	location: string | null;
+	audience: StoryAudience;
 	createdAt: number;
 	expiresAt: number;
 	/** Whether the viewer has watched it (server-side, so it matches across devices). */

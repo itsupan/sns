@@ -1,7 +1,7 @@
 import { and, desc, eq, or, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Database } from '.';
-import { followRequest, user, userBlock, userFollow } from './schema';
+import { closeFriend, followRequest, user, userBlock, userFollow } from './schema';
 import { followersCountOf, followingCountOf } from './counters';
 import { unnotifyStatement } from './notifications';
 import { ApiError } from '$lib/server/api/errors';
@@ -55,9 +55,10 @@ export async function requireNotBlocked(db: Database, a: string, b: string, mess
 }
 
 /**
- * Blocks or unblocks in one D1 batch (one transaction). Blocking also removes the follows and
- * pending follow requests in both directions (and their notifications) and recomputes both users' follower and following counters
- * from the rows, like unfollow. Idempotent: repeating a block or unblock changes nothing.
+ * Blocks or unblocks in one D1 batch (one transaction). Blocking also removes the follows, pending
+ * follow requests (and their notifications) and close friends listings in both directions, and
+ * recomputes both users' follower and following counters from the rows, like unfollow.
+ * Idempotent: repeating a block or unblock changes nothing.
  */
 export async function setBlocked(
 	db: Database,
@@ -73,6 +74,8 @@ export async function setBlocked(
 		and(eq(userFollow.followerId, a), eq(userFollow.followingId, b));
 	const requests = (a: string, b: string) =>
 		and(eq(followRequest.requesterId, a), eq(followRequest.targetId, b));
+	const listings = (a: string, b: string) =>
+		and(eq(closeFriend.userId, a), eq(closeFriend.friendId, b));
 	const recount = (id: string) =>
 		db
 			.update(user)
@@ -88,6 +91,9 @@ export async function setBlocked(
 			.where(or(requests(blockerId, blockedId), requests(blockedId, blockerId))),
 		unnotifyStatement(db, { type: 'follow_request', actorId: blockerId, recipientId: blockedId }),
 		unnotifyStatement(db, { type: 'follow_request', actorId: blockedId, recipientId: blockerId }),
+		db
+			.delete(closeFriend)
+			.where(or(listings(blockerId, blockedId), listings(blockedId, blockerId))),
 		recount(blockerId),
 		recount(blockedId)
 	]);
