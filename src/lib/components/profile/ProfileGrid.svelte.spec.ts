@@ -1,16 +1,26 @@
 import { render } from 'vitest-browser-svelte';
-import { userEvent } from 'vitest/browser';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import ProfileGrid, { type GridItem } from './ProfileGrid.svelte';
+import { stubIntersectionObserver } from '../../../test/intersection-observer';
 
-const saved = (id: string, extra: Partial<GridItem>): GridItem => ({
-	id,
-	title: `Saved ${id}`,
-	image: '',
-	likes: 0,
-	comments: 0,
-	...extra
-});
+const goto = vi.hoisted(() => vi.fn());
+vi.mock('$app/navigation', () => ({ goto }));
+
+const gridItem = (id: string, extra: Partial<GridItem> = {}): GridItem => {
+	const post: PostData = {
+		id,
+		author: { id: 'u-aoi', name: 'Aoi Tanaka', handle: '@aoi', avatar: '' },
+		title: '',
+		description: `Post ${id}`,
+		image: '',
+		tags: [],
+		likes: 0,
+		commentsCount: 0,
+		sharesCount: 0
+	};
+	return { id, title: `Saved ${id}`, image: '', likes: 0, comments: 0, post, ...extra };
+};
 
 describe('ProfileGrid Saved tab', () => {
 	it('renders text-only and video saves without broken images, and links to all saves', async () => {
@@ -18,9 +28,9 @@ describe('ProfileGrid Saved tab', () => {
 			props: {
 				activeTab: 'saved',
 				savedPosts: [
-					saved('text', { description: 'Just words', mediaType: 'none' }),
-					saved('clip', { image: 'https://cdn.test/clip.mp4', mediaType: 'video' }),
-					saved('photo', { image: 'https://cdn.test/photo.jpg', mediaType: 'image' })
+					gridItem('text', { description: 'Just words', mediaType: 'none' }),
+					gridItem('clip', { image: 'https://cdn.test/clip.mp4', mediaType: 'video' }),
+					gridItem('photo', { image: 'https://cdn.test/photo.jpg', mediaType: 'image' })
 				]
 			}
 		});
@@ -37,31 +47,84 @@ describe('ProfileGrid Saved tab', () => {
 		const screen = render(ProfileGrid, { props: { activeTab: 'saved', savedPosts: [] } });
 		await expect.element(screen.getByText('No saved posts')).toBeVisible();
 	});
+});
 
-	it('shows demo items read-only in list view, with no buttons that do nothing', async () => {
-		const screen = render(ProfileGrid, { props: { viewMode: 'feed' } });
-
-		await expect.element(screen.getByText('Brutalist Spiral Staircase Atrium')).toBeInTheDocument();
-		expect(document.querySelector('[aria-label="Post options"]')).toBeNull();
-		expect(document.querySelector('[aria-label="Save work"]')).toBeNull();
+describe('ProfileGrid posts', () => {
+	it("names the owner in someone else's empty profile", async () => {
+		const screen = render(ProfileGrid, { props: { isOwnProfile: false, userName: 'Aoi Tanaka' } });
+		await expect.element(screen.getByText("Aoi Tanaka hasn't shared any posts yet.")).toBeVisible();
 	});
 
-	it('opens a demo item in a modal dialog that closes on Escape and returns focus', async () => {
+	it('opens a post on its own page', async () => {
+		const screen = render(ProfileGrid, { props: { items: [gridItem('p-1')] } });
+		await screen.getByRole('button', { name: 'View post Saved p-1' }).click();
+		expect(goto).toHaveBeenCalledWith('/post/p-1');
+	});
+
+	it('shows each post as a full card in list view', async () => {
 		const screen = render(ProfileGrid, {
-			props: { items: [{ id: 'g9', title: 'Bare study', image: '', likes: 1, comments: 0 }] }
+			props: { viewMode: 'feed', items: [gridItem('p-1'), gridItem('p-2')] }
 		});
-		const tile = screen.getByRole('button', { name: 'View post Bare study' });
-		await tile.click();
+		await expect.element(screen.getByText('Post p-2')).toBeVisible();
+		expect(screen.getByRole('article').elements()).toHaveLength(2);
+	});
+});
 
-		const dialog = screen.getByRole('dialog', { name: 'Bare study' });
-		await expect.element(dialog).toBeVisible();
-		expect(dialog.element().matches(':modal')).toBe(true);
-		expect(document.body.style.overflow).toBe('hidden');
-		expect(document.body.textContent).not.toContain('Hasselblad');
+describe('ProfileGrid paging', () => {
+	const tile = (id: string) => gridItem(id, { title: id });
+	let urls: string[];
 
-		await userEvent.keyboard('{Escape}');
-		await expect.element(dialog).not.toBeInTheDocument();
-		expect(document.body.style.overflow).toBe('');
-		expect(document.activeElement).toBe(tile.element());
+	function stubPosts(respond: () => Response) {
+		urls = [];
+		stubIntersectionObserver();
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				urls.push(url);
+				return respond();
+			})
+		);
+	}
+
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('loads the next page of the profile when scrolled to the end, skipping repeats', async () => {
+		stubPosts(() => Response.json({ posts: [tile('first'), tile('second')], nextCursor: null }));
+		const screen = render(ProfileGrid, {
+			props: { items: [tile('first')], userId: 'u 1', nextCursor: '1700_first' }
+		});
+
+		await expect.element(screen.getByRole('button', { name: 'View post second' })).toBeVisible();
+		expect(urls).toEqual(['/api/users/u%201/posts?cursor=1700_first']);
+		expect(screen.getByRole('button', { name: /^View post/ }).elements()).toHaveLength(2);
+	});
+
+	it('shows a failed page with a retry', async () => {
+		let fail = true;
+		stubPosts(() =>
+			fail
+				? Response.json({ error: { code: 'internal', message: 'Server hiccup' } }, { status: 500 })
+				: Response.json({ posts: [tile('second')], nextCursor: null })
+		);
+		const screen = render(ProfileGrid, {
+			props: { items: [tile('first')], userId: 'u1', nextCursor: '1700_first' }
+		});
+		await expect.element(screen.getByRole('alert')).toHaveTextContent('Server hiccup');
+
+		fail = false;
+		await screen.getByRole('button', { name: 'Try again' }).click();
+		await expect.element(screen.getByRole('button', { name: 'View post second' })).toBeVisible();
+	});
+
+	it('drops the pages it loaded when it switches to another profile', async () => {
+		stubPosts(() => Response.json({ posts: [tile('second')], nextCursor: null }));
+		const screen = render(ProfileGrid, {
+			props: { items: [tile('first')], userId: 'u1', nextCursor: '1700_first' }
+		});
+		await expect.element(screen.getByRole('button', { name: 'View post second' })).toBeVisible();
+
+		await screen.rerender({ items: [tile('other')], userId: 'u2', nextCursor: null });
+		await expect.element(screen.getByRole('button', { name: 'View post other' })).toBeVisible();
+		expect(screen.getByRole('button', { name: /^View post/ }).elements()).toHaveLength(1);
 	});
 });

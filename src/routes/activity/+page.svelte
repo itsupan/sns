@@ -2,20 +2,23 @@
 	import { resolve } from '$app/paths';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
+	import FollowRequests from '$lib/components/activity/FollowRequests.svelte';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
-	import { toast } from '$lib/utils/toast.svelte';
 	import { badges } from '$lib/utils/badges.svelte';
 	import { activityVerb, actorNames, groupActivity } from '$lib/activity/group';
-	import type { ActivityItem, ActivityPage } from '$lib/activity/types';
+	import type { ActivityItem, ActivityPage, ActivityType } from '$lib/activity/types';
+	import type { IconName } from '$lib/components/shared/icons';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	/** Pages loaded with "Load more", appended after the server-rendered first page. */
+	/** Pages loaded while scrolling, appended after the server-rendered first page. */
 	let more = $state<ActivityItem[]>([]);
 	let moreCursor = $state<string | null | undefined>(undefined);
 	let loadingMore = $state(false);
+	let loadError = $state<string | null>(null);
 
 	let items = $derived.by(() => {
 		const seen = new Set(data.items.map((i) => i.id));
@@ -42,29 +45,37 @@
 	async function loadMore() {
 		if (!nextCursor || loadingMore) return;
 		loadingMore = true;
+		loadError = null;
 		try {
 			const res = await fetch(`/api/notifications?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(body, 'Could not load activity').message);
+			if (!res.ok) {
+				loadError = readApiError(body, 'Could not load activity').message;
+				return;
+			}
 			const page = body as ActivityPage;
 			more = [...more, ...page.items];
 			moreCursor = page.nextCursor;
-		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not load activity');
+		} catch {
+			loadError = 'Could not load activity';
 		} finally {
 			loadingMore = false;
 		}
 	}
 
-	const typeIcon = {
+	const typeIcon: Record<ActivityType, IconName> = {
 		like: 'heart',
 		comment: 'comment',
 		reply: 'comment',
 		reaction: 'smile',
 		follow: 'user-add',
 		mention: 'at',
-		story_reaction: 'smile'
-	} as const;
+		story_reaction: 'smile',
+		follow_request: 'user-add',
+		follow_accepted: 'check',
+		repost: 'arrows-repeat',
+		quote: 'comment-alt'
+	};
 </script>
 
 <svelte:head>
@@ -73,6 +84,8 @@
 
 <main class="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
 	<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">Activity</h1>
+
+	<FollowRequests initial={data.requests} />
 
 	{#if groups.length === 0}
 		<div
@@ -156,14 +169,7 @@
 		</ul>
 
 		{#if nextCursor}
-			<button
-				type="button"
-				onclick={loadMore}
-				disabled={loadingMore}
-				class="self-center h-9 px-5 rounded-full border border-slate-200 dark:border-dark-border bg-transparent text-xs font-semibold text-slate-600 dark:text-dark-muted cursor-pointer disabled:opacity-50"
-			>
-				{loadingMore ? 'Loading…' : 'Load more'}
-			</button>
+			<LoadMore onLoad={loadMore} loading={loadingMore} error={loadError} />
 		{/if}
 	{/if}
 </main>

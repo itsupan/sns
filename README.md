@@ -141,35 +141,68 @@ export const POST = withApi(async ({ request, locals }) => {
 
 Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window counted by the `RateLimiter` Durable Object (`src/lib/server/rate-limiter.ts`, one object per limit and user or IP, exported from `worker.ts`). Limits come from `RATE_LIMIT_*` vars (see [Configuration](#configuration)):
 
-| Name            | Var                         | Endpoint                                                | Default   |
-| --------------- | --------------------------- | ------------------------------------------------------- | --------- |
-| `createPost`    | `RATE_LIMIT_CREATE_POST`    | `POST /api/posts`                                       | 10 / min  |
-| `comment`       | `RATE_LIMIT_COMMENT`        | `POST /api/posts/:id/comments`                          | 20 / min  |
-| `reaction`      | `RATE_LIMIT_REACTION`       | `POST /api/comments/:id/reactions`                      | 60 / min  |
-| `storyReaction` | `RATE_LIMIT_STORY_REACTION` | `POST /api/stories/:id/react`                           | 60 / min  |
-| `search`        | `RATE_LIMIT_SEARCH`         | `GET /api/search` (per user, or per IP when signed out) | 60 / min  |
-| `chatStart`     | `RATE_LIMIT_CHAT_START`     | `POST /api/conversations`                               | 10 / min  |
-| `chatMessage`   | `RATE_LIMIT_CHAT_MESSAGE`   | `POST /api/conversations/:id/messages`                  | 30 / min  |
-| `chatConnect`   | `RATE_LIMIT_CHAT_CONNECT`   | `GET /api/chat/ws` (WebSocket upgrade)                  | 30 / min  |
-| `like`          | `RATE_LIMIT_LIKE`           | `POST /api/posts/:id/like`                              | 60 / min  |
-| `follow`        | `RATE_LIMIT_FOLLOW`         | follow / unfollow (#46)                                 | 30 / min  |
-| `share`         | `RATE_LIMIT_SHARE`          | `POST /api/posts/:id/share`                             | 30 / min  |
-| `uploadPresign` | `RATE_LIMIT_UPLOAD_PRESIGN` | `POST /api/upload/presigned`                            | 20 / min  |
-| `upload`        | `RATE_LIMIT_UPLOAD`         | `PUT /api/upload/mock-r2/:key` (media upload)           | 20 / min  |
-| `mediaRefresh`  | `RATE_LIMIT_MEDIA_REFRESH`  | `POST /api/media/refresh` (per user, or per IP)         | 60 / min  |
-| `accountExport` | `RATE_LIMIT_ACCOUNT_EXPORT` | `GET /api/account/export` (per user)                    | 5 / hour  |
-| `report`        | `RATE_LIMIT_REPORT`         | `POST /api/reports`                                     | 10 / hour |
-| `accountDelete` | `RATE_LIMIT_ACCOUNT_DELETE` | `DELETE /api/account`                                   | 5 / hour  |
-| `signIn`        | `RATE_LIMIT_SIGN_IN`        | `POST /api/auth/sign-in/email` (per IP)                 | 10 / min  |
-| `signUp`        | `RATE_LIMIT_SIGN_UP`        | `POST /api/auth/sign-up/email` (per IP)                 | 5 / hour  |
-| `profileUpdate` | `RATE_LIMIT_PROFILE_UPDATE` | `PATCH /api/users/:id`                                  | 10 / min  |
-| `contentEdit`   | `RATE_LIMIT_CONTENT_EDIT`   | edit / delete a post, delete a comment or story         | 30 / min  |
-| `markRead`      | `RATE_LIMIT_MARK_READ`      | mark notifications or a conversation read               | 120 / min |
-| `storyView`     | `RATE_LIMIT_STORY_VIEW`     | `POST /api/stories/:id/view`                            | 120 / min |
+| Name             | Var                          | Endpoint                                                             | Default   |
+| ---------------- | ---------------------------- | -------------------------------------------------------------------- | --------- |
+| `createPost`     | `RATE_LIMIT_CREATE_POST`     | `POST /api/posts`                                                    | 10 / min  |
+| `comment`        | `RATE_LIMIT_COMMENT`         | `POST /api/posts/:id/comments`                                       | 20 / min  |
+| `reaction`       | `RATE_LIMIT_REACTION`        | `POST /api/comments/:id/reactions`                                   | 60 / min  |
+| `storyReaction`  | `RATE_LIMIT_STORY_REACTION`  | `POST /api/stories/:id/react`                                        | 60 / min  |
+| `search`         | `RATE_LIMIT_SEARCH`          | `GET /api/search` (per user, or per IP when signed out)              | 60 / min  |
+| `chatStart`      | `RATE_LIMIT_CHAT_START`      | `POST /api/conversations`                                            | 10 / min  |
+| `chatMessage`    | `RATE_LIMIT_CHAT_MESSAGE`    | `POST /api/conversations/:id/messages`                               | 30 / min  |
+| `chatConnect`    | `RATE_LIMIT_CHAT_CONNECT`    | `GET /api/chat/ws` (WebSocket upgrade)                               | 30 / min  |
+| `like`           | `RATE_LIMIT_LIKE`            | `POST /api/posts/:id/like`                                           | 60 / min  |
+| `follow`         | `RATE_LIMIT_FOLLOW`          | follow / unfollow (#46)                                              | 30 / min  |
+| `mute`           | `RATE_LIMIT_MUTE`            | mute / unmute a user, add / remove a muted keyword                   | 30 / min  |
+| `share`          | `RATE_LIMIT_SHARE`           | `POST /api/posts/:id/share`                                          | 30 / min  |
+| `repost`         | `RATE_LIMIT_REPOST`          | repost / undo a repost, publish a quote post                         | 30 / min  |
+| `uploadPresign`  | `RATE_LIMIT_UPLOAD_PRESIGN`  | `POST /api/upload/presigned`                                         | 20 / min  |
+| `upload`         | `RATE_LIMIT_UPLOAD`          | `PUT /api/upload/mock-r2/:key` (media upload)                        | 20 / min  |
+| `mediaRefresh`   | `RATE_LIMIT_MEDIA_REFRESH`   | `POST /api/media/refresh` (per user, or per IP)                      | 60 / min  |
+| `accountExport`  | `RATE_LIMIT_ACCOUNT_EXPORT`  | `GET /api/account/export` (per user)                                 | 5 / hour  |
+| `report`         | `RATE_LIMIT_REPORT`          | `POST /api/reports`                                                  | 10 / hour |
+| `moderation`     | `RATE_LIMIT_MODERATION`      | every `/api/admin/*` route (per moderator)                           | 120 / min |
+| `accountDelete`  | `RATE_LIMIT_ACCOUNT_DELETE`  | `DELETE /api/account`                                                | 5 / hour  |
+| `signIn`         | `RATE_LIMIT_SIGN_IN`         | `POST /api/auth/sign-in/email` (per IP)                              | 10 / min  |
+| `signUp`         | `RATE_LIMIT_SIGN_UP`         | `POST /api/auth/sign-up/email` (per IP)                              | 5 / hour  |
+| `authEmail`      | `RATE_LIMIT_AUTH_EMAIL`      | request a password reset, resend verification, change email (per IP) | 5 / hour  |
+| `passwordChange` | `RATE_LIMIT_PASSWORD_CHANGE` | reset or change the password (per IP)                                | 10 / hour |
+| `twoFactor`      | `RATE_LIMIT_TWO_FACTOR`      | verify a two-factor or backup code (per IP)                          | 5 / 5 min |
+| `sessionRevoke`  | `RATE_LIMIT_SESSION_REVOKE`  | `DELETE /api/account/sessions/:id`                                   | 30 / min  |
+| `profileUpdate`  | `RATE_LIMIT_PROFILE_UPDATE`  | `PATCH /api/users/:id`, `PUT /api/account/notification-preferences`  | 10 / min  |
+| `contentEdit`    | `RATE_LIMIT_CONTENT_EDIT`    | edit, delete, pin or unpin a post, delete a comment or story         | 30 / min  |
+| `markRead`       | `RATE_LIMIT_MARK_READ`       | mark notifications or a conversation read                            | 120 / min |
+| `storyView`      | `RATE_LIMIT_STORY_VIEW`      | `POST /api/stories/:id/view`                                         | 120 / min |
 
-Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }` (the two auth limits answer in better-auth's `{ "code", "message" }` shape). A Durable Object handles one request at a time, so counts are exact, and each object deletes its storage when its window ends. If the limiter is unreachable, the costly writes in `FAIL_CLOSED_LIMITS` answer `503` and the rest are allowed. Without the binding (`vite dev`, unit tests) requests are allowed.
+Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }` (the `/api/auth/*` limits answer in better-auth's `{ "code", "message" }` shape). A Durable Object handles one request at a time, so counts are exact, and each object deletes its storage when its window ends. If the limiter is unreachable, the costly writes in `FAIL_CLOSED_LIMITS` answer `503` and the rest are allowed. Without the binding (`vite dev`, unit tests) requests are allowed.
 
 To add a limit, extend `RateLimitName`, `DEFAULT_CONFIG` and `RATE_LIMIT_VARS` in `src/lib/server/config.ts`, add a row to the table above, and add its var to **both** `vars` blocks in `wrangler.jsonc`: the top level (local dev and tests) and `env.production`. Wrangler does not inherit `vars` into an environment, so a var missing from `env.production` silently falls back to its default in production. Add the name to `FAIL_CLOSED_LIMITS` (`src/lib/server/api/rate-limit.ts`) if the endpoint is abuse-sensitive.
+
+## Moderation
+
+Users report posts, comments, accounts and messages (`POST /api/reports`). Moderators work the
+queue at `/admin/reports` (linked from Settings): open reports grouped by target, with their
+count, reasons and a preview. Each target is resolved once for all its reports:
+
+- **Dismiss** closes the reports and leaves the content.
+- **Remove** soft-deletes a post or message, or deletes a comment and its replies.
+- **Suspend user** bans the target's owner for 1, 7 or 30 days or until lifted, and signs them
+  out. better-auth's `admin` plugin refuses new sessions while the ban lasts and clears it once it
+  expires.
+
+Every action closes the target's open reports (`resolved_by`, `resolved_at`, `resolution`) and
+writes a `moderation_action` audit row in the same batch. Roles are `user` (or null),
+`moderator` and `admin`; only a higher role may act on a user, and nobody on themselves, so
+moderators cannot touch moderators or admins. Admins also manage moderators and lift
+suspensions at `/admin/moderators`. The `/admin` pages answer 404 to everyone else. The plugin's
+own `/api/auth/admin/*` endpoints grant no role any permission: all moderation goes through
+`/api/admin/*`.
+
+Bootstrap the first admin by hand, then grant moderators from `/admin/moderators`:
+
+```sh
+pnpm exec wrangler d1 execute DB --env production --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"
+```
 
 ## Real-time chat
 
@@ -204,27 +237,72 @@ new tag there (never edit `v1`) if a Durable Object class is renamed or removed.
 
 Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per environment; override locally in `.dev.vars`). `src/lib/server/config.ts` parses them once per Worker with `getConfig(platform.env)`. A missing value uses the default; an invalid value logs a warning and uses the default, so a typo never takes the site down.
 
-| Var                         | Format                        | Default                           |
-| --------------------------- | ----------------------------- | --------------------------------- |
-| `RATE_LIMIT_*`              | `<limit>/<windowSeconds>`     | see [Rate limits](#rate-limits)   |
-| `UPLOAD_MAX_BYTES`          | integer                       | `52428800` (50 MB)                |
-| `UPLOAD_ALLOWED_MIME_TYPES` | comma-separated MIME types    | common image + mp4/webm/mov types |
-| `FEED_PAGE_SIZE`            | integer (≤ max)               | `10`                              |
-| `FEED_MAX_PAGE_SIZE`        | integer                       | `50`                              |
-| `COMMENTS_PAGE_SIZE`        | integer (≤ max)               | `20`                              |
-| `COMMENTS_MAX_PAGE_SIZE`    | integer                       | `50`                              |
-| `SEARCH_PAGE_SIZE`          | integer (≤ max)               | `5` (per section)                 |
-| `SEARCH_MAX_PAGE_SIZE`      | integer                       | `20`                              |
-| `CHAT_PAGE_SIZE`            | integer (≤ max)               | `30` (messages per history page)  |
-| `CHAT_MAX_PAGE_SIZE`        | integer                       | `100`                             |
-| `INBOX_PAGE_SIZE`           | integer (≤ max)               | `20`                              |
-| `INBOX_MAX_PAGE_SIZE`       | integer                       | `50`                              |
-| `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                 |
-| `SIGNUP_BLOCKED_EMAILS`     | comma-separated emails        | empty (nobody blocked)            |
+| Var                           | Format                        | Default                                     |
+| ----------------------------- | ----------------------------- | ------------------------------------------- |
+| `RATE_LIMIT_*`                | `<limit>/<windowSeconds>`     | see [Rate limits](#rate-limits)             |
+| `UPLOAD_MAX_BYTES`            | integer                       | `52428800` (50 MB)                          |
+| `UPLOAD_ALLOWED_MIME_TYPES`   | comma-separated MIME types    | common image + mp4/webm/mov types           |
+| `FEED_PAGE_SIZE`              | integer (≤ max)               | `10`                                        |
+| `FEED_MAX_PAGE_SIZE`          | integer                       | `50`                                        |
+| `COMMENTS_PAGE_SIZE`          | integer (≤ max)               | `20`                                        |
+| `COMMENTS_MAX_PAGE_SIZE`      | integer                       | `50`                                        |
+| `SEARCH_PAGE_SIZE`            | integer (≤ max)               | `5` (per section)                           |
+| `SEARCH_MAX_PAGE_SIZE`        | integer                       | `20`                                        |
+| `CHAT_PAGE_SIZE`              | integer (≤ max)               | `30` (messages per history page)            |
+| `CHAT_MAX_PAGE_SIZE`          | integer                       | `100`                                       |
+| `INBOX_PAGE_SIZE`             | integer (≤ max)               | `20`                                        |
+| `INBOX_MAX_PAGE_SIZE`         | integer                       | `50`                                        |
+| `PROFILE_PAGE_SIZE`           | integer (≤ max)               | `18` (profile grid page)                    |
+| `PROFILE_MAX_PAGE_SIZE`       | integer                       | `36`                                        |
+| `STORY_VIEWERS_PAGE_SIZE`     | integer (≤ max)               | `20` (story viewers list page)              |
+| `STORY_VIEWERS_MAX_PAGE_SIZE` | integer                       | `50`                                        |
+| `MEDIA_URL_TTL_SECONDS`       | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                           |
+| `IMAGE_TRANSFORMS`            | `on` or `off`                 | `off`                                       |
+| `SIGNUP_BLOCKED_EMAILS`       | comma-separated emails        | empty (nobody blocked)                      |
+| `TURNSTILE_SITE_KEY`          | Turnstile site key            | empty (Turnstile off)                       |
+| `EMAIL_FROM`                  | `Name <address>`              | sender of auth emails (see [Email](#email)) |
 
-`SIGNUP_BLOCKED_EMAILS` is checked in Better Auth's `user.create.before` hook, so it blocks email/password and Google signups alike (`403 SIGNUP_NOT_ALLOWED`). Matching ignores case, and for Gmail also dots and `+suffix`. It only prevents new accounts; an existing account is not affected.
+`IMAGE_TRANSFORMS=on` gives feed, Explore and profile images a `srcset` of resized copies from [Cloudflare Image Transformations](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/width=…,quality=85,format=auto/api/media/…`), so phones download a fraction of the original. Only media served by this Worker under `/api/media/` is resized; presigned R2 and external URLs are left as they are. Turn it on only after enabling Transformations for the zone (dashboard → Images → Transformations → enable the zone): until then every `/cdn-cgi/image/` URL fails and those images break.
+
+`SIGNUP_BLOCKED_EMAILS` is checked in Better Auth's `user.create.before` hook, so it blocks email/password and Google signups alike (`403 SIGNUP_NOT_ALLOWED`). Matching ignores case, and for Gmail also dots and `+suffix`. It prevents new accounts, and an existing account cannot change its email to a listed address (`403 EMAIL_NOT_ALLOWED`); an existing account is otherwise not affected.
 
 Product rules tied to the data model (comment/bio length, handle format) stay in their valibot schemas. Secrets never go in `vars`: use `wrangler secret put` / `.dev.vars`.
+
+## Email
+
+Auth emails are sent through [Resend](https://resend.com)'s REST API (`src/lib/server/email.ts`), after the response (`waitUntil`), so response times never reveal whether an account exists.
+
+| Flow            | How it works                                                                                                                                                                                             |
+| --------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Verify email    | Sent on signup and from Settings → Security. The link verifies the address and signs in. Sign-in never requires verification (accounts from before verification existed are unverified).                 |
+| Forgot password | `/forgot-password` always answers the same way. The emailed link opens `/reset-password`; a reset signs out every session.                                                                               |
+| Change email    | Settings → Security. A verified account first approves the change from its current address, then confirms the new one; an unverified account only confirms the new one. `SIGNUP_BLOCKED_EMAILS` applies. |
+| Change password | Settings → Security, for accounts with a password. Signs out every other session.                                                                                                                        |
+| Sessions        | Settings → Security lists active sessions and signs out one, or all but the current one.                                                                                                                 |
+
+Email links return to `/settings`, which shows the outcome as a toast.
+
+**Locally** you need nothing: without `RESEND_API_KEY`, and while `BETTER_AUTH_URL` is a `localhost` address, each email is printed to the terminal (recipient, subject and link). To send real email locally, put a key in `.dev.vars`; the local `EMAIL_FROM` is Resend's test sender, which only delivers to your own Resend account's address. **Deployed** without a key, emails are dropped and an error is logged, never the link.
+
+**Production setup:** create a Resend account, add and verify the sending domain (`sns.ecoapsara.com`, DNS records from Resend → Domains), create an API key with sending access, then:
+
+```sh
+pnpm exec wrangler secret put RESEND_API_KEY --env production
+```
+
+`EMAIL_FROM` in `wrangler.jsonc` (`Kizuna <no-reply@sns.ecoapsara.com>`) must use the verified domain.
+
+## Sign-in security
+
+**Two-factor authentication.** Accounts with a password can turn on an authenticator app (TOTP) in Settings → Two-factor authentication: confirm the password, scan the QR code, enter a code, then save the ten backup codes, which are shown only once. The same section turns it off and regenerates the backup codes. After the password, `/login/two-factor` asks for a code from the app or a backup code, and can trust the device for 30 days. Google sign-ins skip the second step, even on an account that has a password and two-factor turned on: Better Auth only asks for it after an email/password sign-in, so a Google sign-in is protected by the Google account's own 2-Step Verification. Accounts without a password never see the setting. The secret and the backup codes are stored encrypted in the `two_factor` table and never appear in the data export.
+
+**Turnstile.** [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) puts a challenge on signup and password reset requests. It is off until both halves are set: the `TURNSTILE_SITE_KEY` var (public, shown to the browser) and the `TURNSTILE_SECRET_KEY` secret (verifies the answers on the server). Only the signup and forgot-password forms load the Turnstile script. To turn it on, create a widget (dashboard → Turnstile → Add widget, _Managed_ mode, hostname `sns.ecoapsara.com`), put its site key in `TURNSTILE_SITE_KEY` in `env.production` in `wrangler.jsonc`, then:
+
+```sh
+pnpm exec wrangler secret put TURNSTILE_SECRET_KEY --env production
+```
+
+To try it locally, set both in `.dev.vars` (Cloudflare publishes [test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) that always pass).
 
 ## Generated files
 
@@ -305,9 +383,8 @@ pnpm exec wrangler d1 create sns-prod
 pnpm exec wrangler kv namespace create KV --env production
 ```
 
-The `STORIES` namespace has no ID, so the first deploy creates it. The top-level IDs in
-`wrangler.jsonc` are placeholders on purpose — local D1 and KV live in `.wrangler/state` and
-never use them.
+The top-level IDs in `wrangler.jsonc` are placeholders on purpose — local D1 and KV live in
+`.wrangler/state` and never use them.
 
 **2. Configure auth for production.** The site's URL appears three times: `BETTER_AUTH_URL`
 and the custom-domain `routes` entry in `env.production`, and `PRODUCTION_URL` in the workflow
@@ -319,6 +396,7 @@ then set the Worker secrets:
 pnpm dlx auth@latest secret | pnpm exec wrangler secret put BETTER_AUTH_SECRET --env production
 pnpm exec wrangler secret put GOOGLE_CLIENT_ID --env production
 pnpm exec wrangler secret put GOOGLE_CLIENT_SECRET --env production
+pnpm exec wrangler secret put RESEND_API_KEY --env production   # see Email
 ```
 
 **3. Add GitHub repository secrets** (Settings → Secrets and variables → Actions):
@@ -381,8 +459,8 @@ contains:
 D1 always enforces foreign keys and ignores `PRAGMA foreign_keys=OFF`, so `DROP TABLE` runs an
 implicit `DELETE` that fires every `ON DELETE CASCADE`: a rebuild of `user` or `post` deletes
 every row that references them (sessions, posts, likes, comments, messages, …) and drops
-their triggers (search in `0012`, the notification block guard in `0019`). If Drizzle
-generates a rebuild, change the schema so it doesn't.
+their triggers (search in `0012`, the notification block and mute guards in `0019` and
+`0025`). If Drizzle generates a rebuild, change the schema so it doesn't.
 
 Dropping a plain index is allowed: it holds no data, the deployed queries still return the
 same rows (at worst more slowly), and Drizzle drops and recreates an index to change it

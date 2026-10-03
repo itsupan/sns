@@ -7,7 +7,9 @@
 		/** User name (used to generate monogram initials if image is missing) */
 		name?: string;
 		/** Size preset or numeric pixel value */
-		size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | number;
+		size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | number;
+		/** 'eager' for avatars above the fold (the header, a profile header) */
+		loading?: 'lazy' | 'eager';
 		/** Optional story / active ring */
 		ring?: boolean | 'blue' | 'accent' | 'default';
 		/** Optional activity indicator badge */
@@ -24,38 +26,46 @@
 		alt = 'User avatar',
 		name = '',
 		size = 'md',
+		loading = 'lazy',
 		ring = false,
 		status = 'none',
 		class: className = '',
 		...restProps
 	}: Props = $props();
 
-	let imageError = $state(false);
-	let activeSrc = $state<string | null>(null);
-
-	$effect(() => {
-		activeSrc = src;
-		imageError = false;
-	});
+	// Follows `src`, and is overridden by a refreshed URL when an expired one fails to load.
+	let activeSrc = $derived(src);
+	let failedSrc = $state<string | null>(null);
 
 	async function handleAvatarError() {
-		if (activeSrc) {
-			const fresh = await refreshExpiredMediaUrl(activeSrc);
-			if (fresh && fresh !== activeSrc) {
+		const failed = activeSrc;
+		if (failed) {
+			const fresh = await refreshExpiredMediaUrl(failed);
+			if (fresh && fresh !== failed) {
 				activeSrc = fresh;
 				return;
 			}
 		}
-		imageError = true;
+		failedSrc = failed;
 	}
 
-	const sizeClasses: Record<string, { container: string; text: string; badge: string }> = {
-		xs: { container: 'size-6', text: 'text-[10px]', badge: 'size-1.5' },
-		sm: { container: 'size-8', text: 'text-xs', badge: 'size-2' },
-		md: { container: 'size-10', text: 'text-sm', badge: 'size-2.5' },
-		lg: { container: 'size-12', text: 'text-base', badge: 'size-3' },
-		xl: { container: 'size-14', text: 'text-lg', badge: 'size-3.5' },
-		'2xl': { container: 'size-16', text: 'text-xl', badge: 'size-4' }
+	const sizeClasses: Record<
+		string,
+		{ container: string; text: string; badge: string; px: number }
+	> = {
+		xs: { container: 'size-6', text: 'text-[10px]', badge: 'size-1.5', px: 24 },
+		sm: { container: 'size-8', text: 'text-xs', badge: 'size-2', px: 32 },
+		md: { container: 'size-10', text: 'text-sm', badge: 'size-2.5', px: 40 },
+		lg: { container: 'size-12', text: 'text-base', badge: 'size-3', px: 48 },
+		xl: { container: 'size-14', text: 'text-lg', badge: 'size-3.5', px: 56 },
+		'2xl': { container: 'size-16', text: 'text-xl', badge: 'size-4', px: 64 },
+		// The profile header: 80px on phones up to 112px on desktop.
+		'3xl': {
+			container: 'size-20 sm:size-24 lg:size-28',
+			text: 'text-2xl sm:text-3xl',
+			badge: 'size-4',
+			px: 112
+		}
 	};
 
 	let initials = $derived(
@@ -94,6 +104,7 @@
 	});
 
 	const preset = $derived(typeof size === 'string' ? sizeClasses[size] || sizeClasses.md : null);
+	const pixels = $derived(typeof size === 'number' ? size : (preset?.px ?? sizeClasses.md.px));
 </script>
 
 <div
@@ -104,10 +115,14 @@
 	<div
 		class="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-text font-semibold {ringClass} transition-all duration-150"
 	>
-		{#if activeSrc && !imageError}
+		{#if activeSrc && activeSrc !== failedSrc}
 			<img
 				src={activeSrc}
 				{alt}
+				width={pixels}
+				height={pixels}
+				{loading}
+				decoding="async"
 				onerror={handleAvatarError}
 				class="w-full h-full object-cover rounded-full"
 			/>

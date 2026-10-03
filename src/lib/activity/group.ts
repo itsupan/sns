@@ -14,11 +14,13 @@ export interface ActivityGroup {
 	comment: ActivityItem['comment'];
 }
 
-/** What a notification groups by; comments and replies are never grouped. */
+/** What a notification groups by; comments, replies and quotes are never grouped. */
 function groupKey(item: ActivityItem): string | null {
 	switch (item.type) {
 		case 'like':
 			return `like:${item.post?.id}`;
+		case 'repost':
+			return `repost:${item.post?.id}`;
 		case 'reaction':
 			return `reaction:${item.comment?.id}`;
 		case 'follow':
@@ -29,8 +31,9 @@ function groupKey(item: ActivityItem): string | null {
 }
 
 /**
- * Groups likes on the same post, reactions on the same comment, and follows. Input and output are
- * newest first; a group sits where its newest item was and is unread if any of its items is.
+ * Groups likes and reposts of the same post, reactions on the same comment, and follows. Input
+ * and output are newest first; a group sits where its newest item was and is unread if any of its
+ * items is.
  */
 export function groupActivity(items: ActivityItem[]): ActivityGroup[] {
 	const groups: ActivityGroup[] = [];
@@ -83,5 +86,28 @@ export function activityVerb(group: ActivityGroup): string {
 			return 'tagged you in a post';
 		case 'story_reaction':
 			return 'reacted to your story';
+		case 'follow_request':
+			return 'asked to follow you';
+		case 'follow_accepted':
+			return 'accepted your follow request';
+		case 'repost':
+			return 'reposted your post';
+		case 'quote':
+			return 'quoted your post';
 	}
 }
+
+/** What each type of notification is about, as named in notification settings. */
+export const activityTypeLabels: Record<ActivityType, string> = {
+	like: 'Likes on your posts',
+	comment: 'Comments on your posts',
+	reply: 'Replies to your comments',
+	reaction: 'Reactions to your comments',
+	follow: 'New followers',
+	mention: 'Tags in posts',
+	story_reaction: 'Reactions to your stories',
+	follow_request: 'Follow requests',
+	follow_accepted: 'Accepted follow requests',
+	repost: 'Reposts of your posts',
+	quote: 'Quotes of your posts'
+};

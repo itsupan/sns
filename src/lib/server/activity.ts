@@ -2,9 +2,10 @@ import type { Database } from '$lib/server/db';
 import type { FeedCursor } from '$lib/server/db/posts';
 import { loadPostMedia } from '$lib/server/db/posts';
 import { listNotifications } from '$lib/server/db/notifications';
+import { listFollowRequests } from '$lib/server/db/follows';
 import { refreshMediaUrl } from '$lib/server/services/storage';
 import { displayHandle } from '$lib/utils/format';
-import type { ActivityPage } from '$lib/activity/types';
+import type { ActivityPage, FollowRequestPage } from '$lib/activity/types';
 
 /** A page of Activity with post thumbnails and fresh media URLs, ready for the client. */
 export async function loadActivityPage(
@@ -45,6 +46,25 @@ export async function loadActivityPage(
 					comment: n.comment
 				};
 			})
+		),
+		nextCursor
+	};
+}
+
+/** A page of the user's pending follow requests with fresh avatar URLs. */
+export async function loadFollowRequestsPage(
+	db: Database,
+	userId: string,
+	page: { limit: number; cursor?: FeedCursor | null },
+	env: Partial<Env> | undefined
+): Promise<FollowRequestPage> {
+	const { users, nextCursor } = await listFollowRequests(db, userId, page);
+	return {
+		users: await Promise.all(
+			users.map(async (u) => ({
+				...u,
+				image: u.image ? await refreshMediaUrl(u.image, env) : null
+			}))
 		),
 		nextCursor
 	};

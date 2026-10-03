@@ -1,6 +1,7 @@
 <script lang="ts">
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import Switch from '$lib/components/settings/Switch.svelte';
 	import { uploadToR2 } from '$lib/utils/upload';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
@@ -24,6 +25,7 @@
 	let uploading = $state(false);
 	let caption = $state('');
 	let location = $state('');
+	let closeFriendsOnly = $state(false);
 	let sharing = $state(false);
 
 	let canShare = $derived(Boolean(mediaUrl) && !uploading && !sharing);
@@ -36,6 +38,7 @@
 		uploading = false;
 		caption = '';
 		location = '';
+		closeFriendsOnly = false;
 	}
 
 	async function choose(file: File) {
@@ -78,7 +81,13 @@
 			const res = await fetch('/api/stories', {
 				method: 'POST',
 				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ mediaUrl, mediaType, caption, location })
+				body: JSON.stringify({
+					mediaUrl,
+					mediaType,
+					caption,
+					location,
+					audience: closeFriendsOnly ? 'close_friends' : 'everyone'
+				})
 			});
 			const body = (await res.json().catch(() => null)) as { story?: Story } | null;
 			if (!res.ok || !body?.story) {
@@ -86,7 +95,11 @@
 				return;
 			}
 			onShared?.(body.story);
-			toast.show('Story shared · visible for 24 hours');
+			toast.show(
+				closeFriendsOnly
+					? 'Story shared with close friends · visible for 24 hours'
+					: 'Story shared · visible for 24 hours'
+			);
 			reset();
 			open = false;
 		} catch {
@@ -175,6 +188,27 @@
 				placeholder="Location (optional)"
 				aria-label="Story location"
 				class="flex-1 bg-transparent border-0 text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
+			/>
+		</div>
+
+		<div class="flex items-center justify-between gap-3 px-3 py-2">
+			<span class="flex flex-col min-w-0 leading-tight">
+				<span
+					id="story-close-friends-label"
+					class="flex items-center gap-1.5 text-sm font-medium text-slate-900 dark:text-dark-text"
+				>
+					<span class="size-2 rounded-full bg-green-500" aria-hidden="true"></span>
+					Close friends
+				</span>
+				<span id="story-close-friends-hint" class="text-xs text-slate-500 dark:text-dark-muted">
+					Only people on your close friends list will see this story.
+				</span>
+			</span>
+			<Switch
+				checked={closeFriendsOnly}
+				labelledby="story-close-friends-label"
+				describedby="story-close-friends-hint"
+				onclick={() => (closeFriendsOnly = !closeFriendsOnly)}
 			/>
 		</div>
 	</form>

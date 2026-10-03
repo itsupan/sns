@@ -2,7 +2,8 @@ import { json, type RequestHandler } from '@sveltejs/kit';
 import { eq, and } from 'drizzle-orm';
 import * as v from 'valibot';
 import { post, postMedia, postTag } from '$lib/server/db/schema';
-import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
+import { ApiError, parseBody, withApi } from '$lib/server/api';
+import { requireOwnPost } from '$lib/server/api/posts';
 import {
 	attachTagsStatements,
 	loadPostMedia,
@@ -18,6 +19,7 @@ import {
 	refreshPostMediaUrls
 } from '$lib/server/services/storage';
 import {
+	MAX_ALT_LENGTH,
 	MAX_MEDIA_PER_POST,
 	MAX_POST_CONTENT_LENGTH,
 	MAX_POST_LOCATION_LENGTH,
@@ -71,41 +73,6 @@ const UpdatePostBody = v.object(
 	'Request body must be an object'
 );
 
-/** Loads a live post and checks the current user wrote it; 404 before 403 so ids are not probed. */
-async function requireOwnPost(
-	locals: App.Locals,
-	platform: App.Platform | undefined,
-	postId: string | undefined,
-	action: string
-) {
-	const currentUser = requireUser(locals);
-	await enforceRateLimit(platform, 'contentEdit', currentUser.id);
-	if (!postId) {
-		throw new ApiError(400, 'validation_failed', 'Post ID is required');
-	}
-
-	const [existingPost] = await locals.db
-		.select({
-			id: post.id,
-			userId: post.userId,
-			deletedAt: post.deletedAt,
-			content: post.content,
-			postType: post.postType,
-			background: post.background
-		})
-		.from(post)
-		.where(eq(post.id, postId))
-		.limit(1);
-
-	if (!existingPost || existingPost.deletedAt !== null) {
-		throw new ApiError(404, 'not_found', 'Post not found');
-	}
-	if (existingPost.userId !== currentUser.id) {
-		throw new ApiError(403, 'forbidden', `You do not have permission to ${action} this post`);
-	}
-	return { currentUser, postId, existingPost };
-}
-
 export const PATCH: RequestHandler = withApi(async ({ params, locals, request, platform }) => {
 	const { currentUser, postId, existingPost } = await requireOwnPost(
 		locals,
@@ -128,6 +95,10 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 	let media = body.mediaUrls === undefined ? undefined : normalizeMedia(body.mediaUrls);
 	if (media && media.length > MAX_MEDIA_PER_POST) {
 		const message = `A post can have at most ${MAX_MEDIA_PER_POST} media items`;
+		throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
+	}
+	if (media?.some((m) => (m.alt?.length ?? 0) > MAX_ALT_LENGTH)) {
+		const message = `Alt text can be at most ${MAX_ALT_LENGTH} characters`;
 		throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
 	}
 	if (media) {
@@ -210,6 +181,7 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 										postId,
 										url: m.url,
 										type: m.type,
+										alt: m.alt ?? null,
 										position
 									}))
 								)

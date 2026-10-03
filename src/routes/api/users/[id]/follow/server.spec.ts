@@ -78,7 +78,7 @@ describe('POST / DELETE /api/users/:id/follow', { timeout: REAL_D1_TIMEOUT }, ()
 	it('follows and updates both users’ counters', async () => {
 		const res = await call(follow as Handler, { id: 'star', userId: 'viewer' });
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ following: true, followersCount: 1 });
+		expect(await res.json()).toEqual({ status: 'following', followersCount: 1 });
 		expect(await counters('star')).toEqual({ followers: 1, following: 0 });
 		expect(await counters('viewer')).toEqual({ followers: 0, following: 1 });
 	});
@@ -87,7 +87,7 @@ describe('POST / DELETE /api/users/:id/follow', { timeout: REAL_D1_TIMEOUT }, ()
 		await call(follow as Handler, { id: 'star', userId: 'viewer' });
 		const again = await call(follow as Handler, { id: 'star', userId: 'viewer' });
 		expect(again.status).toBe(200);
-		expect(await again.json()).toEqual({ following: true, followersCount: 1 });
+		expect(await again.json()).toEqual({ status: 'following', followersCount: 1 });
 		expect(await edgeCount()).toBe(1);
 		expect(await counters('viewer')).toEqual({ followers: 0, following: 1 });
 	});
@@ -97,7 +97,7 @@ describe('POST / DELETE /api/users/:id/follow', { timeout: REAL_D1_TIMEOUT }, ()
 		for (let i = 0; i < 2; i++) {
 			const res = await call(unfollow as Handler, { id: 'star', userId: 'viewer' });
 			expect(res.status).toBe(200);
-			expect(await res.json()).toEqual({ following: false, followersCount: 0 });
+			expect(await res.json()).toEqual({ status: 'none', followersCount: 0 });
 		}
 		expect(await edgeCount()).toBe(0);
 		expect(await counters('star')).toEqual({ followers: 0, following: 0 });
