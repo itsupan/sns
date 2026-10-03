@@ -11,6 +11,7 @@ import {
 	message,
 	moderationAction,
 	notification,
+	notificationOptOut,
 	post,
 	postComment,
 	postLike,
@@ -25,7 +26,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 5;
+export const EXPORT_FORMAT_VERSION = 6;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -50,6 +51,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		followRequestsReceived,
 		memberships,
 		notifications,
+		notificationOptOuts,
 		stories,
 		storyViews,
 		moderationActions
@@ -136,6 +138,10 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.from(notification)
 			.where(eq(notification.recipientId, userId))
 			.orderBy(asc(notification.createdAt)),
+		db
+			.select({ type: notificationOptOut.type, since: notificationOptOut.createdAt })
+			.from(notificationOptOut)
+			.where(eq(notificationOptOut.userId, userId)),
 		db
 			.select({
 				id: story.id,
@@ -284,6 +290,8 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 				}))
 		})),
 		notifications,
+		// Notification types the user turned off.
+		notificationOptOuts,
 		stories,
 		storyViews,
 		// Actions this account took as a moderator or admin.
