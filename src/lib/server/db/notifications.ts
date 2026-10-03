@@ -1,8 +1,11 @@
-import { aliasedTable, and, desc, eq, isNull, lt, or, sql } from 'drizzle-orm';
+import { aliasedTable, and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm';
+import type { BatchItem } from 'drizzle-orm/batch';
 import type { Database } from '.';
 import {
 	commentReaction,
+	NOTIFICATION_TYPES,
 	notification,
+	notificationOptOut,
 	notificationRead,
 	post,
 	postComment,
@@ -33,7 +36,7 @@ export const UNREAD_CAP = 99;
 
 /**
  * One row per action: a like or reaction is per actor and target, a comment or reply is the
- * comment itself, a follow is per pair, a mention is per post and tagged user. Repeating an
+ * comment itself, a follow (or follow request, or its acceptance) is per pair, a mention is per post and tagged user. Repeating an
  * action hits the same key; undoing deletes it.
  */
 export function dedupeKey(t: NotificationTarget): string {
@@ -52,6 +55,10 @@ export function dedupeKey(t: NotificationTarget): string {
 			return `mention:${t.postId}:${t.recipientId}`;
 		case 'story_reaction':
 			return `story_reaction:${t.actorId}:${t.storyId}`;
+		case 'follow_request':
+			return `follow_request:${t.actorId}:${t.recipientId}`;
+		case 'follow_accepted':
+			return `follow_accepted:${t.actorId}:${t.recipientId}`;
 	}
 }
 
@@ -226,4 +233,51 @@ export async function markNotificationsRead(
 				)
 			)
 	]);
+}
+
+/** Whether each notification type is on for a user. */
+export type NotificationPreferences = Record<NotificationType, boolean>;
+
+export async function getNotificationPreferences(
+	db: Database,
+	userId: string
+): Promise<NotificationPreferences> {
+	const optOuts = await db
+		.select({ type: notificationOptOut.type })
+		.from(notificationOptOut)
+		.where(eq(notificationOptOut.userId, userId));
+	const off = new Set(optOuts.map((o) => o.type));
+	return Object.fromEntries(
+		NOTIFICATION_TYPES.map((type) => [type, !off.has(type)])
+	) as NotificationPreferences;
+}
+
+/** Turns the given types on or off in one batch; types left out keep their setting. */
+export async function setNotificationPreferences(
+	db: Database,
+	userId: string,
+	changes: Partial<NotificationPreferences>
+): Promise<void> {
+	const entries = Object.entries(changes) as [NotificationType, boolean][];
+	const on = entries.filter(([, enabled]) => enabled).map(([type]) => type);
+	const off = entries.filter(([, enabled]) => !enabled).map(([type]) => type);
+
+	const statements: BatchItem<'sqlite'>[] = [];
+	if (on.length) {
+		statements.push(
+			db
+				.delete(notificationOptOut)
+				.where(and(eq(notificationOptOut.userId, userId), inArray(notificationOptOut.type, on)))
+		);
+	}
+	if (off.length) {
+		statements.push(
+			db
+				.insert(notificationOptOut)
+				.values(off.map((type) => ({ userId, type })))
+				.onConflictDoNothing()
+		);
+	}
+	if (!statements.length) return;
+	await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
 }

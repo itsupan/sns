@@ -1,13 +1,15 @@
 import { stripFormatting } from '$lib/formatting';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, user } from './schema';
-import { isFollowing } from './follows';
-import { loadPostMedia, loadPostTags, loadRecentLikers, notDeleted } from './posts';
-import { backgroundOf, loadViewerPostState } from './post-cards';
-import { formatTimeAgo } from '$lib/utils/format';
-import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
+import { followStatus } from './follows';
+import { visibleTo } from './visibility';
+import { encodeCursor, notDeleted, type FeedCursor } from './posts';
+import { postRowAuthor, toPostCards } from './post-cards';
+import { MAX_PINNED_POSTS } from '$lib/constants/post-limits';
+import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
+import type { FollowStatus } from '$lib/utils/follow.svelte';
 
 export interface ProfileStats {
 	postsCount: number;
@@ -15,8 +17,8 @@ export interface ProfileStats {
 	followingCount: number;
 	/** Total views across the user's live posts. */
 	impressionsCount: number;
-	/** Whether `viewerId` follows this user (always false for anonymous or own profile). */
-	isFollowing: boolean;
+	/** Whether `viewerId` follows or asked to follow this user (`none` for anonymous or own profile). */
+	followStatus: FollowStatus;
 }
 
 export const EMPTY_PROFILE_STATS: ProfileStats = {
@@ -24,7 +26,7 @@ export const EMPTY_PROFILE_STATS: ProfileStats = {
 	followersCount: 0,
 	followingCount: 0,
 	impressionsCount: 0,
-	isFollowing: false
+	followStatus: 'none'
 };
 
 /** Header stats for a profile: live posts and their views, stored follow counters, viewer state. */
@@ -33,7 +35,7 @@ export async function loadProfileStats(
 	userId: string,
 	viewerId?: string | null
 ): Promise<ProfileStats> {
-	const [[postRow], [userRow], following] = await Promise.all([
+	const [[postRow], [userRow], status] = await Promise.all([
 		db
 			.select({
 				postsCount: sql<number>`count(*)`,
@@ -46,7 +48,9 @@ export async function loadProfileStats(
 			.from(user)
 			.where(eq(user.id, userId))
 			.limit(1),
-		viewerId && viewerId !== userId ? isFollowing(db, viewerId, userId) : Promise.resolve(false)
+		viewerId && viewerId !== userId
+			? followStatus(db, viewerId, userId)
+			: Promise.resolve<FollowStatus>('none')
 	]);
 
 	return {
@@ -54,75 +58,58 @@ export async function loadProfileStats(
 		impressionsCount: Number(postRow?.impressionsCount ?? 0),
 		followersCount: userRow?.followersCount ?? 0,
 		followingCount: userRow?.followingCount ?? 0,
-		isFollowing: following
+		followStatus: status
 	};
 }
 
-export interface ProfileAuthor {
-	id: string;
-	name: string;
-	handle: string | null;
-	image: string | null;
-	location: string | null;
-}
-
-/** A profile's live posts, newest first, in the same shape the feed renders with `PostCard`. */
+/**
+ * One page of a profile's live posts in the `PostCard` shape, newest first, keyset-paginated on
+ * (created_at, id) via `post_userId_createdAt_idx`. The first page (no cursor) leads with the
+ * pinned posts, most recently pinned first; the pages never repeat them. Empty when the author
+ * and `viewerId` are blocked in either direction, or the author is private and not followed by
+ * `viewerId`: that is how the profile page hides them.
+ */
 export async function loadProfilePosts(
 	db: Database,
-	author: ProfileAuthor,
-	viewerId?: string | null
-): Promise<PostData[]> {
-	const postRows = await db
-		.select()
-		.from(post)
-		.where(and(eq(post.userId, author.id), notDeleted))
-		.orderBy(desc(post.createdAt));
-	if (postRows.length === 0) return [];
-
-	const postIds = postRows.map((p) => p.id);
-	const [mediaByPost, tagsByPost, viewer, likers] = await Promise.all([
-		loadPostMedia(db, postIds),
-		loadPostTags(db, postIds),
-		loadViewerPostState(db, viewerId, postIds),
-		loadRecentLikers(db, viewerId, postIds)
+	userId: string,
+	viewerId: string | null | undefined,
+	{ limit, cursor }: { limit: number; cursor?: FeedCursor | null }
+): Promise<{ posts: PostData[]; nextCursor: string | null }> {
+	const shown = and(eq(post.userId, userId), notDeleted, visibleTo(viewerId, post.userId));
+	const [pinned, rows] = await Promise.all([
+		cursor
+			? []
+			: db
+					.select({ post, user: postRowAuthor })
+					.from(post)
+					.innerJoin(user, eq(post.userId, user.id))
+					.where(and(shown, isNotNull(post.pinnedAt)))
+					.orderBy(desc(post.pinnedAt))
+					.limit(MAX_PINNED_POSTS),
+		db
+			.select({ post, user: postRowAuthor })
+			.from(post)
+			.innerJoin(user, eq(post.userId, user.id))
+			.where(
+				and(
+					shown,
+					isNull(post.pinnedAt),
+					cursor
+						? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
+						: undefined
+				)
+			)
+			.orderBy(desc(post.createdAt), desc(post.id))
+			.limit(limit + 1)
 	]);
-	const handle = author.handle
-		? `@${author.handle.replace(/^@/, '')}`
-		: `@${author.name.toLowerCase().replace(/\s+/g, '')}`;
 
-	return postRows.map((p) => {
-		const media = mediaByPost.get(p.id) ?? [];
-		const location = p.location || author.location || undefined;
-		return {
-			id: p.id,
-			author: {
-				id: author.id,
-				name: author.name,
-				handle,
-				avatar: author.image || '',
-				location,
-				timeAgo: formatTimeAgo(p.createdAt)
-			},
-			title: p.title || '',
-			description: p.content,
-			image: media[0]?.url || '',
-			mediaUrl: media[0]?.url || undefined,
-			mediaType: media[0]?.type || 'none',
-			mediaItems: media,
-			aspectRatio: (p.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
-			postType: p.postType as PostType,
-			background: backgroundOf(p),
-			location,
-			cameraMeta: p.cameraMeta || undefined,
-			tags: tagsByPost.get(p.id) ?? [],
-			likes: p.likesCount,
-			commentsCount: p.commentsCount,
-			repostsCount: p.sharesCount,
-			likedBy: likers.get(p.id),
-			liked: viewer.liked.has(p.id),
-			saved: viewer.saved.has(p.id)
-		};
-	});
+	const hasMore = rows.length > limit;
+	const page = hasMore ? rows.slice(0, limit) : rows;
+	const last = page.at(-1);
+	return {
+		posts: await toPostCards(db, [...pinned, ...page], viewerId),
+		nextCursor: hasMore && last ? encodeCursor(last.post) : null
+	};
 }
 
 /** Grid tile for a post; keeps the full post so list view can render a real `PostCard`. */
@@ -132,6 +119,7 @@ export function toGridItem(p: PostData): GridItem {
 		id: p.id,
 		title: p.title || stripFormatting(p.description).slice(0, 40),
 		image: first?.url || p.image,
+		alt: first?.alt,
 		mediaType: first?.type ?? 'none',
 		likes: p.likes,
 		comments: p.commentsCount,

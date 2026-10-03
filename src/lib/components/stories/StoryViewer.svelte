@@ -1,13 +1,15 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { fade, fly } from 'svelte/transition';
 	import { resolve } from '$app/paths';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
+	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
+	import Modal from '$lib/components/shared/Modal.svelte';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import { FOLLOW_LABELS, followStore } from '$lib/utils/follow.svelte';
 	import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
 	import { STORY_REACTIONS, type StoryReaction } from '$lib/reactions';
 	import type { Story, StoryGroup } from './stories.svelte';
@@ -20,6 +22,12 @@
 		viewedAt: number;
 		reaction: StoryReaction | null;
 		isFollowing: boolean;
+	}
+
+	interface ViewersPage {
+		count: number;
+		viewers: StoryViewer[];
+		nextCursor: string | null;
 	}
 
 	/** How long a photo stays on screen; videos play for their own length. */
@@ -50,6 +58,10 @@
 	let viewersOpen = $state(false);
 	let viewersLoading = $state(false);
 	let viewers = $state<StoryViewer[]>([]);
+	let viewersCount = $state(0);
+	let viewersCursor = $state<string | null>(null);
+	let viewersMoreLoading = $state(false);
+	let viewersMoreError = $state<string | null>(null);
 	let deleting = $state(false);
 	// Reply box and reactions on other people's stories.
 	let replyDraft = $state('');
@@ -60,7 +72,6 @@
 	let reactions = $state<Record<string, StoryReaction | null>>({});
 	let dragY = $state(0);
 	let video = $state<HTMLVideoElement | null>(null);
-	let closeButton = $state<HTMLButtonElement | null>(null);
 
 	let group = $derived(groups[gi]);
 	let story = $derived(group?.stories[si]);
@@ -74,13 +85,9 @@
 			gi = Math.min(startIndex, Math.max(groups.length - 1, 0));
 			si = 0;
 			paused = false;
+			held = false;
+			dragY = 0;
 		});
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = 'hidden';
-		queueMicrotask(() => closeButton?.focus());
-		return () => {
-			document.body.style.overflow = previousOverflow;
-		};
 	});
 
 	// A new story: restart its progress, record it as seen, warm up the next photo.
@@ -124,8 +131,6 @@
 
 	function close() {
 		open = false;
-		dragY = 0;
-		held = false;
 	}
 
 	function next() {
@@ -164,8 +169,8 @@
 	let holdTimer: ReturnType<typeof setTimeout> | undefined;
 
 	function onPointerDown(e: PointerEvent) {
-		// Controls and overlays (viewers list, delete confirmation) handle their own taps.
-		if ((e.target as HTMLElement).closest('button, a, input, [data-no-nav]')) return;
+		// Controls handle their own taps.
+		if ((e.target as HTMLElement).closest('button, a, input')) return;
 		const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
 		start = { x: e.clientX, y: e.clientY, at: Date.now(), width: rect.width, left: rect.left };
 		holdTimer = setTimeout(() => (held = true), HOLD_MS);
@@ -205,13 +210,13 @@
 	}
 
 	function onKeydown(e: KeyboardEvent) {
-		if (!open) return;
-		// Typing a reply must not navigate or pause.
-		if (e.key !== 'Escape' && (e.target as HTMLElement).closest('input')) return;
-		if (e.key === 'Escape') close();
-		else if (e.key === 'ArrowRight') next();
+		const target = e.target as HTMLElement;
+		// Keys in the viewers list or the delete confirmation belong to those dialogs, and typing a
+		// reply must not navigate or pause.
+		if (target.closest('dialog') !== e.currentTarget || target.closest('input')) return;
+		if (e.key === 'ArrowRight') next();
 		else if (e.key === 'ArrowLeft') prev();
-		else if (e.key === ' ' && !(e.target as HTMLElement).closest('button')) {
+		else if (e.key === ' ' && !target.closest('button')) {
 			e.preventDefault();
 			paused = !paused;
 		}
@@ -246,39 +251,65 @@
 		}
 	}
 
+	/** One page of a story's viewers, or the message to show when it could not be loaded. */
+	async function fetchViewers(
+		storyId: string,
+		cursor: string | null
+	): Promise<ViewersPage | string> {
+		const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+		try {
+			const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}/views${query}`);
+			const body = await res.json().catch(() => null);
+			return res.ok ? (body as ViewersPage) : readApiError(body, 'Could not load viewers').message;
+		} catch {
+			return 'Could not load viewers';
+		}
+	}
+
+	/** Shows a loaded page if the viewer is still on `target`; keeps the button's count in step. */
+	function applyViewers(target: Story, page: ViewersPage) {
+		if (story?.id !== target.id) return;
+		viewers = [...viewers, ...page.viewers];
+		viewersCount = page.count;
+		viewersCursor = page.nextCursor;
+		target.viewCount = page.count;
+	}
+
 	async function openViewers() {
 		if (!story) return;
 		const target = story;
 		viewersOpen = true;
 		viewersLoading = true;
 		viewers = [];
-		try {
-			const res = await fetch(`/api/stories/${encodeURIComponent(target.id)}/views`);
-			const body = (await res.json().catch(() => null)) as {
-				viewers?: StoryViewer[];
-			} | null;
-			if (!res.ok) {
-				toast.show(readApiError(body, 'Could not load viewers').message);
-				viewersOpen = false;
-				return;
-			}
-			if (story?.id === target.id) {
-				viewers = body?.viewers ?? [];
-				// Keep the count on the button in step with the list.
-				target.viewCount = viewers.length;
-			}
-		} catch {
-			toast.show('Could not load viewers');
+		viewersCursor = null;
+		viewersMoreError = null;
+		const page = await fetchViewers(target.id, null);
+		viewersLoading = false;
+		if (typeof page === 'string') {
+			toast.show(page);
 			viewersOpen = false;
-		} finally {
-			viewersLoading = false;
+			return;
 		}
+		applyViewers(target, page);
 	}
 
+	async function loadMoreViewers() {
+		if (!story || !viewersCursor || viewersMoreLoading) return;
+		const target = story;
+		viewersMoreLoading = true;
+		viewersMoreError = null;
+		const page = await fetchViewers(target.id, viewersCursor);
+		viewersMoreLoading = false;
+		if (typeof page === 'string') viewersMoreError = page;
+		else applyViewers(target, page);
+	}
+
+	const followStatusOf = (person: StoryViewer) =>
+		followStore.status(person.id, person.isFollowing ? 'following' : 'none');
+
 	async function toggleFollowViewer(person: StoryViewer) {
-		const next = !followStore.isFollowing(person.id, person.isFollowing);
 		try {
-			await followStore.set(person.id, next);
+			await followStore.set(person.id, followStatusOf(person) === 'none');
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -342,15 +373,14 @@
 	}
 </script>
 
-<svelte:window onkeydown={onKeydown} />
-
-{#if open && group && story}
-	<div
-		class="fixed inset-0 z-90 bg-slate-50/95 dark:bg-dark-canvas/95 backdrop-blur-md flex items-center justify-center select-none"
-		role="dialog"
-		aria-modal="true"
-		aria-label={`Stories from ${group.user.name}`}
-		transition:fade={{ duration: 150 }}
+{#if group && story}
+	<Modal
+		bind:open
+		label={`Stories from ${group.user.name}`}
+		variant="fullscreen"
+		closeOnBackdrop={false}
+		class="items-center justify-center bg-slate-50/95 dark:bg-dark-canvas/95 backdrop-blur-md select-none"
+		onkeydown={onKeydown}
 	>
 		<!-- Desktop: previous / next person, outside the frame -->
 		<button
@@ -451,9 +481,16 @@
 								· {formatTimeAgo(story.createdAt)}
 							</span>
 						</span>
+						{#if story.audience === 'close_friends'}
+							<span
+								class="self-start mt-0.5 px-1.5 py-px rounded-full bg-green-500 text-white text-[10px] font-semibold"
+							>
+								Close friends
+							</span>
+						{/if}
 						{#if story.location}
 							<span class="flex items-center gap-1 text-[11px] text-white/80 truncate">
-								<Icon name="marker" class="text-[10px]" />
+								<Icon name="map-marker" class="text-[10px]" />
 								<span class="truncate">{story.location}</span>
 							</span>
 						{/if}
@@ -489,8 +526,9 @@
 							<Icon name="trash" />
 						</button>
 					{/if}
+					<!-- svelte-ignore a11y_autofocus (the viewer is a modal dialog, which focuses it on open) -->
 					<button
-						bind:this={closeButton}
+						autofocus
 						type="button"
 						class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
 						onclick={close}
@@ -570,133 +608,98 @@
 					</form>
 				{/if}
 			</div>
+		</div>
 
-			<!-- Viewers panel (own stories) -->
-			{#if viewersOpen}
-				<div class="absolute inset-0 bg-black/40" data-no-nav transition:fade={{ duration: 120 }}>
+		<!-- Own stories: who viewed it, and the delete confirmation -->
+		<BottomSheet bind:open={viewersOpen} title="Story viewers">
+			<h2 class="m-0 px-3 pt-1 pb-2 text-sm font-semibold flex items-center gap-2">
+				<Icon name="eye" class="text-sm text-slate-500 dark:text-dark-muted" />
+				<span
+					>{viewersLoading
+						? 'Viewers'
+						: `${viewersCount} ${viewersCount === 1 ? 'viewer' : 'viewers'}`}</span
+				>
+			</h2>
+			<ul class="list-none m-0 p-0">
+				{#if viewersLoading}
+					{#each [0, 1, 2] as i (i)}
+						<li class="flex items-center gap-3 px-3 py-2" aria-hidden="true">
+							<div
+								class="size-10 rounded-full bg-slate-100 dark:bg-dark-elevated animate-pulse"
+							></div>
+							<div
+								class="h-3 w-32 rounded-full bg-slate-100 dark:bg-dark-elevated animate-pulse"
+							></div>
+						</li>
+					{/each}
+				{:else if viewers.length === 0}
+					<li class="px-3 py-8 text-center text-xs text-slate-500 dark:text-dark-muted">
+						No one has viewed this story yet.
+					</li>
+				{:else}
+					{#each viewers as person (person.id)}
+						{@const status = followStatusOf(person)}
+						<li class="flex items-center gap-3 px-3 py-2 rounded-2xl">
+							<a
+								href={resolve('/profile/[id]', { id: person.id })}
+								class="flex items-center gap-3 min-w-0 flex-1 no-underline text-inherit"
+							>
+								<Avatar src={person.image} name={person.name} size="md" />
+								<span class="flex flex-col min-w-0 leading-tight">
+									<span class="text-sm font-semibold truncate">{person.name}</span>
+									<span class="text-xs text-slate-500 dark:text-dark-muted truncate">
+										{person.handle ? `@${person.handle} · ` : ''}{formatTimeAgo(person.viewedAt)}
+									</span>
+								</span>
+							</a>
+							{#if person.reaction}
+								<span class="shrink-0 text-xl" aria-label={`Reacted ${person.reaction}`}
+									>{person.reaction}</span
+								>
+							{/if}
+							<button
+								type="button"
+								class="shrink-0 h-8 px-4 rounded-full text-xs font-semibold border-0 cursor-pointer transition {status !==
+								'none'
+									? 'bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text'
+									: 'bg-blue-600 dark:bg-kizuna-blue text-white'}"
+								aria-pressed={status !== 'none'}
+								onclick={() => toggleFollowViewer(person)}
+							>
+								{FOLLOW_LABELS[status]}
+							</button>
+						</li>
+					{/each}
+				{/if}
+			</ul>
+			{#if viewersCursor}
+				<LoadMore onLoad={loadMoreViewers} loading={viewersMoreLoading} error={viewersMoreError} />
+			{/if}
+		</BottomSheet>
+
+		<BottomSheet bind:open={confirmDelete} title="Delete this story?" showTitle>
+			<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
+				It will disappear for everyone right away.
+			</p>
+			{#snippet footer()}
+				<div class="flex justify-end gap-2">
 					<button
 						type="button"
-						class="absolute inset-0 size-full bg-transparent border-0 cursor-default"
-						aria-label="Close viewers"
-						onclick={() => (viewersOpen = false)}
-					></button>
-					<div
-						class="absolute inset-x-0 bottom-0 max-h-[70%] flex flex-col rounded-t-3xl bg-white dark:bg-dark-card text-slate-900 dark:text-dark-text shadow-2xl"
-						role="dialog"
-						aria-label="Story viewers"
-						transition:fly={{ y: 300, duration: 200 }}
+						class="h-10 px-4 rounded-full text-sm font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover"
+						onclick={() => (confirmDelete = false)}
 					>
-						<div
-							class="flex items-center justify-between px-5 pt-4 pb-3 border-b border-slate-100 dark:border-dark-border"
-						>
-							<h2 class="m-0 text-sm font-semibold flex items-center gap-2">
-								<Icon name="eye" class="text-sm text-slate-500 dark:text-dark-muted" />
-								<span
-									>{viewersLoading
-										? 'Viewers'
-										: `${viewers.length} ${viewers.length === 1 ? 'viewer' : 'viewers'}`}</span
-								>
-							</h2>
-							<button
-								type="button"
-								class="size-8 rounded-full flex items-center justify-center bg-transparent hover:bg-slate-100 dark:hover:bg-dark-hover border-0 cursor-pointer text-slate-500 dark:text-dark-muted"
-								onclick={() => (viewersOpen = false)}
-								aria-label="Close viewers"
-							>
-								<Icon name="cross" class="text-xs" />
-							</button>
-						</div>
-						<ul class="flex-1 overflow-y-auto list-none m-0 px-2 py-2">
-							{#if viewersLoading}
-								{#each [0, 1, 2] as i (i)}
-									<li class="flex items-center gap-3 px-3 py-2" aria-hidden="true">
-										<div
-											class="size-10 rounded-full bg-slate-100 dark:bg-dark-elevated animate-pulse"
-										></div>
-										<div
-											class="h-3 w-32 rounded-full bg-slate-100 dark:bg-dark-elevated animate-pulse"
-										></div>
-									</li>
-								{/each}
-							{:else if viewers.length === 0}
-								<li class="px-3 py-8 text-center text-xs text-slate-500 dark:text-dark-muted">
-									No one has viewed this story yet.
-								</li>
-							{:else}
-								{#each viewers as person (person.id)}
-									{@const following = followStore.isFollowing(person.id, person.isFollowing)}
-									<li class="flex items-center gap-3 px-3 py-2 rounded-2xl">
-										<a
-											href={resolve('/profile/[id]', { id: person.id })}
-											class="flex items-center gap-3 min-w-0 flex-1 no-underline text-inherit"
-										>
-											<Avatar src={person.image} name={person.name} size="md" />
-											<span class="flex flex-col min-w-0 leading-tight">
-												<span class="text-sm font-semibold truncate">{person.name}</span>
-												<span class="text-xs text-slate-500 dark:text-dark-muted truncate">
-													{person.handle ? `@${person.handle} · ` : ''}{formatTimeAgo(
-														person.viewedAt
-													)}
-												</span>
-											</span>
-										</a>
-										{#if person.reaction}
-											<span class="shrink-0 text-xl" aria-label={`Reacted ${person.reaction}`}
-												>{person.reaction}</span
-											>
-										{/if}
-										<button
-											type="button"
-											class="shrink-0 h-8 px-4 rounded-full text-xs font-semibold border-0 cursor-pointer transition {following
-												? 'bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text'
-												: 'bg-blue-600 dark:bg-kizuna-blue text-white'}"
-											aria-pressed={following}
-											onclick={() => toggleFollowViewer(person)}
-										>
-											{following ? 'Following' : 'Follow'}
-										</button>
-									</li>
-								{/each}
-							{/if}
-						</ul>
-					</div>
+						Cancel
+					</button>
+					<button
+						type="button"
+						class="h-10 px-5 rounded-full text-sm font-semibold bg-red-600 text-white border-0 cursor-pointer hover:bg-red-700 disabled:opacity-50 disabled:cursor-default"
+						disabled={deleting}
+						onclick={deleteStory}
+					>
+						{deleting ? 'Deleting…' : 'Delete'}
+					</button>
 				</div>
-			{/if}
-
-			<!-- Delete confirmation (own stories) -->
-			{#if confirmDelete}
-				<div
-					class="absolute inset-0 bg-black/60 flex items-end sm:items-center justify-center p-4"
-					data-no-nav
-					transition:fade={{ duration: 120 }}
-				>
-					<div class="w-full max-w-xs rounded-2xl bg-white dark:bg-dark-card p-4 text-center">
-						<p class="m-0 mb-1 text-sm font-semibold text-slate-950 dark:text-white">
-							Delete this story?
-						</p>
-						<p class="m-0 mb-4 text-xs text-slate-500 dark:text-dark-muted">
-							It will disappear for everyone right away.
-						</p>
-						<div class="flex gap-2">
-							<button
-								type="button"
-								class="flex-1 h-10 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text text-xs font-semibold border-0 cursor-pointer"
-								onclick={() => (confirmDelete = false)}
-							>
-								Cancel
-							</button>
-							<button
-								type="button"
-								class="flex-1 h-10 rounded-full bg-red-600 text-white text-xs font-semibold border-0 cursor-pointer disabled:opacity-50"
-								onclick={deleteStory}
-								disabled={deleting}
-							>
-								{deleting ? 'Deleting…' : 'Delete'}
-							</button>
-						</div>
-					</div>
-				</div>
-			{/if}
-		</div>
-	</div>
+			{/snippet}
+		</BottomSheet>
+	</Modal>
 {/if}

@@ -1,6 +1,12 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, expect, it } from 'vitest';
+import { page, userEvent } from 'vitest/browser';
+import { beforeAll, describe, expect, it } from 'vitest';
 import CreatePostBox from './CreatePostBox.svelte';
+// Tailwind spreads the studio's dialog over the viewport, so a corner click lands on its backdrop.
+import '../../../app.css';
+
+// The inline composer and its studio are desktop-only.
+beforeAll(() => page.viewport(1280, 900));
 
 describe('CreatePostBox', () => {
 	it('renders composer with input, post types, and publish button', async () => {
@@ -22,5 +28,24 @@ describe('CreatePostBox', () => {
 		await articleRadio.click();
 
 		await expect.element(screen.getByPlaceholder('Article title...')).toBeInTheDocument();
+	});
+
+	it('opens the studio as a modal that Escape or the backdrop closes, keeping the draft', async () => {
+		const screen = render(CreatePostBox);
+		const studioMode = screen.getByRole('button', { name: 'Studio mode' });
+
+		await studioMode.click();
+		const studio = screen.getByRole('dialog', { name: 'Studio Creation Suite' });
+		await expect.element(studio).toBeVisible();
+		expect(studio.element().matches(':modal')).toBe(true);
+		await userEvent.keyboard('{Escape}');
+		await expect.element(studio).not.toBeInTheDocument();
+		await expect.element(studioMode).toHaveFocus();
+
+		await studioMode.click();
+		await screen.getByLabelText('Curatorial narrative').fill('Concrete at dusk');
+		await studio.click({ position: { x: 4, y: 4 } });
+		await expect.element(studio).not.toBeInTheDocument();
+		await expect.element(screen.getByLabelText('Post content')).toHaveValue('Concrete at dusk');
 	});
 });

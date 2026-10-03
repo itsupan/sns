@@ -1,5 +1,13 @@
 export type ActivityType =
-	'like' | 'comment' | 'reply' | 'reaction' | 'follow' | 'mention' | 'story_reaction';
+	| 'like'
+	| 'comment'
+	| 'reply'
+	| 'reaction'
+	| 'follow'
+	| 'mention'
+	| 'story_reaction'
+	| 'follow_request'
+	| 'follow_accepted';
 
 /** One notification as the Activity API returns it. */
 export interface ActivityItem {
@@ -23,5 +31,20 @@ export interface ActivityItem {
 
 export interface ActivityPage {
 	items: ActivityItem[];
+	nextCursor: string | null;
+}
+
+/** Someone waiting for the user to approve their request to follow. */
+export interface FollowRequestUser {
+	id: string;
+	name: string;
+	handle: string | null;
+	image: string | null;
+	/** When the request was made (ms). */
+	requestedAt: number;
+}
+
+export interface FollowRequestPage {
+	users: FollowRequestUser[];
 	nextCursor: string | null;
 }
