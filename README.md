@@ -166,6 +166,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | `signUp`         | `RATE_LIMIT_SIGN_UP`         | `POST /api/auth/sign-up/email` (per IP)                              | 5 / hour  |
 | `authEmail`      | `RATE_LIMIT_AUTH_EMAIL`      | request a password reset, resend verification, change email (per IP) | 5 / hour  |
 | `passwordChange` | `RATE_LIMIT_PASSWORD_CHANGE` | reset or change the password (per IP)                                | 10 / hour |
+| `twoFactor`      | `RATE_LIMIT_TWO_FACTOR`      | verify a two-factor or backup code (per IP)                          | 5 / 5 min |
 | `sessionRevoke`  | `RATE_LIMIT_SESSION_REVOKE`  | `DELETE /api/account/sessions/:id`                                   | 30 / min  |
 | `profileUpdate`  | `RATE_LIMIT_PROFILE_UPDATE`  | `PATCH /api/users/:id`, `PUT /api/account/notification-preferences`  | 10 / min  |
 | `contentEdit`    | `RATE_LIMIT_CONTENT_EDIT`    | edit / delete a post, delete a comment or story                      | 30 / min  |
@@ -257,6 +258,7 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `MEDIA_URL_TTL_SECONDS`       | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                           |
 | `IMAGE_TRANSFORMS`            | `on` or `off`                 | `off`                                       |
 | `SIGNUP_BLOCKED_EMAILS`       | comma-separated emails        | empty (nobody blocked)                      |
+| `TURNSTILE_SITE_KEY`          | Turnstile site key            | empty (Turnstile off)                       |
 | `EMAIL_FROM`                  | `Name <address>`              | sender of auth emails (see [Email](#email)) |
 
 `IMAGE_TRANSFORMS=on` gives feed, Explore and profile images a `srcset` of resized copies from [Cloudflare Image Transformations](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/width=…,quality=85,format=auto/api/media/…`), so phones download a fraction of the original. Only media served by this Worker under `/api/media/` is resized; presigned R2 and external URLs are left as they are. Turn it on only after enabling Transformations for the zone (dashboard → Images → Transformations → enable the zone): until then every `/cdn-cgi/image/` URL fails and those images break.
@@ -288,6 +290,18 @@ pnpm exec wrangler secret put RESEND_API_KEY --env production
 ```
 
 `EMAIL_FROM` in `wrangler.jsonc` (`Kizuna <no-reply@sns.ecoapsara.com>`) must use the verified domain.
+
+## Sign-in security
+
+**Two-factor authentication.** Accounts with a password can turn on an authenticator app (TOTP) in Settings → Two-factor authentication: confirm the password, scan the QR code, enter a code, then save the ten backup codes, which are shown only once. The same section turns it off and regenerates the backup codes. After the password, `/login/two-factor` asks for a code from the app or a backup code, and can trust the device for 30 days. Google sign-ins skip the second step, even on an account that has a password and two-factor turned on: Better Auth only asks for it after an email/password sign-in, so a Google sign-in is protected by the Google account's own 2-Step Verification. Accounts without a password never see the setting. The secret and the backup codes are stored encrypted in the `two_factor` table and never appear in the data export.
+
+**Turnstile.** [Cloudflare Turnstile](https://developers.cloudflare.com/turnstile/) puts a challenge on signup and password reset requests. It is off until both halves are set: the `TURNSTILE_SITE_KEY` var (public, shown to the browser) and the `TURNSTILE_SECRET_KEY` secret (verifies the answers on the server). Only the signup and forgot-password forms load the Turnstile script. To turn it on, create a widget (dashboard → Turnstile → Add widget, _Managed_ mode, hostname `sns.ecoapsara.com`), put its site key in `TURNSTILE_SITE_KEY` in `env.production` in `wrangler.jsonc`, then:
+
+```sh
+pnpm exec wrangler secret put TURNSTILE_SECRET_KEY --env production
+```
+
+To try it locally, set both in `.dev.vars` (Cloudflare publishes [test keys](https://developers.cloudflare.com/turnstile/troubleshooting/testing/) that always pass).
 
 ## Generated files
 

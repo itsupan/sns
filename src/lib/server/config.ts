@@ -39,6 +39,7 @@ export type RateLimitName =
 	| 'signUp'
 	| 'authEmail'
 	| 'passwordChange'
+	| 'twoFactor'
 	| 'sessionRevoke'
 	| 'profileUpdate'
 	| 'contentEdit'
@@ -78,6 +79,11 @@ export interface AppConfig {
 	imageTransforms: boolean;
 	/** Normalized emails (see `normalizeEmail`) that may not sign up or be moved to. */
 	auth: { blockedSignupEmails: ReadonlySet<string> };
+	/**
+	 * Public Cloudflare Turnstile key, null unless the `TURNSTILE_SECRET_KEY` secret is set too.
+	 * When set, signup and password reset requests need a solved challenge.
+	 */
+	turnstileSiteKey: string | null;
 }
 
 const MAX_SIGV4_TTL_SEC = 7 * 24 * 3600;
@@ -109,6 +115,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		signUp: { limit: 5, windowSec: 3600 },
 		authEmail: { limit: 5, windowSec: 3600 },
 		passwordChange: { limit: 10, windowSec: 3600 },
+		twoFactor: { limit: 5, windowSec: 300 },
 		sessionRevoke: { limit: 30, windowSec: 60 },
 		profileUpdate: { limit: 10, windowSec: 60 },
 		contentEdit: { limit: 30, windowSec: 60 },
@@ -143,7 +150,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 	},
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
 	imageTransforms: false,
-	auth: { blockedSignupEmails: new Set() }
+	auth: { blockedSignupEmails: new Set() },
+	turnstileSiteKey: null
 };
 
 /** Env var name for each rate limit. Value format: `<limit>/<windowSeconds>`, e.g. `10/60`. */
@@ -173,6 +181,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	signUp: 'RATE_LIMIT_SIGN_UP',
 	authEmail: 'RATE_LIMIT_AUTH_EMAIL',
 	passwordChange: 'RATE_LIMIT_PASSWORD_CHANGE',
+	twoFactor: 'RATE_LIMIT_TWO_FACTOR',
 	sessionRevoke: 'RATE_LIMIT_SESSION_REVOKE',
 	profileUpdate: 'RATE_LIMIT_PROFILE_UPDATE',
 	contentEdit: 'RATE_LIMIT_CONTENT_EDIT',
@@ -188,6 +197,8 @@ const OnOff = v.pipe(
 	v.regex(/^(on|off)$/),
 	v.transform((value) => value === 'on')
 );
+
+const NonEmpty = v.pipe(v.string(), v.trim(), v.nonEmpty());
 
 const RateLimitVar = v.pipe(
 	v.string(),
@@ -310,7 +321,11 @@ export function loadConfig(env: object | undefined): AppConfig {
 				EmailList,
 				d.auth.blockedSignupEmails
 			)
-		}
+		},
+		// A widget whose tokens nothing verifies would only slow people down.
+		turnstileSiteKey: vars.TURNSTILE_SECRET_KEY
+			? read<string | null>(vars, 'TURNSTILE_SITE_KEY', NonEmpty, d.turnstileSiteKey)
+			: null
 	};
 }
 

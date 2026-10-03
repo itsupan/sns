@@ -70,6 +70,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 		// Email/password accounts must re-enter their password to change it or delete the account.
 		hasPassword: providers.includes('credential'),
 		socialProviders: providers.filter((id) => id !== 'credential'),
+		twoFactorEnabled: me.twoFactorEnabled ?? false,
 		sessions: sessions.map((s) => ({
 			id: s.id,
 			device: describeUserAgent(s.userAgent),

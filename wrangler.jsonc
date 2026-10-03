@@ -40,6 +40,7 @@
 		"RATE_LIMIT_SIGN_UP": "5/3600",
 		"RATE_LIMIT_AUTH_EMAIL": "5/3600",
 		"RATE_LIMIT_PASSWORD_CHANGE": "10/3600",
+		"RATE_LIMIT_TWO_FACTOR": "5/300",
 		"RATE_LIMIT_SESSION_REVOKE": "30/60",
 		"RATE_LIMIT_PROFILE_UPDATE": "10/60",
 		"RATE_LIMIT_CONTENT_EDIT": "30/60",
@@ -70,7 +71,9 @@
 		"MEDIA_URL_TTL_SECONDS": "604800",
 		// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
 		"IMAGE_TRANSFORMS": "off",
-		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
+		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com",
+		// Turnstile on signup and password reset, with the TURNSTILE_SECRET_KEY secret (see README).
+		"TURNSTILE_SITE_KEY": ""
 	},
 	"secrets": {
 		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY"]
@@ -138,6 +141,7 @@
 				"RATE_LIMIT_SIGN_UP": "5/3600",
 				"RATE_LIMIT_AUTH_EMAIL": "5/3600",
 				"RATE_LIMIT_PASSWORD_CHANGE": "10/3600",
+				"RATE_LIMIT_TWO_FACTOR": "5/300",
 				"RATE_LIMIT_SESSION_REVOKE": "30/60",
 				"RATE_LIMIT_PROFILE_UPDATE": "10/60",
 				"RATE_LIMIT_CONTENT_EDIT": "30/60",
@@ -168,7 +172,9 @@
 				"MEDIA_URL_TTL_SECONDS": "604800",
 				// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
 				"IMAGE_TRANSFORMS": "off",
-				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
+				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com",
+				// Turnstile on signup and password reset, with the TURNSTILE_SECRET_KEY secret (see README).
+				"TURNSTILE_SITE_KEY": ""
 			},
 			"routes": [{ "pattern": "sns.ecoapsara.com", "custom_domain": true }],
 			"secrets": {

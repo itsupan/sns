@@ -4,12 +4,15 @@
 	import AuthAlert from '$lib/components/auth/AuthAlert.svelte';
 	import AuthPanel from '$lib/components/auth/AuthPanel.svelte';
 	import { inputClass, labelClass, linkClass } from '$lib/components/auth/styles';
+	import Turnstile from '$lib/components/auth/Turnstile.svelte';
 	import Button from '$lib/components/shared/Button.svelte';
 
 	let email = $state('');
 	let loading = $state(false);
 	let sent = $state(false);
 	let errorMessage = $state<string | null>(null);
+	let captchaToken = $state('');
+	let turnstile = $state<ReturnType<typeof Turnstile>>();
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
@@ -24,8 +27,10 @@
 			// The answer is the same whether or not an account exists, so neither is the message.
 			const { error } = await authClient.requestPasswordReset({
 				email: trimmedEmail,
-				redirectTo: resolve('/reset-password')
+				redirectTo: resolve('/reset-password'),
+				fetchOptions: { headers: { 'x-captcha-response': captchaToken } }
 			});
+			turnstile?.reset();
 			if (error) errorMessage = error.message || 'Could not send the email. Please try again.';
 			else sent = true;
 		} catch {
@@ -73,6 +78,7 @@
 							class={inputClass}
 						/>
 					</div>
+					<Turnstile bind:token={captchaToken} bind:this={turnstile} />
 					<Button type="submit" variant="primary" size="lg" fullWidth {loading}>
 						Send reset link
 					</Button>

@@ -8,7 +8,8 @@
 		MutedSection,
 		PrivacyDataSection,
 		PrivateAccountSection,
-		SecuritySection
+		SecuritySection,
+		TwoFactorSection
 	} from '$lib/components/settings';
 	import type { PageProps } from './$types';
 
@@ -28,6 +29,7 @@
 		socialProviders={data.socialProviders}
 		sessions={data.sessions}
 	/>
+	<TwoFactorSection hasPassword={data.hasPassword} enabled={data.twoFactorEnabled} />
 	<PrivateAccountSection userId={data.userId} isPrivate={data.isPrivate} />
 	<NotificationsSection />
 	<PrivacyDataSection hasPassword={data.hasPassword} />
