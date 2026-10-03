@@ -155,26 +155,13 @@
 					toast.error(errorMessage);
 					loading = false;
 				} else {
-					// Sign out immediately so user must sign in with their email and password first
-					try {
-						await authClient.signOut();
-					} catch {
-						// Ignore if not authenticated yet
-					}
-
-					successMessage =
-						'Account created successfully! Please sign in with your email and password.';
-					toast.success('Account created successfully! Please sign in.');
-
-					// Redirect user to login with their email and redirectTo prefilled
-					const redirectParam = page.url?.searchParams?.get('redirectTo');
-					const loginUrl = redirectParam
-						? `${resolve('/login')}?email=${encodeURIComponent(trimmedEmail)}&redirectTo=${encodeURIComponent(redirectParam)}`
-						: `${resolve('/login')}?email=${encodeURIComponent(trimmedEmail)}`;
-					setTimeout(() => {
-						// eslint-disable-next-line svelte/no-navigation-without-resolve
-						goto(loginUrl);
-					}, 600);
+					// The new account stays signed in and sets up its profile; the verification email
+					// is already on its way.
+					toast.success('Account created! Check your inbox to verify your email.');
+					// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() is the base; only a query is added
+					await goto(`${resolve('/welcome')}?redirectTo=${encodeURIComponent(effectiveRedirect)}`, {
+						invalidateAll: true
+					});
 				}
 			}
 		} catch (err: unknown) {

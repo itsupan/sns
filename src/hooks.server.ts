@@ -1,4 +1,10 @@
-import { json, redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
+import {
+	json,
+	redirect,
+	type Handle,
+	type HandleServerError,
+	type RequestEvent
+} from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { createAuth } from '$lib/server/auth';
@@ -28,6 +34,29 @@ const SECURITY_HEADERS: Record<string, string> = {
 	'X-Frame-Options': 'DENY',
 	'Content-Security-Policy': "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 };
+
+/** Pages a signed-in user can open before finishing the welcome flow (each with its subpages). */
+const ONBOARDING_EXEMPT = [
+	'/welcome',
+	'/login',
+	'/signup',
+	'/forgot-password',
+	'/reset-password',
+	'/offline',
+	'/legal',
+	'/admin'
+];
+
+/** Page visits (not API calls, assets or the exempt pages) that send a new user to /welcome. */
+function requiresOnboarding({ request, url }: RequestEvent): boolean {
+	const { pathname } = url;
+	if (request.method !== 'GET' || pathname.startsWith('/api/') || pathname.startsWith('/_app/')) {
+		return false;
+	}
+	// Files such as /robots.txt or /brand/logo-64.png.
+	if (/\.[a-z0-9]+$/i.test(pathname)) return false;
+	return !ONBOARDING_EXEMPT.some((page) => pathname === page || pathname.startsWith(`${page}/`));
+}
 
 function withSecurityHeaders(response: Response): Response {
 	// A WebSocket upgrade comes straight from the chat room, with immutable headers.
@@ -74,6 +103,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		throw redirect(
 			302,
 			`/login?redirectTo=${encodeURIComponent(event.url.pathname + event.url.search)}`
+		);
+	}
+
+	if (event.locals.user && !event.locals.user.onboardedAt && requiresOnboarding(event)) {
+		throw redirect(
+			302,
+			`/welcome?redirectTo=${encodeURIComponent(event.url.pathname + event.url.search)}`
 		);
 	}
 

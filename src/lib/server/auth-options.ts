@@ -101,6 +101,8 @@ export function authOptions(env: Env) {
 				followingCount: { type: 'number', required: true, defaultValue: 0, input: false },
 				// Set server-side at account creation; never user input.
 				termsAcceptedAt: { type: 'date', required: false, input: false },
+				// Set when the first-run welcome flow finishes; until then page visits go to /welcome.
+				onboardedAt: { type: 'date', required: false, input: false },
 				// Toggled through PATCH /api/users/:id, which approves pending requests on going public.
 				isPrivate: { type: 'boolean', required: true, defaultValue: false, input: false }
 			}
