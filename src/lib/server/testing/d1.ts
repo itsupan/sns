@@ -48,7 +48,7 @@ export async function createTestDb(options: { stopBefore?: string } = {}) {
 	return {
 		db: drizzle(d1, { schema }),
 		d1,
-		/** All local bindings from wrangler.jsonc (e.g. the STORIES KV namespace), in memory. */
+		/** All local bindings from wrangler.jsonc (e.g. the KV namespace), in memory. */
 		env: proxy.env,
 		migrateRest: () => applyMigrations(d1, files.slice(cut)),
 		dispose: () => proxy.dispose()

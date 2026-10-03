@@ -4,6 +4,7 @@
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import Modal from '$lib/components/shared/Modal.svelte';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
@@ -21,6 +22,12 @@
 		viewedAt: number;
 		reaction: StoryReaction | null;
 		isFollowing: boolean;
+	}
+
+	interface ViewersPage {
+		count: number;
+		viewers: StoryViewer[];
+		nextCursor: string | null;
 	}
 
 	/** How long a photo stays on screen; videos play for their own length. */
@@ -51,6 +58,10 @@
 	let viewersOpen = $state(false);
 	let viewersLoading = $state(false);
 	let viewers = $state<StoryViewer[]>([]);
+	let viewersCount = $state(0);
+	let viewersCursor = $state<string | null>(null);
+	let viewersMoreLoading = $state(false);
+	let viewersMoreError = $state<string | null>(null);
 	let deleting = $state(false);
 	// Reply box and reactions on other people's stories.
 	let replyDraft = $state('');
@@ -240,33 +251,57 @@
 		}
 	}
 
+	/** One page of a story's viewers, or the message to show when it could not be loaded. */
+	async function fetchViewers(
+		storyId: string,
+		cursor: string | null
+	): Promise<ViewersPage | string> {
+		const query = cursor ? `?cursor=${encodeURIComponent(cursor)}` : '';
+		try {
+			const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}/views${query}`);
+			const body = await res.json().catch(() => null);
+			return res.ok ? (body as ViewersPage) : readApiError(body, 'Could not load viewers').message;
+		} catch {
+			return 'Could not load viewers';
+		}
+	}
+
+	/** Shows a loaded page if the viewer is still on `target`; keeps the button's count in step. */
+	function applyViewers(target: Story, page: ViewersPage) {
+		if (story?.id !== target.id) return;
+		viewers = [...viewers, ...page.viewers];
+		viewersCount = page.count;
+		viewersCursor = page.nextCursor;
+		target.viewCount = page.count;
+	}
+
 	async function openViewers() {
 		if (!story) return;
 		const target = story;
 		viewersOpen = true;
 		viewersLoading = true;
 		viewers = [];
-		try {
-			const res = await fetch(`/api/stories/${encodeURIComponent(target.id)}/views`);
-			const body = (await res.json().catch(() => null)) as {
-				viewers?: StoryViewer[];
-			} | null;
-			if (!res.ok) {
-				toast.show(readApiError(body, 'Could not load viewers').message);
-				viewersOpen = false;
-				return;
-			}
-			if (story?.id === target.id) {
-				viewers = body?.viewers ?? [];
-				// Keep the count on the button in step with the list.
-				target.viewCount = viewers.length;
-			}
-		} catch {
-			toast.show('Could not load viewers');
+		viewersCursor = null;
+		viewersMoreError = null;
+		const page = await fetchViewers(target.id, null);
+		viewersLoading = false;
+		if (typeof page === 'string') {
+			toast.show(page);
 			viewersOpen = false;
-		} finally {
-			viewersLoading = false;
+			return;
 		}
+		applyViewers(target, page);
+	}
+
+	async function loadMoreViewers() {
+		if (!story || !viewersCursor || viewersMoreLoading) return;
+		const target = story;
+		viewersMoreLoading = true;
+		viewersMoreError = null;
+		const page = await fetchViewers(target.id, viewersCursor);
+		viewersMoreLoading = false;
+		if (typeof page === 'string') viewersMoreError = page;
+		else applyViewers(target, page);
 	}
 
 	async function toggleFollowViewer(person: StoryViewer) {
@@ -573,7 +608,7 @@
 				<span
 					>{viewersLoading
 						? 'Viewers'
-						: `${viewers.length} ${viewers.length === 1 ? 'viewer' : 'viewers'}`}</span
+						: `${viewersCount} ${viewersCount === 1 ? 'viewer' : 'viewers'}`}</span
 				>
 			</h2>
 			<ul class="list-none m-0 p-0">
@@ -627,6 +662,9 @@
 					{/each}
 				{/if}
 			</ul>
+			{#if viewersCursor}
+				<LoadMore onLoad={loadMoreViewers} loading={viewersMoreLoading} error={viewersMoreError} />
+			{/if}
 		</BottomSheet>
 
 		<BottomSheet bind:open={confirmDelete} title="Delete this story?" showTitle>
