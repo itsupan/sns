@@ -83,5 +83,22 @@ export function activityVerb(group: ActivityGroup): string {
 			return 'tagged you in a post';
 		case 'story_reaction':
 			return 'reacted to your story';
+		case 'follow_request':
+			return 'asked to follow you';
+		case 'follow_accepted':
+			return 'accepted your follow request';
 	}
 }
+
+/** What each type of notification is about, as named in notification settings. */
+export const activityTypeLabels: Record<ActivityType, string> = {
+	like: 'Likes on your posts',
+	comment: 'Comments on your posts',
+	reply: 'Replies to your comments',
+	reaction: 'Reactions to your comments',
+	follow: 'New followers',
+	mention: 'Tags in posts',
+	story_reaction: 'Reactions to your stories',
+	follow_request: 'Follow requests',
+	follow_accepted: 'Accepted follow requests'
+};

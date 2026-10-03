@@ -40,14 +40,14 @@ describe('profile utilities', () => {
 		expect(profile.handle).toBe('aoi_minimal');
 	});
 
-	it('falls back to email prefix when handle is missing', () => {
+	it('never derives a handle from the email or the name', () => {
 		const sessionUser = {
 			name: 'Marcus Chen',
 			email: 'marcus.chen@example.com'
 		};
 
 		const profile = resolveProfile(sessionUser, null);
-		expect(profile.handle).toBe('marcus.chen');
+		expect(profile.handle).toBeNull();
 	});
 
 	it('prioritizes updatedUser over sessionUser', () => {

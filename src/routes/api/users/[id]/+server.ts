@@ -3,7 +3,7 @@ import { eq, and, ne } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { user } from '$lib/server/db/schema';
-import { isFollowing } from '$lib/server/db/follows';
+import { approvalStatements, isFollowing } from '$lib/server/db/follows';
 import { isOwnUpload } from '$lib/server/services/storage';
 import {
 	ApiError,
@@ -59,7 +59,8 @@ const UpdateProfile = v.object(
 			)
 		),
 		location: clearableText('Location', 100),
-		cameraGear: clearableText('Camera gear', 200)
+		cameraGear: clearableText('Camera gear', 200),
+		isPrivate: v.optional(v.boolean('Private account must be true or false'))
 	},
 	'Request body must be an object'
 );
@@ -153,14 +154,20 @@ export const PATCH: RequestHandler = withApi(async ({ params, request, locals, p
 	}
 
 	// 4. Update the user row in database
+	const write = locals.db
+		.update(user)
+		.set({
+			...updates,
+			updatedAt: new Date()
+		})
+		.where(eq(user.id, targetUserId));
 	try {
-		await locals.db
-			.update(user)
-			.set({
-				...updates,
-				updatedAt: new Date()
-			})
-			.where(eq(user.id, targetUserId));
+		// Anyone may follow a public account, so going public approves every pending request with it.
+		if (updates.isPrivate === false) {
+			await locals.db.batch([write, ...approvalStatements(locals.db, targetUserId)]);
+		} else {
+			await write;
+		}
 	} catch (err) {
 		// The unique index is the real guard: two requests can both pass the check above.
 		const detail = `${err} ${(err as { cause?: unknown })?.cause ?? ''}`;
@@ -181,6 +188,7 @@ export const PATCH: RequestHandler = withApi(async ({ params, request, locals, p
 			website: user.website,
 			location: user.location,
 			cameraGear: user.cameraGear,
+			isPrivate: user.isPrivate,
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt
 		})

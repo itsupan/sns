@@ -8,6 +8,7 @@ import {
 } from '$lib/constants/post-limits';
 import { DEFAULT_TEXT_BACKGROUND, type TextBackground } from '$lib/post-backgrounds';
 import type { PostData, PostType } from './PostCard.svelte';
+import type { IconName } from '$lib/components/shared/icons';
 
 export type { PostType };
 export type AspectRatio = '1:1' | '4:5' | '16:9';
@@ -17,12 +18,14 @@ export interface MediaPlate {
 	url: string;
 	previewUrl: string;
 	type: 'image' | 'video';
+	/** Alt text for screen readers; images only. */
+	alt: string;
 	file?: File;
 	uploading?: boolean;
 	progress?: number;
 }
 
-export const POST_TYPES: { id: PostType; label: string; icon: string }[] = [
+export const POST_TYPES: { id: PostType; label: string; icon: IconName }[] = [
 	{ id: 'photo', label: 'Photo', icon: 'picture' },
 	{ id: 'story', label: 'Story', icon: 'play-alt' },
 	{ id: 'article', label: 'Article', icon: 'document' },
@@ -85,7 +88,8 @@ export class PostDraft {
 			id: crypto.randomUUID(),
 			url: m.url,
 			previewUrl: m.url,
-			type: m.type
+			type: m.type,
+			alt: m.alt ?? ''
 		}));
 		return draft;
 	}
@@ -113,6 +117,7 @@ export class PostDraft {
 					url: '',
 					previewUrl: URL.createObjectURL(file),
 					type: isVideo ? 'video' : 'image',
+					alt: '',
 					file,
 					uploading: true,
 					progress: 0
@@ -206,7 +211,7 @@ export class PostDraft {
 		}
 		const mediaUrls = this.mediaPlates
 			.filter((p) => p.url)
-			.map((p) => ({ url: p.url, type: p.type }));
+			.map((p) => ({ url: p.url, type: p.type, alt: p.alt }));
 		return {
 			content: trimmed || (this.selectedType === 'photo' ? 'Visual Exhibition' : 'Note'),
 			title:

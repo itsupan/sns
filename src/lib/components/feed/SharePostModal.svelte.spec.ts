@@ -16,7 +16,7 @@ const testPost: PostData = {
 	tags: ['#Architecture'],
 	likes: 12,
 	commentsCount: 3,
-	repostsCount: 1
+	sharesCount: 1
 };
 
 describe('SharePostModal', () => {

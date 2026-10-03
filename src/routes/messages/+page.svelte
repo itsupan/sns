@@ -3,18 +3,19 @@
 	import { resolve } from '$app/paths';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
-	import { toast } from '$lib/utils/toast.svelte';
 	import type { InboxItem } from '$lib/chat/types';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 
-	/** Pages loaded with "Load more", appended after the server-rendered first page. */
+	/** Pages loaded while scrolling, appended after the server-rendered first page. */
 	let more = $state<InboxItem[]>([]);
 	let moreCursor = $state<string | null | undefined>(undefined);
 	let loadingMore = $state(false);
+	let loadError = $state<string | null>(null);
 
 	let conversations = $derived.by(() => {
 		const seen = new Set(data.conversations.map((c) => c.id));
@@ -25,15 +26,19 @@
 	async function loadMore() {
 		if (!nextCursor || loadingMore) return;
 		loadingMore = true;
+		loadError = null;
 		try {
 			const res = await fetch(`/api/conversations?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(body, 'Could not load conversations').message);
+			if (!res.ok) {
+				loadError = readApiError(body, 'Could not load conversations').message;
+				return;
+			}
 			const page = body as { conversations: InboxItem[]; nextCursor: string | null };
 			more = [...more, ...page.conversations];
 			moreCursor = page.nextCursor;
-		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not load conversations');
+		} catch {
+			loadError = 'Could not load conversations';
 		} finally {
 			loadingMore = false;
 		}
@@ -45,6 +50,7 @@
 			if (document.visibilityState === 'visible') {
 				more = [];
 				moreCursor = undefined;
+				loadError = null;
 				invalidateAll();
 			}
 		};
@@ -122,14 +128,7 @@
 		</ul>
 
 		{#if nextCursor}
-			<button
-				type="button"
-				onclick={loadMore}
-				disabled={loadingMore}
-				class="self-center h-9 px-5 rounded-full border border-slate-200 dark:border-dark-border bg-transparent text-xs font-semibold text-slate-600 dark:text-dark-muted cursor-pointer disabled:opacity-50"
-			>
-				{loadingMore ? 'Loading…' : 'Load more'}
-			</button>
+			<LoadMore onLoad={loadMore} loading={loadingMore} error={loadError} />
 		{/if}
 	{/if}
 </main>
