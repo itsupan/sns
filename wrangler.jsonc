@@ -12,6 +12,8 @@
 
 	"vars": {
 		"BETTER_AUTH_URL": "http://localhost:5173",
+		// Resend's shared test sender: delivers only to your own Resend account's address.
+		"EMAIL_FROM": "Kizuna <onboarding@resend.dev>",
 		// App tuning (parsed by src/lib/server/config.ts; invalid values fall back to defaults)
 		"RATE_LIMIT_CREATE_POST": "10/60",
 		"RATE_LIMIT_COMMENT": "20/60",
@@ -34,6 +36,9 @@
 		"RATE_LIMIT_ACCOUNT_DELETE": "5/3600",
 		"RATE_LIMIT_SIGN_IN": "10/60",
 		"RATE_LIMIT_SIGN_UP": "5/3600",
+		"RATE_LIMIT_AUTH_EMAIL": "5/3600",
+		"RATE_LIMIT_PASSWORD_CHANGE": "10/3600",
+		"RATE_LIMIT_SESSION_REVOKE": "30/60",
 		"RATE_LIMIT_PROFILE_UPDATE": "10/60",
 		"RATE_LIMIT_CONTENT_EDIT": "30/60",
 		"RATE_LIMIT_MARK_READ": "120/60",
@@ -52,15 +57,19 @@
 		"ACTIVITY_MAX_PAGE_SIZE": "50",
 		"EXPLORE_PAGE_SIZE": "18",
 		"EXPLORE_MAX_PAGE_SIZE": "36",
+		"PROFILE_PAGE_SIZE": "18",
+		"PROFILE_MAX_PAGE_SIZE": "36",
 		"CHAT_PAGE_SIZE": "30",
 		"CHAT_MAX_PAGE_SIZE": "100",
 		"INBOX_PAGE_SIZE": "20",
 		"INBOX_MAX_PAGE_SIZE": "50",
 		"MEDIA_URL_TTL_SECONDS": "604800",
+		// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
+		"IMAGE_TRANSFORMS": "off",
 		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
 	},
 	"secrets": {
-		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY"]
 	},
 	"d1_databases": [
 		{
@@ -101,6 +110,7 @@
 			"name": "sns",
 			"vars": {
 				"BETTER_AUTH_URL": "https://sns.ecoapsara.com",
+				"EMAIL_FROM": "Kizuna <no-reply@sns.ecoapsara.com>",
 				// App tuning (parsed by src/lib/server/config.ts; invalid values fall back to defaults)
 				"RATE_LIMIT_CREATE_POST": "10/60",
 				"RATE_LIMIT_COMMENT": "20/60",
@@ -123,6 +133,9 @@
 				"RATE_LIMIT_ACCOUNT_DELETE": "5/3600",
 				"RATE_LIMIT_SIGN_IN": "10/60",
 				"RATE_LIMIT_SIGN_UP": "5/3600",
+				"RATE_LIMIT_AUTH_EMAIL": "5/3600",
+				"RATE_LIMIT_PASSWORD_CHANGE": "10/3600",
+				"RATE_LIMIT_SESSION_REVOKE": "30/60",
 				"RATE_LIMIT_PROFILE_UPDATE": "10/60",
 				"RATE_LIMIT_CONTENT_EDIT": "30/60",
 				"RATE_LIMIT_MARK_READ": "120/60",
@@ -141,16 +154,25 @@
 				"ACTIVITY_MAX_PAGE_SIZE": "50",
 				"EXPLORE_PAGE_SIZE": "18",
 				"EXPLORE_MAX_PAGE_SIZE": "36",
+				"PROFILE_PAGE_SIZE": "18",
+				"PROFILE_MAX_PAGE_SIZE": "36",
 				"CHAT_PAGE_SIZE": "30",
 				"CHAT_MAX_PAGE_SIZE": "100",
 				"INBOX_PAGE_SIZE": "20",
 				"INBOX_MAX_PAGE_SIZE": "50",
 				"MEDIA_URL_TTL_SECONDS": "604800",
+				// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
+				"IMAGE_TRANSFORMS": "off",
 				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
 			},
 			"routes": [{ "pattern": "sns.ecoapsara.com", "custom_domain": true }],
 			"secrets": {
-				"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET"]
+				"required": [
+					"BETTER_AUTH_SECRET",
+					"GOOGLE_CLIENT_ID",
+					"GOOGLE_CLIENT_SECRET",
+					"RESEND_API_KEY"
+				]
 			},
 			"d1_databases": [
 				{

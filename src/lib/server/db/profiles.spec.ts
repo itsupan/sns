@@ -78,12 +78,9 @@ describe('profiles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 	});
 
 	it('lists live posts in feed shape with the viewer like state', async () => {
-		const posts = await loadProfilePosts(
-			db,
-			{ id: 'alice', name: 'alice', handle: 'alice', image: null, location: null },
-			'bob'
-		);
+		const { posts, nextCursor } = await loadProfilePosts(db, 'alice', 'bob', { limit: 10 });
 		expect(posts.map((p) => p.id).sort()).toEqual(['a-1', 'a-2']);
+		expect(nextCursor).toBeNull();
 		expect(posts[0].author.handle).toBe('@alice');
 		expect(posts[0].liked).toBe(false);
 	});

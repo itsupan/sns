@@ -4,7 +4,7 @@
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import TileGrid from '$lib/components/explore/TileGrid.svelte';
-	import LoadMore from '$lib/components/explore/LoadMore.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import { followStore } from '$lib/utils/follow.svelte';
 	import { formatCount } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
