@@ -169,7 +169,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | `twoFactor`      | `RATE_LIMIT_TWO_FACTOR`      | verify a two-factor or backup code (per IP)                          | 5 / 5 min |
 | `sessionRevoke`  | `RATE_LIMIT_SESSION_REVOKE`  | `DELETE /api/account/sessions/:id`                                   | 30 / min  |
 | `profileUpdate`  | `RATE_LIMIT_PROFILE_UPDATE`  | `PATCH /api/users/:id`, `PUT /api/account/notification-preferences`  | 10 / min  |
-| `contentEdit`    | `RATE_LIMIT_CONTENT_EDIT`    | edit / delete a post, delete a comment or story                      | 30 / min  |
+| `contentEdit`    | `RATE_LIMIT_CONTENT_EDIT`    | edit, delete, pin or unpin a post, delete a comment or story         | 30 / min  |
 | `markRead`       | `RATE_LIMIT_MARK_READ`       | mark notifications or a conversation read                            | 120 / min |
 | `storyView`      | `RATE_LIMIT_STORY_VIEW`      | `POST /api/stories/:id/view`                                         | 120 / min |
 

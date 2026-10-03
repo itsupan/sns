@@ -19,3 +19,6 @@ export const MAX_TEXT_POST_LENGTH = 280;
 
 /** People that can be tagged (@mentioned) in one post. */
 export const MAX_MENTIONS_PER_POST = 20;
+
+/** Posts an author can pin to the top of their profile at once. */
+export const MAX_PINNED_POSTS = 3;

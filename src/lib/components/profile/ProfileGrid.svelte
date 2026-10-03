@@ -239,9 +239,18 @@
 						type="button"
 						class="group relative w-full aspect-square overflow-hidden rounded-2xl bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
 						onclick={() => openItem(item)}
-						aria-label={`View post ${item.title}`}
+						aria-label={`View ${item.post.pinned ? 'pinned ' : ''}post ${item.title}`}
 					>
 						{@render preview(item, 'text-[11px] sm:text-sm', GRID_CELL_SIZES)}
+
+						{#if item.post.pinned}
+							<div
+								class="absolute top-2 left-2 sm:top-3 sm:left-3 p-1 rounded-md bg-black/50 backdrop-blur-xs text-white"
+								aria-hidden="true"
+							>
+								<Icon name="pin" class="text-xs sm:text-sm drop-shadow-xs" />
+							</div>
+						{/if}
 
 						<!-- Multi-photo Carousel Indicator Icon -->
 						{#if item.isCarousel}
@@ -278,6 +287,7 @@
 					<PostCard
 						post={item.post}
 						showFollow={false}
+						showPinned
 						onDelete={handleDeleted}
 						onUpdate={handleUpdated}
 					/>
@@ -294,7 +304,7 @@
 						type="button"
 						class="w-full flex items-center justify-between gap-4 py-3 sm:py-3.5 hover:bg-slate-50/80 dark:hover:bg-dark-elevated/40 px-2 sm:px-3 rounded-xl transition-colors cursor-pointer border-0 bg-transparent text-left"
 						onclick={() => openItem(item)}
-						aria-label={`View post ${item.title}`}
+						aria-label={`View ${item.post.pinned ? 'pinned ' : ''}post ${item.title}`}
 					>
 						<!-- Left: Thumbnail + Title -->
 						<div class="flex items-center gap-3.5 min-w-0">
@@ -304,8 +314,13 @@
 								{@render preview(item, 'text-[8px]', '56px')}
 							</div>
 							<div class="flex flex-col min-w-0">
-								<span class="font-semibold text-sm text-slate-900 dark:text-white truncate">
-									{item.title}
+								<span
+									class="flex items-center gap-1.5 font-semibold text-sm text-slate-900 dark:text-white min-w-0"
+								>
+									{#if item.post.pinned}
+										<Icon name="pin" class="text-xs shrink-0 text-slate-500 dark:text-dark-muted" />
+									{/if}
+									<span class="truncate">{item.title}</span>
 								</span>
 								{#if item.cameraMeta || item.tags?.length}
 									<span class="text-xs text-slate-400 dark:text-dark-muted truncate">
