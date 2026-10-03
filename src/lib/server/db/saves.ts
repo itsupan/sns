@@ -3,6 +3,7 @@ import type { Database } from '.';
 import { post, postSave, user } from './schema';
 import { encodeCursor, notDeleted, type FeedCursor } from './posts';
 import { postRowAuthor, toPostCards, type PostRow } from './post-cards';
+import { visibleTo } from './visibility';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 
 /** Saves or unsaves a post. Idempotent: repeating either changes nothing. Saves are private. */
@@ -38,6 +39,7 @@ export async function loadSavedPage(
 			and(
 				eq(postSave.userId, userId),
 				notDeleted,
+				visibleTo(userId, post.userId),
 				cursor
 					? sql`(${postSave.createdAt}, ${postSave.postId}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined

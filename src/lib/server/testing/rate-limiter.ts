@@ -1,3 +1,4 @@
+import { DEFAULT_CONFIG, type RateLimitName } from '../config';
 import type { RateLimiter } from '../rate-limiter';
 import { countHit, type RateWindow } from '../rate-window';
 
@@ -14,5 +15,15 @@ export function fakeRateLimiter(now = () => Date.now()) {
 			}
 		})
 	};
-	return { namespace: namespace as unknown as DurableObjectNamespace<RateLimiter>, windows };
+	/** Uses up `subject`'s current window of the default `name` rule, so its next hit is a 429. */
+	const exhaust = (name: RateLimitName, subject: string) => {
+		const { limit, windowSec } = DEFAULT_CONFIG.rateLimits[name];
+		const nowSec = Math.floor(now() / 1000);
+		windows.set(`${name}:${subject}`, { windowStart: nowSec - (nowSec % windowSec), count: limit });
+	};
+	return {
+		namespace: namespace as unknown as DurableObjectNamespace<RateLimiter>,
+		windows,
+		exhaust
+	};
 }
