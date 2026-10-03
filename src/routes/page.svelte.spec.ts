@@ -74,7 +74,7 @@ describe('home page', () => {
 							tags: ['#test'],
 							likes: 5,
 							commentsCount: 1,
-							repostsCount: 0
+							sharesCount: 0
 						}
 					],
 					hasMore: false,
@@ -156,7 +156,7 @@ function makePost(id: string) {
 		tags: [],
 		likes: 0,
 		commentsCount: 0,
-		repostsCount: 0
+		sharesCount: 0
 	};
 }
 

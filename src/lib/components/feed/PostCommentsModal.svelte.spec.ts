@@ -23,7 +23,7 @@ const testPost: PostData = {
 	tags: [],
 	likes: 0,
 	commentsCount: 3,
-	repostsCount: 0
+	sharesCount: 0
 };
 
 function makeComment(id: string, overrides: Partial<CommentItem> = {}): CommentItem {

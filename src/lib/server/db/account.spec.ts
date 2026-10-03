@@ -108,7 +108,7 @@ describe('account export on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(data).not.toBeNull();
 		expect(data!.profile).toMatchObject({ id: 'alice', email: 'a@test.dev', handle: 'alice' });
 		expect(data!.posts.map((p) => p.id)).toEqual(['p-a']);
-		expect(data!.posts[0].media).toEqual([{ url: 'uploads/a.jpg', type: 'image' }]);
+		expect(data!.posts[0].media).toEqual([{ url: 'uploads/a.jpg', type: 'image', alt: null }]);
 		expect(data!.comments.map((c) => c.id)).toEqual(['c-1']);
 		expect(data!.likes.map((l) => l.postId)).toEqual(['p-b']);
 		expect(data!.saves.map((s) => s.postId)).toEqual(['p-b']);
@@ -121,7 +121,7 @@ describe('account export on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 			{ id: 'alice:1', mediaUrl: '/api/media/stories/alice/s.jpg', mediaType: 'image' }
 		]);
 		// Stories alice watched, not who watched hers.
-		expect(data!.storyViews).toMatchObject([{ storyId: 'bob:1', reaction: '🔥' }]);,
+		expect(data!.storyViews).toMatchObject([{ storyId: 'bob:1', reaction: '🔥' }]);
 		expect(data!.moderationActions).toMatchObject([
 			{ action: 'dismiss', targetType: 'post', targetId: 'p-b' }
 		]);
