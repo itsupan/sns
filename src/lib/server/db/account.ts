@@ -4,6 +4,7 @@ import type { Database } from './index';
 import { account, session, user } from './auth-schema';
 import { deleteR2Objects, extractR2Key } from '$lib/server/services/storage';
 import {
+	closeFriend,
 	commentReaction,
 	conversation,
 	conversationMember,
@@ -28,7 +29,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 10;
+export const EXPORT_FORMAT_VERSION = 11;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -54,6 +55,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		followRequestsReceived,
 		muted,
 		mutedKeywords,
+		closeFriends,
 		memberships,
 		notifications,
 		notificationOptOuts,
@@ -138,6 +140,11 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.from(mutedKeyword)
 			.where(eq(mutedKeyword.userId, userId)),
 		db
+			.select({ userId: closeFriend.friendId, handle: user.handle, since: closeFriend.createdAt })
+			.from(closeFriend)
+			.innerJoin(user, eq(user.id, closeFriend.friendId))
+			.where(eq(closeFriend.userId, userId)),
+		db
 			.select({ conversationId: conversationMember.conversationId })
 			.from(conversationMember)
 			.where(eq(conversationMember.userId, userId)),
@@ -163,6 +170,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 				mediaType: story.mediaType,
 				caption: story.caption,
 				location: story.location,
+				audience: story.audience,
 				viewsCount: story.viewsCount,
 				createdAt: story.createdAt,
 				expiresAt: story.expiresAt
@@ -290,6 +298,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		followRequestsReceived,
 		muted,
 		mutedKeywords,
+		closeFriends,
 		// Deleted messages keep only their metadata, as in the app.
 		conversations: conversationIds.map((id) => ({
 			id,

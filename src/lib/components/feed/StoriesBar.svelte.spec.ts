@@ -24,6 +24,7 @@ const groups: StoryGroup[] = [
 				userId: 'aoi',
 				mediaUrl: PIXEL,
 				mediaType: 'image',
+				audience: 'everyone',
 				caption: 'Night walk',
 				location: null,
 				createdAt: now,

@@ -1,10 +1,17 @@
-import { and, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, lt, or, sql } from 'drizzle-orm';
 import type { Database } from '$lib/server/db';
-import { notification, story, storyView, user, userFollow } from '$lib/server/db/schema';
+import {
+	closeFriend,
+	notification,
+	story,
+	storyView,
+	user,
+	userFollow
+} from '$lib/server/db/schema';
 import { notBlockedWith } from '$lib/server/db/blocks';
 import { notMutedBy } from '$lib/server/db/mutes';
 import { encodeCursor, type FeedCursor } from '$lib/server/db/posts';
-import { STORY_TTL_SEC } from '$lib/stories';
+import { STORY_TTL_SEC, type StoryAudience } from '$lib/stories';
 import type { StoryReaction } from '$lib/reactions';
 
 export { STORY_TTL_SEC };
@@ -22,6 +29,7 @@ export interface StoredStory {
 	mediaType: 'image' | 'video';
 	caption: string | null;
 	location: string | null;
+	audience: StoryAudience;
 	/** Viewers other than the author. */
 	viewsCount: number;
 	createdAt: number;
@@ -41,6 +49,7 @@ const storyFields = {
 	mediaType: story.mediaType,
 	caption: story.caption,
 	location: story.location,
+	audience: story.audience,
 	viewsCount: story.viewsCount,
 	createdAt: story.createdAt,
 	expiresAt: story.expiresAt
@@ -55,6 +64,14 @@ const toStored = (row: StoryRow): StoredStory => ({
 });
 
 const live = (now: number) => gt(story.expiresAt, new Date(now));
+
+/** Keeps stories `viewerId` is in the audience of: close friends ones need the author's list. */
+const inAudience = (viewerId: string) =>
+	or(
+		eq(story.audience, 'everyone'),
+		eq(story.userId, viewerId),
+		sql`exists (select 1 from ${closeFriend} where ${closeFriend.userId} = ${story.userId} and ${closeFriend.friendId} = ${viewerId})`
+	);
 
 /**
  * Shares a story that expires 24 hours from `now`. Null when the author already shared one in
@@ -99,8 +116,9 @@ export interface TrayStory extends StoredStory {
 }
 
 /**
- * Live stories by `viewerId` and the people they follow, minus anyone blocked either way or muted,
- * with whether the viewer watched each and the reaction they sent. Own stories first, then newest.
+ * Live stories by `viewerId` and the people they follow, minus anyone blocked either way or muted
+ * and close friends stories the viewer isn't listed for, with whether the viewer watched each and
+ * the reaction they sent. Own stories first, then newest.
  */
 export async function loadTrayStories(
 	db: Database,
@@ -121,6 +139,7 @@ export async function loadTrayStories(
 			and(
 				sql`${story.userId} in (select ${userFollow.followingId} from ${userFollow} where ${userFollow.followerId} = ${viewerId} union all select ${viewerId})`,
 				live(now),
+				inAudience(viewerId),
 				notBlockedWith(viewerId, story.userId),
 				notMutedBy(viewerId, story.userId)
 			)

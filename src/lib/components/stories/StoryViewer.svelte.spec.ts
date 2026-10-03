@@ -14,6 +14,7 @@ function story(userId: string, n: number, caption: string): Story {
 		userId,
 		mediaUrl: PIXEL,
 		mediaType: 'image',
+		audience: 'everyone',
 		caption,
 		location: n === 1 ? 'Kyoto' : null,
 		createdAt: now - n * 60_000,

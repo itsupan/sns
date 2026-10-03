@@ -9,6 +9,7 @@ import {
 	primaryKey
 } from 'drizzle-orm/sqlite-core';
 import { user } from './auth-schema';
+import { STORY_AUDIENCES } from '../../stories';
 
 export * from './auth-schema';
 
@@ -332,6 +333,28 @@ export const userMute = sqliteTable(
 	]
 );
 
+/** `friendId` is on `userId`'s close friends list: they see `userId`'s close friends stories. */
+export const closeFriend = sqliteTable(
+	'close_friend',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		friendId: text('friend_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes adding idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.userId, table.friendId] }),
+		// Cascading the friend's account deletion: WHERE friend_id = ?.
+		index('close_friend_friendId_idx').on(table.friendId)
+	]
+);
+
 /** A word or phrase `userId` muted: posts containing it stay out of their feeds. Stored lowercased. */
 export const mutedKeyword = sqliteTable(
 	'muted_keyword',
@@ -484,7 +507,10 @@ export const message = sqliteTable(
 	]
 );
 
-/** A story: visible to the author's followers until `expires_at`, 24 hours after it was shared. */
+/**
+ * A story: visible to the author's followers (or, by `audience`, only those on their close friends
+ * list) until `expires_at`, 24 hours after it was shared.
+ */
 export const story = sqliteTable(
 	'story',
 	{
@@ -497,6 +523,7 @@ export const story = sqliteTable(
 		mediaType: text('media_type', { enum: ['image', 'video'] }).notNull(),
 		caption: text('caption'),
 		location: text('location'),
+		audience: text('audience', { enum: STORY_AUDIENCES }).default('everyone').notNull(),
 		// Viewers other than the author; grows by one per new `story_view` row.
 		viewsCount: integer('views_count').default(0).notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),

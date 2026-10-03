@@ -1,6 +1,7 @@
 import { json } from '@sveltejs/kit';
 import * as v from 'valibot';
 import type { RequestHandler } from './$types';
+import { STORY_AUDIENCES } from '$lib/stories';
 import { isOwnUpload, refreshMediaUrl } from '$lib/server/services/storage';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import {
@@ -31,12 +32,13 @@ const CreateStoryBody = v.object(
 		mediaUrl: v.pipe(v.string('Media is required'), v.trim(), v.minLength(1, 'Media is required')),
 		mediaType: v.optional(v.picklist(['image', 'video'], 'Invalid media type')),
 		caption: optionalText('Caption', MAX_STORY_CAPTION),
-		location: optionalText('Location', MAX_STORY_LOCATION)
+		location: optionalText('Location', MAX_STORY_LOCATION),
+		audience: v.optional(v.picklist(STORY_AUDIENCES, 'Invalid audience'), 'everyone')
 	},
 	'Request body must be an object'
 );
 
-/** Shares a story that disappears after 24 hours. */
+/** Shares a story that disappears after 24 hours, with all followers or only close friends. */
 export const POST: RequestHandler = withApi(async ({ request, locals, platform }) => {
 	const currentUser = requireUser(locals);
 	await enforceRateLimit(platform, 'createStory', currentUser.id);
@@ -53,7 +55,8 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 		mediaUrl: body.mediaUrl,
 		mediaType: body.mediaType ?? (VIDEO_URL.test(body.mediaUrl) ? 'video' : 'image'),
 		caption: body.caption,
-		location: body.location
+		location: body.location,
+		audience: body.audience
 	});
 	if (!story) {
 		throw new ApiError(409, 'duplicate_story', 'A story was just shared. Try again.');
