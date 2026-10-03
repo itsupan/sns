@@ -32,6 +32,7 @@ export type RateLimitName =
 	| 'mediaRefresh'
 	| 'accountExport'
 	| 'report'
+	| 'moderation'
 	| 'accountDelete'
 	| 'signIn'
 	| 'signUp'
@@ -66,6 +67,8 @@ export interface AppConfig {
 	profile: PageSize;
 	/** Who watched one of your stories. */
 	storyViewers: PageSize;
+	/** The moderation queue and the moderator list. */
+	moderation: PageSize;
 	/** Chat history pages and the conversations inbox. */
 	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
@@ -98,6 +101,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		mediaRefresh: { limit: 60, windowSec: 60 },
 		accountExport: { limit: 5, windowSec: 3600 },
 		report: { limit: 10, windowSec: 3600 },
+		moderation: { limit: 120, windowSec: 60 },
 		accountDelete: { limit: 5, windowSec: 3600 },
 		signIn: { limit: 10, windowSec: 60 },
 		signUp: { limit: 5, windowSec: 3600 },
@@ -130,6 +134,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	explore: { defaultPageSize: 18, maxPageSize: 36 },
 	profile: { defaultPageSize: 18, maxPageSize: 36 },
 	storyViewers: { defaultPageSize: 20, maxPageSize: 50 },
+	moderation: { defaultPageSize: 20, maxPageSize: 50 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
 		inbox: { defaultPageSize: 20, maxPageSize: 50 }
@@ -159,6 +164,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	mediaRefresh: 'RATE_LIMIT_MEDIA_REFRESH',
 	accountExport: 'RATE_LIMIT_ACCOUNT_EXPORT',
 	report: 'RATE_LIMIT_REPORT',
+	moderation: 'RATE_LIMIT_MODERATION',
 	accountDelete: 'RATE_LIMIT_ACCOUNT_DELETE',
 	signIn: 'RATE_LIMIT_SIGN_IN',
 	signUp: 'RATE_LIMIT_SIGN_UP',
@@ -284,6 +290,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 		explore: pageSize('EXPLORE', d.explore),
 		profile: pageSize('PROFILE', d.profile),
 		storyViewers: pageSize('STORY_VIEWERS', d.storyViewers),
+		moderation: pageSize('MODERATION', d.moderation),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),
 			inbox: pageSize('INBOX', d.chat.inbox)

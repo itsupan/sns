@@ -347,23 +347,9 @@ export async function deleteComment(
 		throw new ApiError(403, 'forbidden', 'You can only delete your own comments');
 	}
 
-	const remove = db.delete(postComment).where(eq(postComment.id, commentId));
-	const updatePost = db
-		.update(post)
-		.set({ commentsCount: commentsCountOf(target.postId), updatedAt: new Date() })
-		.where(eq(post.id, target.postId))
-		.returning({ commentsCount: post.commentsCount });
-
-	if (target.parentCommentId) {
-		const [, updatedPost, updatedParent] = await db.batch([
-			remove,
-			updatePost,
-			db
-				.update(postComment)
-				.set({ repliesCount: repliesCountOf(target.parentCommentId) })
-				.where(eq(postComment.id, target.parentCommentId))
-				.returning({ repliesCount: postComment.repliesCount })
-		]);
+	const { remove, updatePost, updateParent } = commentRemoval(db, target);
+	if (updateParent) {
+		const [, updatedPost, updatedParent] = await db.batch([remove, updatePost, updateParent]);
 		return {
 			commentsCount: updatedPost[0]?.commentsCount ?? 0,
 			parentCommentId: target.parentCommentId,
@@ -376,6 +362,31 @@ export async function deleteComment(
 		commentsCount: updatedPost[0]?.commentsCount ?? 0,
 		parentCommentId: null,
 		repliesCount: null
+	};
+}
+
+/**
+ * The statements that delete a comment (its replies go by cascade) and recount its post's
+ * `commentsCount` and, for a reply, the parent's `repliesCount`; run them in one batch.
+ */
+export function commentRemoval(
+	db: Database,
+	target: { id: string; postId: string; parentCommentId: string | null }
+) {
+	return {
+		remove: db.delete(postComment).where(eq(postComment.id, target.id)),
+		updatePost: db
+			.update(post)
+			.set({ commentsCount: commentsCountOf(target.postId), updatedAt: new Date() })
+			.where(eq(post.id, target.postId))
+			.returning({ commentsCount: post.commentsCount }),
+		updateParent: target.parentCommentId
+			? db
+					.update(postComment)
+					.set({ repliesCount: repliesCountOf(target.parentCommentId) })
+					.where(eq(postComment.id, target.parentCommentId))
+					.returning({ repliesCount: postComment.repliesCount })
+			: null
 	};
 }
 

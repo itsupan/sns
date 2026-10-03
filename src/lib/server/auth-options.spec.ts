@@ -5,6 +5,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest
 import { REAL_D1_TIMEOUT, createTestDb } from '$lib/server/testing/d1';
 import { authOptions } from './auth-options';
 import { schema } from './db';
+import { resolveReports } from './db/moderation';
 
 type TestDb = Awaited<ReturnType<typeof createTestDb>>;
 
@@ -188,5 +189,66 @@ describe('auth options on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(res.status).toBe(403);
 		expect(await res.json()).toMatchObject({ code: 'EMAIL_NOT_ALLOWED' });
 		expect(await userByEmail('unverified@example.com')).toBeDefined();
+	});
+
+	it('gives new users the user role and refuses to sign in a suspended one until it expires', async () => {
+		const cookie = await signUp('troll@example.com');
+		const troll = await userByEmail('troll@example.com');
+		expect(troll.role).toBe('user');
+
+		const [moderator] = await t.db
+			.insert(schema.user)
+			.values({ id: 'mod-1', name: 'Mod', email: 'mod@example.com', role: 'moderator' })
+			.returning();
+		await t.db.insert(schema.report).values({
+			id: 'r-troll',
+			reporterId: moderator.id,
+			targetType: 'user',
+			targetId: troll.id,
+			reason: 'harassment'
+		});
+		await resolveReports(t.db, {
+			moderator,
+			targetType: 'user',
+			targetId: troll.id,
+			action: 'suspend_user',
+			durationDays: 7,
+			note: null
+		});
+
+		// Suspending signs the user out and the admin plugin refuses new sessions.
+		expect(await (await call('/get-session', { cookie })).json()).toBeNull();
+		const refused = await signIn('troll@example.com', 'correct-horse-battery');
+		expect(refused.status).toBe(403);
+		expect(await refused.json()).toMatchObject({ code: 'BANNED_USER' });
+
+		await t.db
+			.update(schema.user)
+			.set({ banExpires: new Date(Date.now() - 1000) })
+			.where(eq(schema.user.id, troll.id));
+		expect((await signIn('troll@example.com', 'correct-horse-battery')).status).toBe(200);
+		expect((await userByEmail('troll@example.com')).banned).toBe(false);
+	});
+
+	it("denies even admins the admin plugin's own endpoints", async () => {
+		await signUp('boss@example.com');
+		await t.db
+			.update(schema.user)
+			.set({ role: 'admin' })
+			.where(eq(schema.user.email, 'boss@example.com'));
+		const cookie = sessionCookie(await signIn('boss@example.com', 'correct-horse-battery'));
+		const victim = await userByEmail('troll@example.com');
+
+		for (const [path, body] of [
+			['/admin/set-role', { userId: victim.id, role: 'admin' }],
+			['/admin/ban-user', { userId: victim.id }],
+			['/admin/remove-user', { userId: victim.id }],
+			['/admin/impersonate-user', { userId: victim.id }],
+			['/admin/set-user-password', { userId: victim.id, newPassword: 'hijacked-password' }],
+			['/admin/update-user', { userId: victim.id, data: { role: 'admin' } }]
+		] as const) {
+			expect((await call(path, { body, cookie })).status, path).toBe(403);
+		}
+		expect(await userByEmail('troll@example.com')).toMatchObject({ role: 'user', banned: false });
 	});
 });

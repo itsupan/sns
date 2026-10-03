@@ -15,12 +15,13 @@ export function createAuth(env: Env, db: Database, ctx: Pick<ExecutionContext, '
 	if (!dev && (env.BETTER_AUTH_SECRET?.trim().length ?? 0) < MIN_SECRET_LENGTH) {
 		throw new Error(`BETTER_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters`);
 	}
+	const options = authOptions(env);
 	return betterAuth({
-		...authOptions(env),
+		...options,
 		database: drizzleAdapter(db, { provider: 'sqlite', schema }),
 		// Emails are sent after the response, so response times never reveal whether one went out.
 		advanced: { backgroundTasks: { handler: (task) => ctx.waitUntil(task) } },
-		plugins: [sveltekitCookies(getRequestEvent)]
+		plugins: [...options.plugins, sveltekitCookies(getRequestEvent)]
 	});
 }
 

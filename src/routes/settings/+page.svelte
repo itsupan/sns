@@ -17,7 +17,7 @@
 <main class="w-full max-w-2xl mx-auto px-4 py-6 sm:py-10 flex flex-col gap-6">
 	<h1 class="text-2xl font-bold m-0">Settings</h1>
 
-	<AccountSection />
+	<AccountSection isModerator={data.isModerator} />
 	<SecuritySection
 		email={data.email}
 		emailVerified={data.emailVerified}
