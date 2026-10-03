@@ -16,6 +16,7 @@ export interface RateLimitRule {
 export type RateLimitName =
 	| 'createPost'
 	| 'createStory'
+	| 'highlight'
 	| 'draft'
 	| 'comment'
 	| 'reaction'
@@ -73,6 +74,8 @@ export interface AppConfig {
 	profile: PageSize;
 	/** Who watched one of your stories. */
 	storyViewers: PageSize;
+	/** Your story archive grid. */
+	storyArchive: PageSize;
 	/** The moderation queue and the moderator list. */
 	moderation: PageSize;
 	/** Chat history pages and the conversations inbox. */
@@ -101,6 +104,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	rateLimits: {
 		createPost: { limit: 10, windowSec: 60 },
 		createStory: { limit: 10, windowSec: 60 },
+		highlight: { limit: 30, windowSec: 60 },
 		draft: { limit: 30, windowSec: 60 },
 		comment: { limit: 20, windowSec: 60 },
 		reaction: { limit: 60, windowSec: 60 },
@@ -156,6 +160,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	explore: { defaultPageSize: 18, maxPageSize: 36 },
 	profile: { defaultPageSize: 18, maxPageSize: 36 },
 	storyViewers: { defaultPageSize: 20, maxPageSize: 50 },
+	storyArchive: { defaultPageSize: 24, maxPageSize: 48 },
 	moderation: { defaultPageSize: 20, maxPageSize: 50 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
@@ -172,6 +177,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	createPost: 'RATE_LIMIT_CREATE_POST',
 	createStory: 'RATE_LIMIT_CREATE_STORY',
+	highlight: 'RATE_LIMIT_HIGHLIGHT',
 	draft: 'RATE_LIMIT_DRAFT',
 	comment: 'RATE_LIMIT_COMMENT',
 	reaction: 'RATE_LIMIT_REACTION',
@@ -334,6 +340,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 		explore: pageSize('EXPLORE', d.explore),
 		profile: pageSize('PROFILE', d.profile),
 		storyViewers: pageSize('STORY_VIEWERS', d.storyViewers),
+		storyArchive: pageSize('STORY_ARCHIVE', d.storyArchive),
 		moderation: pageSize('MODERATION', d.moderation),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),

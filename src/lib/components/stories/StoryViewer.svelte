@@ -6,6 +6,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import Modal from '$lib/components/shared/Modal.svelte';
+	import HighlightPicker from './HighlightPicker.svelte';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
@@ -41,11 +42,26 @@
 		groups: StoryGroup[];
 		/** Group to start on when opened. */
 		startIndex?: number;
+		/**
+		 * False when replaying the archive or a highlight: no viewers list, reactions or replies,
+		 * which belong to a story's 24 hours in the tray.
+		 */
+		live?: boolean;
 		onSeen?: (story: Story) => void;
 		onDeleted?: (story: Story) => void;
+		/** Your highlights changed through "Add to highlight". */
+		onHighlightsChange?: () => void;
 	}
 
-	let { open = $bindable(false), groups, startIndex = 0, onSeen, onDeleted }: Props = $props();
+	let {
+		open = $bindable(false),
+		groups,
+		startIndex = 0,
+		live = true,
+		onSeen,
+		onDeleted,
+		onHighlightsChange
+	}: Props = $props();
 
 	let gi = $state(0);
 	let si = $state(0);
@@ -54,6 +70,8 @@
 	let held = $state(false);
 	let muted = $state(true);
 	let confirmDelete = $state(false);
+	// "Add to highlight" on your own story.
+	let pickerOpen = $state(false);
 	// "Viewers" panel on your own story.
 	let viewersOpen = $state(false);
 	let viewersLoading = $state(false);
@@ -75,7 +93,7 @@
 
 	let group = $derived(groups[gi]);
 	let story = $derived(group?.stories[si]);
-	let stopped = $derived(paused || held || confirmDelete || viewersOpen || replying);
+	let stopped = $derived(paused || held || confirmDelete || pickerOpen || viewersOpen || replying);
 
 	// Start on the requested group every time the viewer opens.
 	$effect(() => {
@@ -95,6 +113,7 @@
 		if (!open || !story) return;
 		progress = 0;
 		confirmDelete = false;
+		pickerOpen = false;
 		viewersOpen = false;
 		replyDraft = '';
 		// The reply box may have unmounted with focus (your own story, or the viewer reopened).
@@ -211,8 +230,8 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		const target = e.target as HTMLElement;
-		// Keys in the viewers list or the delete confirmation belong to those dialogs, and typing a
-		// reply must not navigate or pause.
+		// Keys in the highlight picker, the viewers list or the delete confirmation belong to those
+		// dialogs, and typing a reply must not navigate or pause.
 		if (target.closest('dialog') !== e.currentTarget || target.closest('input')) return;
 		if (e.key === 'ArrowRight') next();
 		else if (e.key === 'ArrowLeft') prev();
@@ -476,7 +495,9 @@
 					</span>
 					<span class="flex flex-col min-w-0 leading-tight">
 						<span class="flex items-center gap-1.5 text-sm font-semibold drop-shadow">
-							<span class="truncate">{group.isSelf ? 'Your story' : group.user.name}</span>
+							<span class="truncate"
+								>{group.title ?? (group.isSelf ? 'Your story' : group.user.name)}</span
+							>
 							<span class="text-xs font-normal text-white/75 shrink-0">
 								· {formatTimeAgo(story.createdAt)}
 							</span>
@@ -520,6 +541,14 @@
 						<button
 							type="button"
 							class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
+							onclick={() => (pickerOpen = true)}
+							aria-label="Add to highlight"
+						>
+							<Icon name="plus" />
+						</button>
+						<button
+							type="button"
+							class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
 							onclick={() => (confirmDelete = true)}
 							aria-label="Delete story"
 						>
@@ -556,7 +585,7 @@
 						<p class="m-0 text-sm leading-relaxed">{story.caption}</p>
 					</div>
 				{/if}
-				{#if group.isSelf}
+				{#if live && group.isSelf}
 					<button
 						type="button"
 						class="self-start flex items-center gap-2 h-9 px-3.5 rounded-full bg-black/45 hover:bg-black/60 backdrop-blur-md text-white text-xs font-semibold border-0 cursor-pointer"
@@ -566,7 +595,7 @@
 						<Icon name="eye" class="text-sm" />
 						<span>{story.viewCount ?? 0} {story.viewCount === 1 ? 'view' : 'views'}</span>
 					</button>
-				{:else}
+				{:else if live}
 					{@const mine = reactionOf(story)}
 					<div class="flex items-center justify-between gap-1" role="group" aria-label="React">
 						{#each STORY_REACTIONS as emoji (emoji)}
@@ -610,7 +639,16 @@
 			</div>
 		</div>
 
-		<!-- Own stories: who viewed it, and the delete confirmation -->
+		<!-- Own stories: highlights, who viewed it, and the delete confirmation -->
+		{#if group.isSelf}
+			<HighlightPicker
+				bind:open={pickerOpen}
+				storyId={story.id}
+				userId={group.user.id}
+				onChange={onHighlightsChange}
+			/>
+		{/if}
+
 		<BottomSheet bind:open={viewersOpen} title="Story viewers">
 			<h2 class="m-0 px-3 pt-1 pb-2 text-sm font-semibold flex items-center gap-2">
 				<Icon name="eye" class="text-sm text-slate-500 dark:text-dark-muted" />

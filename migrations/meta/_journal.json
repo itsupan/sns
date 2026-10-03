@@ -246,6 +246,13 @@
       "when": 1791032918804,
       "tag": "0035_push",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1791032963099,
+      "tag": "0036_story_highlights",
+      "breakpoints": true
     }
   ]
 }

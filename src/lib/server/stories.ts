@@ -11,7 +11,9 @@ import {
 import { notBlockedWith } from '$lib/server/db/blocks';
 import { notMutedBy } from '$lib/server/db/mutes';
 import { encodeCursor, type FeedCursor } from '$lib/server/db/posts';
-import { STORY_TTL_SEC, type StoryAudience } from '$lib/stories';
+import { refreshMediaUrl } from '$lib/server/services/storage';
+import { STORY_TTL_SEC } from '$lib/stories';
+import type { SavedStory } from '$lib/highlights';
 import type { StoryReaction } from '$lib/reactions';
 
 export { STORY_TTL_SEC };
@@ -22,18 +24,9 @@ export const MAX_TRAY_STORIES = 500;
 /** Views of a story are kept this long after it expires, then pruned by the daily cron. */
 export const STORY_VIEW_RETENTION_MS = 7 * 24 * 3600 * 1000;
 
-export interface StoredStory {
-	id: string;
-	userId: string;
-	mediaUrl: string;
-	mediaType: 'image' | 'video';
-	caption: string | null;
-	location: string | null;
-	audience: StoryAudience;
+export interface StoredStory extends SavedStory {
 	/** Viewers other than the author. */
 	viewsCount: number;
-	createdAt: number;
-	expiresAt: number;
 }
 
 /** `<userId>:<createdAtMs>`, the id `createStory` gives a story. */
@@ -42,7 +35,8 @@ export function parseStoryId(id: string): { userId: string; createdAt: number } 
 	return match ? { userId: match[1], createdAt: Number(match[2]) } : null;
 }
 
-const storyFields = {
+/** The columns of a `SavedStory`, for selects that join stories. */
+export const savedStoryFields = {
 	id: story.id,
 	userId: story.userId,
 	mediaUrl: story.mediaUrl,
@@ -50,14 +44,14 @@ const storyFields = {
 	caption: story.caption,
 	location: story.location,
 	audience: story.audience,
-	viewsCount: story.viewsCount,
 	createdAt: story.createdAt,
 	expiresAt: story.expiresAt
 };
 
-type StoryRow = Omit<StoredStory, 'createdAt' | 'expiresAt'> & { createdAt: Date; expiresAt: Date };
+const storyFields = { ...savedStoryFields, viewsCount: story.viewsCount };
 
-const toStored = (row: StoryRow): StoredStory => ({
+/** A selected story row with its times as milliseconds, the way the API sends them. */
+export const toStored = <T extends { createdAt: Date; expiresAt: Date }>(row: T) => ({
 	...row,
 	createdAt: row.createdAt.getTime(),
 	expiresAt: row.expiresAt.getTime()
@@ -65,13 +59,18 @@ const toStored = (row: StoryRow): StoredStory => ({
 
 const live = (now: number) => gt(story.expiresAt, new Date(now));
 
-/** Keeps stories `viewerId` is in the audience of: close friends ones need the author's list. */
-const inAudience = (viewerId: string) =>
-	or(
-		eq(story.audience, 'everyone'),
-		eq(story.userId, viewerId),
-		sql`exists (select 1 from ${closeFriend} where ${closeFriend.userId} = ${story.userId} and ${closeFriend.friendId} = ${viewerId})`
-	);
+/**
+ * Keeps stories `viewerId` is in the audience of: close friends ones need the author's list, so
+ * signed out only those for everyone pass.
+ */
+export const inAudience = (viewerId: string | null | undefined) =>
+	viewerId
+		? or(
+				eq(story.audience, 'everyone'),
+				eq(story.userId, viewerId),
+				sql`exists (select 1 from ${closeFriend} where ${closeFriend.userId} = ${story.userId} and ${closeFriend.friendId} = ${viewerId})`
+			)
+		: eq(story.audience, 'everyone');
 
 /**
  * Shares a story that expires 24 hours from `now`. Null when the author already shared one in
@@ -107,6 +106,61 @@ export async function getLiveStory(
 		.where(and(eq(story.id, id), live(now)))
 		.limit(1);
 	return row ? toStored(row) : null;
+}
+
+/** `stories` with their media URLs signed for viewing. */
+export function withSignedMedia<T extends { mediaUrl: string }>(
+	stories: T[],
+	env: Partial<Env> | undefined
+): Promise<T[]> {
+	return Promise.all(
+		stories.map(async (s) => ({ ...s, mediaUrl: await refreshMediaUrl(s.mediaUrl, env) }))
+	);
+}
+
+/** One of `authorId`'s stories, live or expired. */
+export async function getOwnStory(
+	db: Database,
+	id: string,
+	authorId: string
+): Promise<StoredStory | null> {
+	const [row] = await db
+		.select(storyFields)
+		.from(story)
+		.where(and(eq(story.id, id), eq(story.userId, authorId)))
+		.limit(1);
+	return row ? toStored(row) : null;
+}
+
+/**
+ * One page of `userId`'s archive: every story they shared, expired ones included, newest first,
+ * keyset-paginated on (created_at, id) via `story_userId_createdAt_idx`.
+ */
+export async function loadArchivePage(
+	db: Database,
+	userId: string,
+	{ limit, cursor }: { limit: number; cursor: FeedCursor | null }
+): Promise<{ stories: StoredStory[]; nextCursor: string | null }> {
+	const rows = await db
+		.select(storyFields)
+		.from(story)
+		.where(
+			and(
+				eq(story.userId, userId),
+				cursor
+					? sql`(${story.createdAt}, ${story.id}) < (${cursor.createdAt}, ${cursor.id})`
+					: undefined
+			)
+		)
+		.orderBy(desc(story.createdAt), desc(story.id))
+		.limit(limit + 1);
+
+	const page = rows.slice(0, limit);
+	const last = page.at(-1);
+	return {
+		stories: page.map(toStored),
+		nextCursor: rows.length > limit && last ? encodeCursor(last) : null
+	};
 }
 
 export interface TrayStory extends StoredStory {
@@ -248,8 +302,8 @@ export async function loadViewersPage(
 }
 
 /**
- * Deletes one of `authorId`'s stories with its views (by cascade) and the reaction notifications
- * about it. Returns its media URL, or null when there was no such story.
+ * Deletes one of `authorId`'s stories with its views and highlight items (by cascade) and the
+ * reaction notifications about it. Returns its media URL, or null when there was no such story.
  */
 export async function deleteStory(
 	db: Database,
@@ -277,7 +331,8 @@ export async function deleteStory(
 
 /**
  * Deletes the views of stories that expired more than `STORY_VIEW_RETENTION_MS` ago. The story rows
- * stay: they record the R2 media that account deletion removes.
+ * stay: the archive and highlights show them, and they record the R2 media that account deletion
+ * removes.
  */
 export async function pruneStoryViews(db: Database, now = Date.now()): Promise<number> {
 	const result = await db
