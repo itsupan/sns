@@ -14,6 +14,8 @@
 		"prepare": "wrangler types && svelte-kit sync || echo ''",
 		"check": "wrangler types && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"check:migrations": "node scripts/check-migrations.mjs",
+		"check:bundle-size": "node scripts/check-bundle-size.mjs",
 		"format": "prettier --write .",
 		"format:check": "prettier --check .",
 		"lint": "eslint .",

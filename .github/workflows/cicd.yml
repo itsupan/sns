@@ -62,6 +62,12 @@ jobs:
       - name: Typecheck
         run: pnpm run check
 
+      - name: Check migrations are expand-only
+        if: ${{ github.event_name != 'workflow_dispatch' && !github.event.created }}
+        run: pnpm run check:migrations "$BASE_SHA"
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+
       - name: Install Playwright browser
         run: pnpm exec playwright install --with-deps chromium
 
@@ -74,6 +80,9 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+      - name: Check bundle size
+        run: pnpm run check:bundle-size
 
       - name: Create local secrets for end-to-end tests
         run: |
@@ -102,8 +111,9 @@ jobs:
     timeout-minutes: 15
     environment:
       name: production
-      url: ${{ steps.deploy.outputs.url }}
+      url: ${{ env.PRODUCTION_URL }}
     env:
+      PRODUCTION_URL: https://sns.ecoapsara.com
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:
@@ -135,5 +145,10 @@ jobs:
         run: pnpm run db:migrate:production
 
       - name: Deploy Worker
-        id: deploy
         run: pnpm run deploy:production
+
+      - name: Smoke check
+        run: >-
+          curl --fail-with-body --silent --show-error --max-time 10
+          --retry 10 --retry-delay 6 --retry-all-errors
+          "$PRODUCTION_URL/api/health"

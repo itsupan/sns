@@ -1,0 +1,27 @@
+version: 2
+
+# Pull requests target the default branch, main.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # Safe Chain (.aikido) rejects releases younger than 48 hours, so CI would fail on fresher ones.
+    cooldown:
+      default-days: 3
+    # Minor and patch updates arrive as one PR per group; each major gets its own PR.
+    groups:
+      production-dependencies:
+        dependency-type: production
+        update-types: [minor, patch]
+      development-dependencies:
+        dependency-type: development
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ['*']
