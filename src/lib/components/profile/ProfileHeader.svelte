@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import SheetAction from '$lib/components/shared/SheetAction.svelte';
@@ -218,24 +219,15 @@
 	>
 		<div class="profile-grid gap-x-4 sm:gap-x-6 gap-y-4 sm:gap-y-6 items-center sm:items-start">
 			<!-- 1. AVATAR -->
-			<div class="area-avatar relative shrink-0">
-				<div
-					class="size-20 sm:size-24 lg:size-28 rounded-full overflow-hidden ring-2 sm:ring-4 ring-slate-100 dark:ring-dark-border sm:dark:ring-dark-elevated shadow-xs sm:shadow-sm bg-slate-100 dark:bg-dark-elevated flex items-center justify-center shrink-0"
-				>
-					{#if profile.avatar}
-						<img
-							src={profile.avatar}
-							alt={profile.name || 'Profile photo'}
-							class="w-full h-full object-cover"
-						/>
-					{:else}
-						<span
-							class="font-bold text-2xl sm:text-3xl text-slate-600 dark:text-dark-text select-none"
-						>
-							{profile.name ? profile.name.slice(0, 1).toUpperCase() : 'U'}
-						</span>
-					{/if}
-				</div>
+			<div class="area-avatar relative flex shrink-0">
+				<Avatar
+					src={profile.avatar}
+					name={profile.name}
+					alt={profile.name || 'Profile photo'}
+					size="3xl"
+					loading="eager"
+					class="rounded-full ring-2 sm:ring-4 ring-slate-100 dark:ring-dark-border sm:dark:ring-dark-elevated shadow-xs sm:shadow-sm"
+				/>
 
 				<!-- Mobile Camera overlay button -->
 				{#if profile.isOwnProfile}
@@ -383,7 +375,7 @@
 
 						{#if profile.location}
 							<div class="hidden sm:inline-flex items-center gap-1.5">
-								<Icon name="marker" class="text-xs shrink-0" />
+								<Icon name="map-marker" class="text-xs shrink-0" />
 								<span>{profile.location}</span>
 							</div>
 						{/if}
@@ -502,7 +494,7 @@
 						{#if isFollowing}
 							<Icon name="check" class="text-xs" />
 							<span>Following</span>
-							<Icon name="angle-small-down" class="hidden sm:inline-block text-xs ml-0.5" />
+							<Icon name="angle-down" class="hidden sm:inline-block text-xs ml-0.5" />
 						{:else}
 							<span>Follow</span>
 						{/if}

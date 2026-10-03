@@ -26,6 +26,7 @@ describe('Post Page Component', () => {
 		const screen = render(Page, {
 			props: {
 				data: {
+					imageTransforms: false,
 					post: mockPost,
 					postUrl: 'https://sns.ecoapsara.com/post/post-test-42',
 					origin: 'https://sns.ecoapsara.com',

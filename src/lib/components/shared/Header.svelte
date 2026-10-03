@@ -134,7 +134,7 @@
 				aria-label={unread > 0 ? `Direct messages, ${unread} unread` : 'Direct messages'}
 				title="Direct messages"
 			>
-				<Icon name="beacon" class="text-xl sm:text-base" />
+				<Icon name="comment" class="text-xl sm:text-base" />
 				{#if unread > 0}
 					<span
 						class="absolute top-1.5 right-1.5 sm:top-0 sm:right-0 min-w-4 h-4 px-1 rounded-full bg-blue-600 text-white text-[10px] font-bold leading-4 text-center"
@@ -170,7 +170,7 @@
 					href={resolve('/profile')}
 					class="hidden sm:flex items-center gap-2.5 pl-1 pr-1.5 py-1 rounded-full hover:bg-slate-100 dark:hover:bg-dark-hover transition-colors duration-150 no-underline text-inherit"
 				>
-					<Avatar src={currentUser.image} name={currentUser.name} size="sm" />
+					<Avatar src={currentUser.image} name={currentUser.name} size="sm" loading="eager" />
 					<div class="hidden md:flex flex-col text-left">
 						<span class="text-xs font-semibold text-slate-900 dark:text-dark-text leading-tight">
 							{currentUser.name}

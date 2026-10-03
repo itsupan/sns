@@ -52,11 +52,15 @@
 		"ACTIVITY_MAX_PAGE_SIZE": "50",
 		"EXPLORE_PAGE_SIZE": "18",
 		"EXPLORE_MAX_PAGE_SIZE": "36",
+		"PROFILE_PAGE_SIZE": "18",
+		"PROFILE_MAX_PAGE_SIZE": "36",
 		"CHAT_PAGE_SIZE": "30",
 		"CHAT_MAX_PAGE_SIZE": "100",
 		"INBOX_PAGE_SIZE": "20",
 		"INBOX_MAX_PAGE_SIZE": "50",
 		"MEDIA_URL_TTL_SECONDS": "604800",
+		// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
+		"IMAGE_TRANSFORMS": "off",
 		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
 	},
 	"secrets": {
@@ -141,11 +145,15 @@
 				"ACTIVITY_MAX_PAGE_SIZE": "50",
 				"EXPLORE_PAGE_SIZE": "18",
 				"EXPLORE_MAX_PAGE_SIZE": "36",
+				"PROFILE_PAGE_SIZE": "18",
+				"PROFILE_MAX_PAGE_SIZE": "36",
 				"CHAT_PAGE_SIZE": "30",
 				"CHAT_MAX_PAGE_SIZE": "100",
 				"INBOX_PAGE_SIZE": "20",
 				"INBOX_MAX_PAGE_SIZE": "50",
 				"MEDIA_URL_TTL_SECONDS": "604800",
+				// "on" only once the zone has Cloudflare Image Transformations enabled (see README).
+				"IMAGE_TRANSFORMS": "off",
 				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com"
 			},
 			"routes": [{ "pattern": "sns.ecoapsara.com", "custom_domain": true }],

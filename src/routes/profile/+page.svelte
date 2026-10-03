@@ -87,6 +87,8 @@
 			{viewMode}
 			items={userPosts}
 			userName={currentProfile.name}
+			userId={data?.user.id}
+			nextCursor={data?.nextCursor}
 		/>
 	</div>
 </main>

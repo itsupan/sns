@@ -142,7 +142,7 @@
 				class="{rowClass} hover:bg-slate-50 dark:hover:bg-dark-hover"
 			>
 				<span>Edit profile</span>
-				<Icon name="angle-small-right" class="text-slate-400" />
+				<Icon name="angle-right" class="text-slate-400" />
 			</a>
 			<div class={rowClass}>
 				<span>Appearance</span>
@@ -284,7 +284,7 @@
 			{#each LEGAL_LINKS as link (link.href)}
 				<a href={resolve(link.href)} class="{rowClass} hover:bg-slate-50 dark:hover:bg-dark-hover">
 					<span>{link.title}</span>
-					<Icon name="angle-small-right" class="text-slate-400" />
+					<Icon name="angle-right" class="text-slate-400" />
 				</a>
 			{/each}
 		</div>

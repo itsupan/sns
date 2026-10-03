@@ -4,6 +4,7 @@ import { user } from '$lib/server/db/schema';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
 import { refreshMediaUrl, refreshPostMediaUrls } from '$lib/server/services/storage';
+import { getConfig } from '$lib/server/config';
 import {
 	EMPTY_PROFILE_STATS,
 	loadProfilePosts,
@@ -42,18 +43,19 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	}
 
 	const viewerId = locals.user?.id ?? null;
-	// Either way round, a block shows a limited profile: no posts, no follow or message.
-	const block =
+	// Either way round, a block shows a limited profile: no posts (`loadProfilePosts` leaves them
+	// out), no follow or message.
+	const [block, firstPage, stats] = await Promise.all([
 		viewerId && viewerId !== targetUser.id
-			? await blockStatus(locals.db, viewerId, targetUser.id)
-			: { blocked: false, blockedBy: false };
-	const hidden = block.blocked || block.blockedBy;
-	const [posts, stats] = await Promise.all([
-		hidden ? [] : loadProfilePosts(locals.db, targetUser, viewerId),
+			? blockStatus(locals.db, viewerId, targetUser.id)
+			: { blocked: false, blockedBy: false },
+		loadProfilePosts(locals.db, targetUser.id, viewerId, {
+			limit: getConfig(platform?.env).profile.defaultPageSize
+		}),
 		loadProfileStats(locals.db, targetUser.id, viewerId).catch(() => EMPTY_PROFILE_STATS)
 	]);
 	const gridPosts = await Promise.all(
-		posts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
+		firstPage.posts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
 	);
 
 	const isOwnProfile = viewerId === targetUser.id;
@@ -94,6 +96,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		isOwnProfile,
 		block,
 		posts: gridPosts,
+		nextCursor: firstPage.nextCursor,
 		saved,
 		stats,
 		canonicalUrl,

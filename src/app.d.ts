@@ -32,6 +32,11 @@ declare global {
 			user: User | null;
 			session: Session | null;
 		}
+
+		/** Returned by the root layout, so every page has it. */
+		interface PageData {
+			imageTransforms: boolean;
+		}
 	}
 }
 
