@@ -45,6 +45,7 @@ export function draftPayload(
 		cameraMeta: post.cameraMeta,
 		postType: post.postType,
 		background: post.background,
+		poll: post.poll,
 		tags: post.tags.map((t) => t.name)
 	};
 	return JSON.stringify(payload);

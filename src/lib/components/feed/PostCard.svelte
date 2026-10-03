@@ -7,6 +7,7 @@
 	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
 	import { formatCount, likesSummary } from '$lib/utils/format';
 	import { TEXT_BACKGROUNDS, type TextBackground } from '$lib/post-backgrounds';
+	import type { PollData } from '$lib/polls';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { authClient } from '$lib/auth-client';
 	import SharePostModal from './SharePostModal.svelte';
@@ -14,6 +15,7 @@
 	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
 	import QuoteComposer from './QuoteComposer.svelte';
 	import QuotedPostCard from './QuotedPostCard.svelte';
+	import PostPoll from './PostPoll.svelte';
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
 	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { readApiError } from '$lib/utils/api-error';
@@ -68,6 +70,8 @@
 		postType?: PostType;
 		/** Text posts: the background preset the text sits on. */
 		background?: TextBackground;
+		/** Text posts: a poll, with the viewer's vote. */
+		poll?: PollData;
 		location?: string;
 		cameraMeta?: string;
 		tags: string[];
@@ -860,6 +864,10 @@
 					{/if}
 				{/key}
 			</div>
+		{/if}
+
+		{#if post.poll}
+			<PostPoll postId={post.id} poll={post.poll} {isOwner} {requireSignIn} />
 		{/if}
 
 		<!-- Action Bar: sits right under the media on phones and vertical tablets, like native feeds -->

@@ -28,6 +28,7 @@ export type RateLimitName =
 	| 'save'
 	| 'share'
 	| 'repost'
+	| 'pollVote'
 	| 'follow'
 	| 'mute'
 	| 'uploadPresign'
@@ -106,6 +107,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 		save: { limit: 60, windowSec: 60 },
 		share: { limit: 30, windowSec: 60 },
 		repost: { limit: 30, windowSec: 60 },
+		pollVote: { limit: 30, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
 		mute: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 },
@@ -174,6 +176,7 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	save: 'RATE_LIMIT_SAVE',
 	share: 'RATE_LIMIT_SHARE',
 	repost: 'RATE_LIMIT_REPOST',
+	pollVote: 'RATE_LIMIT_POLL_VOTE',
 	follow: 'RATE_LIMIT_FOLLOW',
 	mute: 'RATE_LIMIT_MUTE',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN',

@@ -26,6 +26,48 @@ import { postRowAuthor, toPostCards } from '$lib/server/db/post-cards';
 import { syncMentionsStatements } from '$lib/server/db/mentions';
 import { requireNotBlocked } from '$lib/server/db/blocks';
 import { notifyStatement } from '$lib/server/db/notifications';
+import { insertPollStatements } from '$lib/server/db/polls';
+import {
+	MAX_POLL_DURATION_MINUTES,
+	MAX_POLL_OPTIONS,
+	MAX_POLL_OPTION_LENGTH,
+	MIN_POLL_DURATION_MINUTES,
+	MIN_POLL_OPTIONS,
+	type PollInput
+} from '$lib/polls';
+
+/** A text post's poll from a composer payload, or null without one; a 400 naming `poll` if invalid. */
+function validatePoll(value: unknown): PollInput | null {
+	if (value === undefined || value === null) return null;
+	const fail = (message: string): never => {
+		throw new ApiError(400, 'validation_failed', message, { poll: message });
+	};
+	const { options, durationMinutes } =
+		typeof value === 'object' ? (value as Record<string, unknown>) : {};
+	if (
+		!Array.isArray(options) ||
+		options.length < MIN_POLL_OPTIONS ||
+		options.length > MAX_POLL_OPTIONS
+	) {
+		return fail(`A poll needs ${MIN_POLL_OPTIONS} to ${MAX_POLL_OPTIONS} options`);
+	}
+	const labels = options.map((o) => (typeof o === 'string' ? o.trim() : ''));
+	if (labels.some((label) => !label || label.length > MAX_POLL_OPTION_LENGTH)) {
+		return fail(`Poll options must be 1 to ${MAX_POLL_OPTION_LENGTH} characters`);
+	}
+	if (new Set(labels.map((label) => label.toLowerCase())).size < labels.length) {
+		return fail('Poll options must be different');
+	}
+	if (
+		typeof durationMinutes !== 'number' ||
+		!Number.isInteger(durationMinutes) ||
+		durationMinutes < MIN_POLL_DURATION_MINUTES ||
+		durationMinutes > MAX_POLL_DURATION_MINUTES
+	) {
+		return fail('A poll can run from 5 minutes to 7 days');
+	}
+	return { options: labels, durationMinutes };
+}
 
 /**
  * Checks a composer payload against the post rules and returns it normalized; throws a 400
@@ -88,6 +130,11 @@ export function validatePostInput(
 			: 'photo';
 
 	let background: TextBackground | null = null;
+	const poll = validatePoll(input.poll);
+	if (poll && postType !== 'text') {
+		const message = 'Only text posts can have a poll';
+		throw new ApiError(400, 'validation_failed', message, { poll: message });
+	}
 	if (postType === 'text') {
 		if (!isTextBackground(input.background)) {
 			const message = 'Choose a background for your text post';
@@ -123,14 +170,15 @@ export function validatePostInput(
 		cameraMeta,
 		postType,
 		background,
+		poll,
 		tags
 	};
 }
 
 /**
- * Validates a composer payload and stores the post with its media, tags and mentions in one
- * transaction; with `quoteOfId` it is a quote post of a post the author may see, whose author is
- * notified. Returns the new post in the `PostCard` shape with fresh media URLs.
+ * Validates a composer payload and stores the post with its media, poll, tags and mentions in one
+ * transaction; a poll opens now. With `quoteOfId` it is a quote post of a post the author may see,
+ * whose author is notified. Returns the new post in the `PostCard` shape with fresh media URLs.
  */
 export async function createPost(
 	db: Database,
@@ -147,6 +195,7 @@ export async function createPost(
 		cameraMeta,
 		postType,
 		background,
+		poll,
 		tags
 	} = validatePostInput(platform, userId, input);
 	const quoted =
@@ -205,10 +254,11 @@ export async function createPost(
 				})
 			]
 		: [];
-	// Post, media, tags, mentions and the quote notification land together in one transaction.
+	// Post, media, poll, tags, mentions and the quote notification land together in one transaction.
 	await db.batch([
 		insertPost,
 		...insertMedia,
+		...(poll ? insertPollStatements(db, postId, poll, new Date()) : []),
 		...attachTagsStatements(db, postId, tags),
 		...mentionStatements,
 		...notifyQuoted

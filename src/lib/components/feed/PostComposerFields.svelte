@@ -4,6 +4,7 @@
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
 	import TextPostPicker from './TextPostPicker.svelte';
+	import PollEditor from './PollEditor.svelte';
 	import MediaAltFields from './MediaAltFields.svelte';
 	import { formatShortcuts } from '$lib/formatting-editor';
 	import { ASPECT_RATIOS, POST_TYPES, type PostDraft } from './post-draft.svelte';
@@ -15,6 +16,8 @@
 		onsubmit: () => void;
 		/** Show the title field for every post type (edit form, when the post already has one). */
 		alwaysShowTitle?: boolean;
+		/** Offer a poll on text posts (new posts only: a poll cannot be edited). */
+		allowPoll?: boolean;
 		/** Called before opening the file picker; return false to block (e.g. signed out). */
 		beforeAddMedia?: () => boolean;
 		/** Shown under the text, e.g. the post being quoted. */
@@ -26,6 +29,7 @@
 		id,
 		onsubmit,
 		alwaysShowTitle = false,
+		allowPoll = false,
 		beforeAddMedia,
 		attachment
 	}: Props = $props();
@@ -95,6 +99,9 @@
 
 	{#if draft.isText}
 		<TextPostPicker {draft} />
+		{#if allowPoll}
+			<PollEditor {draft} />
+		{/if}
 	{/if}
 
 	<!-- Multiple Media Sequence Tray (Mockup 0) -->

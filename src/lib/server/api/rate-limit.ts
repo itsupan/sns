@@ -44,6 +44,7 @@ export const FAIL_CLOSED_LIMITS: ReadonlySet<RateLimitName> = new Set<RateLimitN
 	'follow',
 	'share',
 	'repost',
+	'pollVote',
 	'accountExport',
 	'report',
 	'signUp',

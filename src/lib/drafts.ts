@@ -1,5 +1,6 @@
 import type { PostType } from '$lib/components/feed/PostCard.svelte';
 import type { TextBackground } from '$lib/post-backgrounds';
+import type { PollInput } from '$lib/polls';
 
 /** Drafts one user may keep at a time. */
 export const MAX_DRAFTS_PER_USER = 50;
@@ -18,6 +19,8 @@ export interface DraftPayload {
 	cameraMeta: string | null;
 	postType: PostType;
 	background: TextBackground | null;
+	/** Text posts; missing from drafts saved before polls existed. */
+	poll?: PollInput | null;
 	/** Without the leading '#'. */
 	tags: string[];
 }

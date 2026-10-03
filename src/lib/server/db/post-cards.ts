@@ -3,6 +3,7 @@ import type { Database } from '.';
 import { post, postLike, postSave, user } from './schema';
 import { loadFollowedIds } from './follows';
 import { loadMutedIds } from './mutes';
+import { loadPolls } from './polls';
 import {
 	loadCommentPreviews,
 	loadPostMedia,
@@ -127,7 +128,8 @@ export function backgroundOf(row: { postType: string; background: string | null 
 
 /**
  * Turns post rows into the `PostCard` shape: media, tags, follow and mute state, the viewer's
- * likes, saves and reposts, the latest comment as a preview and a quote's embedded post. A repost
+ * likes, saves and reposts, the latest comment as a preview, a quote's embedded post and a poll
+ * with the viewer's vote. A repost
  * row becomes its original's card naming the reposter, and is dropped when the viewer may no
  * longer see the original. Media URLs are not refreshed here.
  */
@@ -159,7 +161,8 @@ export async function toPostCards(
 		viewer,
 		likers,
 		commentPreview,
-		quotedById
+		quotedById,
+		polls
 	] = await Promise.all([
 		loadPostMedia(db, postIds),
 		loadPostTags(db, postIds),
@@ -168,7 +171,8 @@ export async function toPostCards(
 		loadViewerPostState(db, viewerId, postIds),
 		loadRecentLikers(db, viewerId, postIds),
 		loadCommentPreviews(db, viewerId, postIds),
-		loadQuotedPosts(db, viewerId, quoteOfIds)
+		loadQuotedPosts(db, viewerId, quoteOfIds),
+		loadPolls(db, viewerId, postIds)
 	]);
 
 	return entries.map(({ row: r, reposter }) => {
@@ -197,6 +201,7 @@ export async function toPostCards(
 			aspectRatio: (r.post.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
 			postType: r.post.postType as PostType,
 			background: backgroundOf(r.post),
+			poll: polls.get(r.post.id),
 			location,
 			cameraMeta: r.post.cameraMeta || undefined,
 			tags: tagsByPost.get(r.post.id) ?? [],

@@ -438,6 +438,59 @@ export const postMention = sqliteTable(
 	]
 );
 
+/** A text post's poll; its options and votes go with it. */
+export const poll = sqliteTable('poll', {
+	postId: text('post_id')
+		.primaryKey()
+		.references(() => post.id, { onDelete: 'cascade' }),
+	closesAt: integer('closes_at', { mode: 'timestamp_ms' }).notNull(),
+	createdAt: integer('created_at', { mode: 'timestamp_ms' })
+		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+		.notNull()
+});
+
+export const pollOption = sqliteTable(
+	'poll_option',
+	{
+		id: text('id').primaryKey(),
+		postId: text('post_id')
+			.notNull()
+			.references(() => poll.postId, { onDelete: 'cascade' }),
+		// 0-based order within the poll.
+		position: integer('position').notNull(),
+		label: text('label').notNull(),
+		// Grows by one with each vote; votes cannot be changed or taken back.
+		votesCount: integer('votes_count').default(0).notNull()
+	},
+	(table) => [uniqueIndex('poll_option_postId_position_unique').on(table.postId, table.position)]
+);
+
+/** One vote per user and poll. */
+export const pollVote = sqliteTable(
+	'poll_vote',
+	{
+		postId: text('post_id')
+			.notNull()
+			.references(() => poll.postId, { onDelete: 'cascade' }),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		optionId: text('option_id')
+			.notNull()
+			.references(() => pollOption.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		primaryKey({ columns: [table.postId, table.userId] }),
+		// Account export and the user's cascade: WHERE user_id = ?.
+		index('poll_vote_userId_idx').on(table.userId),
+		// The option foreign key's cascade.
+		index('poll_vote_optionId_idx').on(table.optionId)
+	]
+);
+
 export const postRelations = relations(post, ({ one, many }) => ({
 	user: one(user, {
 		fields: [post.userId],
