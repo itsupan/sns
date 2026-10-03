@@ -2,9 +2,10 @@ import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { commentReaction, post, postComment, user } from './schema';
 import { commentsCountOf, reactionsCountOf, repliesCountOf } from './counters';
-import { encodeCursor, notDeleted, type FeedCursor } from './posts';
+import { encodeCursor, notDeleted, requireVisiblePost, type FeedCursor } from './posts';
 import { notifyStatement, unnotifyReactionStatement } from './notifications';
 import { notBlockedWith, requireNotBlocked } from './blocks';
+import { visibleTo } from './visibility';
 import { ApiError } from '$lib/server/api/errors';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import {
@@ -32,17 +33,6 @@ export interface CommentDto {
 
 const isForeignKeyError = (err: unknown) =>
 	err instanceof Error && /FOREIGN KEY constraint failed/i.test(`${err.message} ${err.cause}`);
-
-/** The live post a comment belongs to, or a 404. */
-async function requireLivePost(db: Database, postId: string) {
-	const [row] = await db
-		.select({ id: post.id, userId: post.userId })
-		.from(post)
-		.where(and(eq(post.id, postId), notDeleted))
-		.limit(1);
-	if (!row) throw new ApiError(404, 'not_found', 'Post not found');
-	return row;
-}
 
 /** A comment on a live post with that post's author, or a 404. */
 export async function requireComment(db: Database, commentId: string) {
@@ -103,8 +93,9 @@ export async function loadReactionSummaries(
 
 /**
  * One page of a post's top-level comments (`parentCommentId` null) or of one comment's
- * replies, oldest first, minus comments by users blocked in either direction with the viewer. Keyset pagination on (created_at, id), served by
- * `post_comment_postId_parent_createdAt_idx`.
+ * replies, oldest first, minus comments by users blocked in either direction with the viewer, and
+ * none at all when the post itself is hidden from them (see `visibleTo`). Keyset pagination on
+ * (created_at, id), served by `post_comment_postId_parent_createdAt_idx`.
  */
 export async function listComments(
 	db: Database,
@@ -145,6 +136,7 @@ export async function listComments(
 					? isNull(postComment.parentCommentId)
 					: eq(postComment.parentCommentId, parentCommentId),
 				notBlockedWith(viewerId, postComment.userId),
+				visibleTo(viewerId, post.userId),
 				cursor
 					? sql`(${postComment.createdAt}, ${postComment.id}) > (${cursor.createdAt}, ${cursor.id})`
 					: undefined
@@ -182,12 +174,12 @@ export async function listComments(
 	};
 }
 
-/** Top-level comments of a live post (404 when the post is missing or deleted). */
+/** Top-level comments of a live post (404 when the post is missing, deleted or hidden from the viewer). */
 export async function listPostComments(
 	db: Database,
 	args: { postId: string; viewerId?: string | null; limit: number; cursor?: FeedCursor | null }
 ) {
-	await requireLivePost(db, args.postId);
+	await requireVisiblePost(db, args.viewerId, args.postId);
 	return listComments(db, { ...args, parentCommentId: null });
 }
 
@@ -225,7 +217,7 @@ export async function createComment(
 		parentCommentId?: string | null;
 	}
 ): Promise<{ comment: CommentDto; commentsCount: number; repliesCount: number | null }> {
-	const livePost = await requireLivePost(db, postId);
+	const livePost = await requireVisiblePost(db, author.id, postId);
 
 	let parentAuthorId: string | null = null;
 	if (parentCommentId) {
@@ -247,7 +239,7 @@ export async function createComment(
 		parentAuthorId = parent.userId;
 		await requireNotBlocked(db, author.id, parent.userId, 'You cannot reply to this comment');
 	}
-	await requireNotBlocked(db, author.id, livePost.userId, 'You cannot comment on this post');
+	await requireNotBlocked(db, author.id, livePost.authorId, 'You cannot comment on this post');
 
 	const id = crypto.randomUUID();
 	const createdAt = new Date();
@@ -271,7 +263,7 @@ export async function createComment(
 	const notifyPostAuthor = notifyStatement(db, {
 		type: 'comment',
 		actorId: author.id,
-		recipientId: parentAuthorId === livePost.userId ? author.id : livePost.userId,
+		recipientId: parentAuthorId === livePost.authorId ? author.id : livePost.authorId,
 		postId,
 		commentId: id
 	});
@@ -347,23 +339,9 @@ export async function deleteComment(
 		throw new ApiError(403, 'forbidden', 'You can only delete your own comments');
 	}
 
-	const remove = db.delete(postComment).where(eq(postComment.id, commentId));
-	const updatePost = db
-		.update(post)
-		.set({ commentsCount: commentsCountOf(target.postId), updatedAt: new Date() })
-		.where(eq(post.id, target.postId))
-		.returning({ commentsCount: post.commentsCount });
-
-	if (target.parentCommentId) {
-		const [, updatedPost, updatedParent] = await db.batch([
-			remove,
-			updatePost,
-			db
-				.update(postComment)
-				.set({ repliesCount: repliesCountOf(target.parentCommentId) })
-				.where(eq(postComment.id, target.parentCommentId))
-				.returning({ repliesCount: postComment.repliesCount })
-		]);
+	const { remove, updatePost, updateParent } = commentRemoval(db, target);
+	if (updateParent) {
+		const [, updatedPost, updatedParent] = await db.batch([remove, updatePost, updateParent]);
 		return {
 			commentsCount: updatedPost[0]?.commentsCount ?? 0,
 			parentCommentId: target.parentCommentId,
@@ -376,6 +354,31 @@ export async function deleteComment(
 		commentsCount: updatedPost[0]?.commentsCount ?? 0,
 		parentCommentId: null,
 		repliesCount: null
+	};
+}
+
+/**
+ * The statements that delete a comment (its replies go by cascade) and recount its post's
+ * `commentsCount` and, for a reply, the parent's `repliesCount`; run them in one batch.
+ */
+export function commentRemoval(
+	db: Database,
+	target: { id: string; postId: string; parentCommentId: string | null }
+) {
+	return {
+		remove: db.delete(postComment).where(eq(postComment.id, target.id)),
+		updatePost: db
+			.update(post)
+			.set({ commentsCount: commentsCountOf(target.postId), updatedAt: new Date() })
+			.where(eq(post.id, target.postId))
+			.returning({ commentsCount: post.commentsCount }),
+		updateParent: target.parentCommentId
+			? db
+					.update(postComment)
+					.set({ repliesCount: repliesCountOf(target.parentCommentId) })
+					.where(eq(postComment.id, target.parentCommentId))
+					.returning({ repliesCount: postComment.repliesCount })
+			: null
 	};
 }
 

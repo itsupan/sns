@@ -2,10 +2,19 @@
 	import { fly } from 'svelte/transition';
 	import { toast } from '$lib/utils/toast.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+
+	// A popover, to share the top layer with modals. It stays open so screen readers know the live
+	// region before its first message, and reopens for each toast to land above newer modals.
+	function raise(region: HTMLElement) {
+		if (toast.current) region.hidePopover();
+		region.showPopover();
+	}
 </script>
 
 <div
-	class="pointer-events-none fixed inset-x-0 z-[100] flex justify-center px-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-8"
+	{@attach raise}
+	popover="manual"
+	class="pointer-events-none inset-x-0 top-auto w-auto overflow-visible bg-transparent flex justify-center px-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-8"
 	aria-live="polite"
 	role="status"
 >

@@ -13,8 +13,14 @@
 	import PostCommentsModal from './PostCommentsModal.svelte';
 	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
+	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { readApiError } from '$lib/utils/api-error';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import {
+		FOLLOW_LABELS,
+		followStore,
+		followToast,
+		type FollowStatus
+	} from '$lib/utils/follow.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
@@ -157,8 +163,10 @@
 					id: post.author.id ?? post.author.handle.replace(/^@/, '')
 				})
 	);
-	let followingAuthor = $derived(
-		post.author.id ? followStore.isFollowing(post.author.id, post.author.isFollowing) : false
+	let followStatus = $derived<FollowStatus>(
+		post.author.id
+			? followStore.status(post.author.id, post.author.isFollowing ? 'following' : 'none')
+			: 'none'
 	);
 	let canFollow = $derived(showFollow && Boolean(post.author.id) && !isOwner);
 
@@ -172,10 +180,9 @@
 			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
 			return;
 		}
-		const next = !followingAuthor;
 		try {
-			await followStore.set(authorId, next);
-			toast.show(next ? `Following ${post.author.name}` : `Unfollowed ${post.author.name}`);
+			const { status } = await followStore.set(authorId, followStatus === 'none');
+			toast.show(followToast(status, post.author.name));
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -547,13 +554,14 @@
 							<span class="text-xs text-slate-400 dark:text-dark-subtle" aria-hidden="true">•</span>
 							<button
 								type="button"
-								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followingAuthor
+								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followStatus !==
+								'none'
 									? 'text-slate-500 dark:text-dark-muted hover:text-slate-800 dark:hover:text-dark-text'
 									: 'text-blue-600 dark:text-kizuna-blue hover:text-blue-700'}"
-								aria-pressed={followingAuthor}
+								aria-pressed={followStatus !== 'none'}
 								onclick={toggleFollowAuthor}
 							>
-								{followingAuthor ? 'Following' : 'Follow'}
+								{FOLLOW_LABELS[followStatus]}
 							</button>
 						{/if}
 					</div>
@@ -680,6 +688,7 @@
 					<img
 						src={activeMediaUrl}
 						alt={post.title || `Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+						srcset={imageSrcset(activeMediaUrl, FEED_IMAGE_WIDTHS)}
 						sizes="(min-width: 672px) 672px, 100vw"
 						class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
 						loading={priority && activeSlide === 0 ? 'eager' : 'lazy'}
@@ -906,37 +915,42 @@
 	</article>
 {/if}
 
-<BottomSheet bind:open={optionsOpen} title="Post options">
-	{#if isOwner}
-		<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+<!-- Mounted only while open: a feed of idle cards carries no dialogs. -->
+{#if optionsOpen}
+	<BottomSheet bind:open={optionsOpen} title="Post options">
+		{#if isOwner}
+			<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+			<SheetAction
+				icon="trash"
+				label="Delete post"
+				danger
+				onclick={() => {
+					optionsOpen = false;
+					confirmDeleteOpen = true;
+				}}
+			/>
+		{/if}
 		<SheetAction
-			icon="trash"
-			label="Delete post"
-			danger
+			icon="bookmark"
+			label={isSaved ? 'Remove from saved' : 'Save'}
 			onclick={() => {
 				optionsOpen = false;
-				confirmDeleteOpen = true;
+				toggleSave();
 			}}
 		/>
-	{/if}
-	<SheetAction
-		icon="bookmark"
-		label={isSaved ? 'Remove from saved' : 'Save'}
-		onclick={() => {
-			optionsOpen = false;
-			toggleSave();
-		}}
-	/>
-	<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
-	<SheetAction icon="link" label="Copy link" onclick={copyLink} />
-	{#if !isOwner}
-		<SheetAction icon="flag" label="Report" danger onclick={openReport} />
-	{/if}
-</BottomSheet>
+		<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
+		<SheetAction icon="link" label="Copy link" onclick={copyLink} />
+		{#if !isOwner}
+			<SheetAction icon="flag" label="Report" danger onclick={openReport} />
+		{/if}
+	</BottomSheet>
+{/if}
 
-{#if isOwner}
+{#if editOpen}
 	<EditPostModal bind:open={editOpen} {post} onSaved={handleEdited} />
+{/if}
 
+{#if confirmDeleteOpen}
 	<BottomSheet bind:open={confirmDeleteOpen} title="Delete post?" showTitle>
 		<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
 			This removes the post from your profile and everyone's feed. You can't undo this.
@@ -963,14 +977,19 @@
 	</BottomSheet>
 {/if}
 
-{#if !isOwner}
+{#if reportOpen}
 	<ReportSheet bind:open={reportOpen} targetType="post" targetId={post.id} />
 {/if}
 
-<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
-<PostCommentsModal
-	bind:open={commentsOpen}
-	{post}
-	onCommentAdded={handleCommentAdded}
-	onCommentDeleted={handleCommentDeleted}
-/>
+{#if shareOpen}
+	<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
+{/if}
+
+{#if commentsOpen}
+	<PostCommentsModal
+		bind:open={commentsOpen}
+		{post}
+		onCommentAdded={handleCommentAdded}
+		onCommentDeleted={handleCommentDeleted}
+	/>
+{/if}

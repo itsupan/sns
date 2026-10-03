@@ -75,7 +75,7 @@
 
 		<!-- Preferences Link -->
 		<a
-			href={resolve('/profile')}
+			href={resolve('/settings')}
 			title="Preferences"
 			class="flex items-center justify-center xl:justify-between size-11 xl:size-auto xl:w-full xl:px-4 xl:py-2.5 rounded-xl text-[13px] font-medium text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated transition-colors duration-150 no-underline"
 		>
@@ -83,7 +83,7 @@
 				<Icon name="settings" class="text-lg xl:text-base shrink-0" />
 				<span class="hidden xl:inline">Preferences</span>
 			</div>
-			<Icon name="angle-small-right" class="hidden xl:inline text-base text-slate-400 shrink-0" />
+			<Icon name="angle-right" class="hidden xl:inline text-base text-slate-400 shrink-0" />
 		</a>
 	</div>
 </aside>

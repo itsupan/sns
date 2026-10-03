@@ -13,12 +13,11 @@ const testProfile = {
 	location: 'Tokyo',
 	cameraGear: 'Leica M6',
 	badgeText: '',
-	isVerified: false,
 	postsCount: 10,
 	followersCount: 150,
 	followingCount: 50,
 	impressionsCount: 1200,
-	isFollowing: false,
+	followStatus: 'none' as const,
 	isOwnProfile: true
 };
 
@@ -65,5 +64,25 @@ describe('ShareProfileModal', () => {
 		// Copy link button
 		const copyBtn = screen.getByRole('button', { name: /Copy/i });
 		await expect.element(copyBtn).toBeInTheDocument();
+	});
+
+	it('links to the user id when there is no handle, and leaves the handle out of the message', async () => {
+		const screen = render(ShareProfileModal, {
+			props: { open: true, profile: { ...testProfile, handle: null, avatar: '' } }
+		});
+
+		const input = screen.getByRole('textbox', { name: 'Profile URL' });
+		await expect.element(input).toHaveValue(`${location.origin}/profile/usr_test_123`);
+		const telegram = screen.getByRole('link', { name: /Telegram/i });
+		await expect
+			.element(telegram)
+			.toHaveAttribute('href', expect.stringContaining('profile%2Fusr_test_123'));
+		expect(telegram.element().getAttribute('href')).toContain(
+			encodeURIComponent('Check out Kenji Sato on Kizuna')
+		);
+		// Display falls back to a name-based handle, the same as on posts.
+		await expect.element(screen.getByText('@kenjisato')).toBeVisible();
+		// No photo: the shared avatar shows initials.
+		await expect.element(screen.getByText('KS')).toBeVisible();
 	});
 });

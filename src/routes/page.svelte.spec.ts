@@ -1,6 +1,7 @@
 import { render } from 'vitest-browser-svelte';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import Page from './+page.svelte';
+import { stubIntersectionObserver } from '../test/intersection-observer';
 
 describe('home page', () => {
 	it('shows the app name and feed layout components', async () => {
@@ -17,6 +18,7 @@ describe('home page', () => {
 		const screen = render(Page, {
 			props: {
 				data: {
+					imageTransforms: false,
 					posts: [],
 					hasMore: false,
 					nextCursor: null,
@@ -38,6 +40,7 @@ describe('home page', () => {
 		const screen = render(Page, {
 			props: {
 				data: {
+					imageTransforms: false,
 					posts: [],
 					hasMore: false,
 					nextCursor: null,
@@ -56,6 +59,7 @@ describe('home page', () => {
 		const screen = render(Page, {
 			props: {
 				data: {
+					imageTransforms: false,
 					posts: [
 						{
 							id: 'post-test-1',
@@ -89,25 +93,7 @@ describe('home page', () => {
 	});
 
 	describe('infinite scroll', () => {
-		// Treat the sentinel as visible once observed, so the test doesn't depend on viewport size.
-		beforeEach(() => {
-			vi.stubGlobal(
-				'IntersectionObserver',
-				class {
-					constructor(private cb: IntersectionObserverCallback) {}
-					observe(target: Element) {
-						queueMicrotask(() =>
-							this.cb(
-								[{ isIntersecting: true, target } as IntersectionObserverEntry],
-								this as unknown as IntersectionObserver
-							)
-						);
-					}
-					disconnect() {}
-					unobserve() {}
-				}
-			);
-		});
+		beforeEach(stubIntersectionObserver);
 		afterEach(() => vi.unstubAllGlobals());
 
 		it('pages with nextCursor and stops when it is null', async () => {
@@ -117,6 +103,7 @@ describe('home page', () => {
 			const screen = render(Page, {
 				props: {
 					data: {
+						imageTransforms: false,
 						posts: [makePost('page-1')],
 						hasMore: true,
 						nextCursor: '1700_p1',
@@ -141,6 +128,7 @@ describe('home page', () => {
 			const screen = render(Page, {
 				props: {
 					data: {
+						imageTransforms: false,
 						posts: [makePost('page-1')],
 						hasMore: true,
 						nextCursor: 'bad',

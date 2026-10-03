@@ -3,9 +3,29 @@ import type { Database } from '.';
 import { post, postComment, postLike, postMedia, postTag, tag, user } from './schema';
 import { MAX_TAGS_PER_POST } from '$lib/constants/post-limits';
 import { notBlockedWith } from './blocks';
+import { notPrivateTo, visibleTo } from './visibility';
+import { ApiError } from '$lib/server/api/errors';
 
 /** Every read or write of a post must exclude soft-deleted rows (see `post.deletedAt`). */
 export const notDeleted = isNull(post.deletedAt);
+
+/**
+ * The live post `postId` with its author, or a 404 when it is missing, deleted, or by a private
+ * account the viewer does not follow. Blocks are left to `requireNotBlocked`, which answers 403.
+ */
+export async function requireVisiblePost(
+	db: Database,
+	viewerId: string | null | undefined,
+	postId: string
+) {
+	const [row] = await db
+		.select({ id: post.id, authorId: post.userId, sharesCount: post.sharesCount })
+		.from(post)
+		.where(and(eq(post.id, postId), notDeleted, notPrivateTo(viewerId, post.userId)))
+		.limit(1);
+	if (!row) throw new ApiError(404, 'not_found', 'Post not found');
+	return row;
+}
 
 /** Position in the feed: the last post seen, ordered by (created_at, id) descending. */
 export interface FeedCursor {
@@ -55,7 +75,7 @@ export async function loadFeedPage(
 		.where(
 			and(
 				notDeleted,
-				notBlockedWith(viewerId, post.userId),
+				visibleTo(viewerId, post.userId),
 				cursor
 					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined

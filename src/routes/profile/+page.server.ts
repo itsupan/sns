@@ -5,6 +5,7 @@ import { user } from '$lib/server/db/schema';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import type { PageServerLoad } from './$types';
 import { refreshMediaUrl, refreshPostMediaUrls } from '$lib/server/services/storage';
+import { getConfig } from '$lib/server/config';
 import {
 	EMPTY_PROFILE_STATS,
 	loadProfilePosts,
@@ -23,6 +24,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 
 	let dbUser: Record<string, unknown> | null = null;
 	let userPosts: PostData[] = [];
+	let nextCursor: string | null = null;
 	let stats = EMPTY_PROFILE_STATS;
 	let savedPosts: PostData[] = [];
 
@@ -47,19 +49,13 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 				.where(eq(user.id, locals.user.id))
 				.limit(1);
 
-			const found = rows[0] ?? null;
-			dbUser = found;
-			userPosts = await loadProfilePosts(
+			dbUser = rows[0] ?? null;
+			({ posts: userPosts, nextCursor } = await loadProfilePosts(
 				locals.db,
-				{
-					id: locals.user.id,
-					name: found?.name ?? locals.user.name,
-					handle: found?.handle ?? null,
-					image: found?.image ?? null,
-					location: found?.location ?? null
-				},
-				locals.user.id
-			);
+				locals.user.id,
+				locals.user.id,
+				{ limit: getConfig(platform?.env).profile.defaultPageSize }
+			));
 		} catch {
 			// Fallback to locals.user
 		}
@@ -89,7 +85,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 
 	return {
 		user: {
-			id: currentUser.id,
+			id: locals.user.id,
 			name: currentUser.name,
 			email: currentUser.email,
 			image: refreshedImage,
@@ -101,6 +97,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 			cameraGear: (currentUser.cameraGear as string | null | undefined) ?? null
 		},
 		posts: refreshedPosts,
+		nextCursor,
 		saved: await Promise.all(
 			savedPosts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
 		),

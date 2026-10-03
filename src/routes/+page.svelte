@@ -5,6 +5,7 @@
 	import PostCard from '$lib/components/feed/PostCard.svelte';
 	import RightSidebar from '$lib/components/feed/RightSidebar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import type { PageData } from './$types';
 	import type { PostData } from '$lib/components/feed/PostCard.svelte';
 	import { readApiError } from '$lib/utils/api-error';
@@ -24,7 +25,6 @@
 	let hasMore = $derived(nextCursor !== null);
 	let loadingMore = $state(false);
 	let loadError = $state<string | null>(null);
-	let sentinelEl = $state<HTMLDivElement | null>(null);
 
 	let posts = $derived.by(() => {
 		const seen: Record<string, boolean> = {};
@@ -78,28 +78,6 @@
 			loadingMore = false;
 		}
 	}
-
-	$effect(() => {
-		if (!sentinelEl || !hasMore || loadError) return;
-
-		const observer = new IntersectionObserver(
-			(entries) => {
-				const [entry] = entries;
-				if (entry?.isIntersecting && !loadingMore && hasMore) {
-					loadNextPage();
-				}
-			},
-			{
-				rootMargin: '350px 0px'
-			}
-		);
-
-		observer.observe(sentinelEl);
-
-		return () => {
-			observer.disconnect();
-		};
-	});
 </script>
 
 <svelte:head>
@@ -152,38 +130,9 @@
 			</div>
 		{/if}
 
-		{#if loadError}
-			<div class="py-8 flex flex-col items-center gap-2 text-center px-4" role="alert">
-				<p class="text-sm text-slate-600 dark:text-slate-300">{loadError}</p>
-				<button
-					type="button"
-					class="text-xs font-medium underline text-slate-800 dark:text-slate-200"
-					onclick={loadNextPage}>Try again</button
-				>
-			</div>
-		{:else if hasMore}
-			<!-- Sentinel element positioned preemptively for seamless infinite scroll -->
-			<div
-				bind:this={sentinelEl}
-				class="h-8 w-full -mt-2 pointer-events-none"
-				aria-hidden="true"
-			></div>
-		{/if}
-
-		{#if loadingMore}
-			<div
-				class="py-8 flex flex-col items-center justify-center gap-2.5 text-slate-400 dark:text-slate-500"
-				aria-live="polite"
-				aria-busy="true"
-			>
-				<div
-					class="size-6 border-2 border-slate-300 dark:border-slate-700 border-t-slate-800 dark:border-t-slate-200 rounded-full animate-spin"
-				></div>
-				<span class="text-xs font-mono tracking-wider uppercase text-slate-500 dark:text-slate-400"
-					>Loading posts...</span
-				>
-			</div>
-		{:else if !hasMore && posts.length > 0}
+		{#if hasMore}
+			<LoadMore onLoad={loadNextPage} loading={loadingMore} error={loadError} />
+		{:else if posts.length > 0}
 			<div class="py-10 flex flex-col items-center justify-center text-center px-4">
 				<div
 					class="size-10 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-800/60 flex items-center justify-center text-emerald-600 dark:text-emerald-400 mb-2.5 shadow-xs"

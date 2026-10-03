@@ -5,12 +5,15 @@ import {
 	conversation,
 	conversationMember,
 	message,
+	moderationAction,
 	post,
 	postComment,
 	postLike,
 	postMedia,
 	postSave,
 	postShare,
+	story,
+	storyView,
 	userFollow
 } from './schema';
 import { buildAccountExport } from './account';
@@ -71,7 +74,29 @@ beforeAll(async () => {
 			.values({ id: 'msg-2', conversationId: 'cv-1', senderId: 'bob', content: 'hi alice' }),
 		db
 			.insert(message)
-			.values({ id: 'msg-3', conversationId: 'cv-2', senderId: 'bob', content: 'private' })
+			.values({ id: 'msg-3', conversationId: 'cv-2', senderId: 'bob', content: 'private' }),
+		...(['alice', 'bob'] as const).map((userId) =>
+			db.insert(story).values({
+				id: `${userId}:1`,
+				userId,
+				mediaUrl: `/api/media/stories/${userId}/s.jpg`,
+				mediaType: 'image',
+				createdAt: now,
+				expiresAt: new Date(now.getTime() + 86_400_000)
+			})
+		),
+		db.insert(storyView).values({ storyId: 'bob:1', viewerId: 'alice', reaction: '🔥' }),
+		db.insert(storyView).values({ storyId: 'alice:1', viewerId: 'carol' }),
+		db.insert(moderationAction).values([
+			{ id: 'ma-1', moderatorId: 'alice', action: 'dismiss', targetType: 'post', targetId: 'p-b' },
+			{
+				id: 'ma-2',
+				moderatorId: 'bob',
+				action: 'suspend_user',
+				targetType: 'user',
+				targetId: 'carol'
+			}
+		])
 	]);
 }, 60_000);
 
@@ -92,6 +117,14 @@ describe('account export on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(data!.followers).toMatchObject([{ userId: 'carol', handle: 'carol' }]);
 		expect(data!.sessions).toMatchObject([{ ipAddress: '203.0.113.7', userAgent: 'Firefox' }]);
 		expect(data!.logins).toMatchObject([{ provider: 'credential' }]);
+		expect(data!.stories).toMatchObject([
+			{ id: 'alice:1', mediaUrl: '/api/media/stories/alice/s.jpg', mediaType: 'image' }
+		]);
+		// Stories alice watched, not who watched hers.
+		expect(data!.storyViews).toMatchObject([{ storyId: 'bob:1', reaction: '🔥' }]);,
+		expect(data!.moderationActions).toMatchObject([
+			{ action: 'dismiss', targetType: 'post', targetId: 'p-b' }
+		]);
 
 		// Only conversations alice is in; bob and carol's DM stays out.
 		expect(data!.conversations.map((c) => c.id)).toEqual(['cv-1']);

@@ -68,7 +68,7 @@ describe('Individual Post +page.server.ts', () => {
 			location: 'Copenhagen, Denmark'
 		};
 
-		const { db: mockDb, viewCount } = postDb([{ post: mockPost, user: mockUser }]);
+		const { db: mockDb, viewCount } = postDb([{ post: mockPost, user: mockUser, visible: true }]);
 
 		const mockEvent = {
 			params: { id: 'post-100' },
@@ -95,7 +95,8 @@ describe('Individual Post +page.server.ts', () => {
 		const { db, viewCount } = postDb([
 			{
 				post: { id: 'post-100', userId: 'usr_elena_dev', content: 'x', createdAt: new Date() },
-				user: { id: 'usr_elena_dev', name: 'Elena Rostova', handle: null, image: null }
+				user: { id: 'usr_elena_dev', name: 'Elena Rostova', handle: null, image: null },
+				visible: true
 			}
 		]);
 		const result = await load({
