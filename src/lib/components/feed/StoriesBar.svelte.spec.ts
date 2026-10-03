@@ -53,24 +53,26 @@ describe('StoriesBar', () => {
 		await expect.element(screen.getByRole('button', { name: 'Add your story' })).toBeVisible();
 	});
 
-	it('opens the viewer and marks the story as watched', async () => {
+	it('opens the viewer, marks the story as watched, and returns focus to its ring', async () => {
 		const screen = render(StoriesBar);
 		await screen.getByRole('button', { name: 'View story from Aoi Tanaka, new' }).click();
 		await expect
 			.element(screen.getByRole('dialog', { name: 'Stories from Aoi Tanaka' }))
 			.toBeVisible();
 		await expect.element(screen.getByText('Night walk')).toBeVisible();
+		const close = screen.getByRole('button', { name: 'Close stories' });
+		await expect.element(close).toHaveFocus();
 
 		// Watching records a view on the server (so rings match on other devices).
 		expect(fetch).toHaveBeenCalledWith(`/api/stories/${encodeURIComponent(`aoi:${now}`)}/view`, {
 			method: 'POST'
 		});
 
-		await screen.getByRole('button', { name: 'Close stories' }).click();
+		await close.click();
 		// Grey ring now: no ", new" in the label.
-		await expect
-			.element(screen.getByRole('button', { name: 'View story from Aoi Tanaka', exact: true }))
-			.toBeVisible();
+		const ring = screen.getByRole('button', { name: 'View story from Aoi Tanaka', exact: true });
+		await expect.element(ring).toBeVisible();
+		await expect.element(ring).toHaveFocus();
 	});
 
 	it('opens the story composer from "Your story"', async () => {

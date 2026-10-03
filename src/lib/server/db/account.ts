@@ -3,12 +3,12 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import type { Database } from './index';
 import { account, session, user } from './auth-schema';
 import { deleteR2Objects, extractR2Key } from '$lib/server/services/storage';
-import { deleteStory, listUserStories } from '$lib/server/stories';
 import {
 	commentReaction,
 	conversation,
 	conversationMember,
 	message,
+	moderationAction,
 	notification,
 	post,
 	postComment,
@@ -17,12 +17,14 @@ import {
 	postSave,
 	postShare,
 	postTag,
+	story,
+	storyView,
 	tag,
 	userFollow
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 2;
+export const EXPORT_FORMAT_VERSION = 4;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -44,7 +46,10 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		following,
 		followers,
 		memberships,
-		notifications
+		notifications,
+		stories,
+		storyViews,
+		moderationActions
 	] = await Promise.all([
 		db
 			.select({ provider: account.providerId, createdAt: account.createdAt })
@@ -109,7 +114,42 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			})
 			.from(notification)
 			.where(eq(notification.recipientId, userId))
-			.orderBy(asc(notification.createdAt))
+			.orderBy(asc(notification.createdAt)),
+		db
+			.select({
+				id: story.id,
+				mediaUrl: story.mediaUrl,
+				mediaType: story.mediaType,
+				caption: story.caption,
+				location: story.location,
+				viewsCount: story.viewsCount,
+				createdAt: story.createdAt,
+				expiresAt: story.expiresAt
+			})
+			.from(story)
+			.where(eq(story.userId, userId))
+			.orderBy(asc(story.createdAt)),
+		db
+			.select({
+				storyId: storyView.storyId,
+				viewedAt: storyView.viewedAt,
+				reaction: storyView.reaction
+			})
+			.from(storyView)
+			.where(eq(storyView.viewerId, userId))
+			.orderBy(asc(storyView.viewedAt)),
+		db
+			.select({
+				action: moderationAction.action,
+				targetType: moderationAction.targetType,
+				targetId: moderationAction.targetId,
+				reportId: moderationAction.reportId,
+				note: moderationAction.note,
+				createdAt: moderationAction.createdAt
+			})
+			.from(moderationAction)
+			.where(eq(moderationAction.moderatorId, userId))
+			.orderBy(asc(moderationAction.createdAt))
 	]);
 
 	const postIds = posts.map((p) => p.id);
@@ -181,6 +221,10 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			website: profile.website,
 			location: profile.location,
 			cameraGear: profile.cameraGear,
+			role: profile.role,
+			banned: profile.banned,
+			banReason: profile.banReason,
+			banExpires: profile.banExpires,
 			createdAt: profile.createdAt,
 			updatedAt: profile.updatedAt
 		},
@@ -215,7 +259,11 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 					deletedAt: m.deletedAt
 				}))
 		})),
-		notifications
+		notifications,
+		stories,
+		storyViews,
+		// Actions this account took as a moderator or admin.
+		moderationActions
 	};
 }
 
@@ -243,8 +291,8 @@ export interface DeleteAccountResult {
  * Deletes a user and everything they own (GDPR art. 17). Foreign keys cascade the rows (sessions,
  * accounts, posts, comments, likes, follows, messages...); one D1 batch (one transaction) deletes
  * the user, their DMs, and recomputes the denormalized counters of other users' rows that lose
- * likes, comments, replies, reactions or follows. Media on our R2 bucket is removed afterwards;
- * R2 or KV failures are logged and do not undo the deletion.
+ * likes, comments, replies, reactions, follows or story views. Media on our R2 bucket is removed
+ * afterwards; R2 failures are logged and do not undo the deletion.
  */
 export async function deleteAccount(
 	db: Database,
@@ -254,59 +302,60 @@ export async function deleteAccount(
 	const [profile] = await db.select({ image: user.image }).from(user).where(eq(user.id, userId));
 	if (!profile) return null;
 
-	const [media, following, followers, liked, commented, replyParents, reacted, dms] =
-		await Promise.all([
-			db
-				.select({ url: postMedia.url })
-				.from(postMedia)
-				.innerJoin(post, eq(post.id, postMedia.postId))
-				.where(eq(post.userId, userId)),
-			db
-				.select({ id: userFollow.followingId })
-				.from(userFollow)
-				.where(eq(userFollow.followerId, userId)),
-			db
-				.select({ id: userFollow.followerId })
-				.from(userFollow)
-				.where(eq(userFollow.followingId, userId)),
-			db
-				.select({ id: postLike.postId })
-				.from(postLike)
-				.innerJoin(post, eq(post.id, postLike.postId))
-				.where(and(eq(postLike.userId, userId), ne(post.userId, userId))),
-			// Replies by others to the user's comments are on the same posts, so this covers them.
-			db
-				.selectDistinct({ id: postComment.postId })
-				.from(postComment)
-				.innerJoin(post, eq(post.id, postComment.postId))
-				.where(and(eq(postComment.userId, userId), ne(post.userId, userId))),
-			db
-				.selectDistinct({ id: postComment.parentCommentId })
-				.from(postComment)
-				.where(and(eq(postComment.userId, userId), isNotNull(postComment.parentCommentId))),
-			db
-				.select({ id: commentReaction.commentId })
-				.from(commentReaction)
-				.where(eq(commentReaction.userId, userId)),
-			db
-				.select({ id: conversationMember.conversationId })
-				.from(conversationMember)
-				.where(eq(conversationMember.userId, userId))
-		]);
-
-	const kv = env?.STORIES;
-	let stories: Awaited<ReturnType<typeof listUserStories>> = [];
-	if (kv) {
-		try {
-			// Include stories KV has not expired yet, even past 24h.
-			stories = await listUserStories(kv, userId, 0);
-		} catch (err) {
-			console.error('Listing stories for account deletion failed', err);
-		}
-	}
+	const [
+		media,
+		stories,
+		following,
+		followers,
+		liked,
+		commented,
+		replyParents,
+		reacted,
+		viewed,
+		dms
+	] = await Promise.all([
+		db
+			.select({ url: postMedia.url })
+			.from(postMedia)
+			.innerJoin(post, eq(post.id, postMedia.postId))
+			.where(eq(post.userId, userId)),
+		db.select({ url: story.mediaUrl }).from(story).where(eq(story.userId, userId)),
+		db
+			.select({ id: userFollow.followingId })
+			.from(userFollow)
+			.where(eq(userFollow.followerId, userId)),
+		db
+			.select({ id: userFollow.followerId })
+			.from(userFollow)
+			.where(eq(userFollow.followingId, userId)),
+		db
+			.select({ id: postLike.postId })
+			.from(postLike)
+			.innerJoin(post, eq(post.id, postLike.postId))
+			.where(and(eq(postLike.userId, userId), ne(post.userId, userId))),
+		// Replies by others to the user's comments are on the same posts, so this covers them.
+		db
+			.selectDistinct({ id: postComment.postId })
+			.from(postComment)
+			.innerJoin(post, eq(post.id, postComment.postId))
+			.where(and(eq(postComment.userId, userId), ne(post.userId, userId))),
+		db
+			.selectDistinct({ id: postComment.parentCommentId })
+			.from(postComment)
+			.where(and(eq(postComment.userId, userId), isNotNull(postComment.parentCommentId))),
+		db
+			.select({ id: commentReaction.commentId })
+			.from(commentReaction)
+			.where(eq(commentReaction.userId, userId)),
+		db.select({ id: storyView.storyId }).from(storyView).where(eq(storyView.viewerId, userId)),
+		db
+			.select({ id: conversationMember.conversationId })
+			.from(conversationMember)
+			.where(eq(conversationMember.userId, userId))
+	]);
 
 	const mediaKeys = unique(
-		[...media.map((m) => m.url), ...stories.map((s) => s.mediaUrl), profile.image].map(extractR2Key)
+		[...media.map((m) => m.url), ...stories.map((s) => s.url), profile.image].map(extractR2Key)
 	);
 
 	const statements: BatchItem<'sqlite'>[] = [
@@ -362,16 +411,17 @@ export async function deleteAccount(
 					reactionsCount: sql`(select count(*) from ${commentReaction} where ${commentReaction.commentId} = ${postComment.id})`
 				})
 				.where(inArray(postComment.id, ids))
+		),
+		...chunks(unique(viewed.map((v) => v.id))).map((ids) =>
+			db
+				.update(story)
+				.set({
+					viewsCount: sql`(select count(*) from ${storyView} where ${storyView.storyId} = ${story.id})`
+				})
+				.where(inArray(story.id, ids))
 		)
 	];
 	await db.batch(statements as [BatchItem<'sqlite'>, ...BatchItem<'sqlite'>[]]);
-
-	if (kv) {
-		const results = await Promise.allSettled(stories.map((s) => deleteStory(kv, s.id)));
-		for (const r of results) {
-			if (r.status === 'rejected') console.error('Story delete failed', r.reason);
-		}
-	}
 
 	const failedKeys = await deleteR2Objects(env, mediaKeys);
 	if (failedKeys.length) console.error(`Account ${userId}: R2 keys left behind`, failedKeys);

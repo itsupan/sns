@@ -1,6 +1,14 @@
 import type { BetterAuthOptions } from 'better-auth';
 import { APIError } from 'better-auth/api';
+import { admin } from 'better-auth/plugins/admin';
 import { getConfig, normalizeEmail } from './config';
+import {
+	createEmailSender,
+	emailChangeEmail,
+	passwordResetEmail,
+	verificationEmail
+} from './email';
+import { accessControl, pluginRoles } from './roles';
 
 export function authOptions(env: Env) {
 	const hasGoogleCredentials = Boolean(
@@ -9,13 +17,25 @@ export function authOptions(env: Env) {
 		env.GOOGLE_CLIENT_SECRET &&
 		env.GOOGLE_CLIENT_SECRET !== 'replace-me'
 	);
+	const sendEmail = createEmailSender(env);
+	const isBlocked = (email: string) =>
+		getConfig(env).auth.blockedSignupEmails.has(normalizeEmail(email));
 
 	return {
+		appName: 'Kizuna',
 		baseURL: env.BETTER_AUTH_URL || 'http://localhost:5173',
 		secret:
 			env.BETTER_AUTH_SECRET || 'dev_secret_key_at_least_32_characters_long_for_local_testing',
 		emailAndPassword: {
-			enabled: true
+			enabled: true,
+			sendResetPassword: ({ user, url }) => sendEmail(passwordResetEmail(user.email, url)),
+			revokeSessionsOnPasswordReset: true
+		},
+		// Accounts created before verification existed are unverified, so sign-in never requires it.
+		emailVerification: {
+			sendVerificationEmail: ({ user, url }) => sendEmail(verificationEmail(user.email, url)),
+			sendOnSignUp: true,
+			autoSignInAfterVerification: true
 		},
 		socialProviders: {
 			...(hasGoogleCredentials
@@ -32,8 +52,7 @@ export function authOptions(env: Env) {
 				create: {
 					// Runs for every signup path (email/password and Google), so one check covers both.
 					before: async (user) => {
-						const blocked = getConfig(env).auth.blockedSignupEmails;
-						if (blocked.has(normalizeEmail(user.email))) {
+						if (isBlocked(user.email)) {
 							throw new APIError('FORBIDDEN', {
 								code: 'SIGNUP_NOT_ALLOWED',
 								message: 'This email cannot be used to create an account.'
@@ -41,6 +60,16 @@ export function authOptions(env: Env) {
 						}
 						// Signup requires ticking the age/Terms checkbox, so record when that consent was given.
 						return { data: { ...user, termsAcceptedAt: new Date() } };
+					}
+				},
+				update: {
+					before: async (user) => {
+						if (user.email && isBlocked(user.email)) {
+							throw new APIError('FORBIDDEN', {
+								code: 'EMAIL_NOT_ALLOWED',
+								message: 'This email cannot be used for an account.'
+							});
+						}
 					}
 				}
 			}
@@ -50,6 +79,13 @@ export function authOptions(env: Env) {
 			cookieCache: { enabled: false }
 		},
 		user: {
+			changeEmail: {
+				enabled: true,
+				// A verified account approves the move from its current address first, so a stolen
+				// session cannot quietly take the account over.
+				sendChangeEmailConfirmation: ({ user, newEmail, url }) =>
+					sendEmail(emailChangeEmail(user.email, newEmail, url))
+			},
 			additionalFields: {
 				handle: { type: 'string', required: false, unique: true },
 				bio: { type: 'string', required: false },
@@ -63,6 +99,8 @@ export function authOptions(env: Env) {
 				// Set server-side at account creation; never user input.
 				termsAcceptedAt: { type: 'date', required: false, input: false }
 			}
-		}
+		},
+		// Adds `role` and the ban fields, and refuses to create a session for a banned user.
+		plugins: [admin({ ac: accessControl, roles: pluginRoles })]
 	} satisfies BetterAuthOptions;
 }
