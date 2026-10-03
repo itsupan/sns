@@ -8,6 +8,7 @@ import {
 } from '$lib/constants/post-limits';
 import { DEFAULT_TEXT_BACKGROUND, type TextBackground } from '$lib/post-backgrounds';
 import type { PostData, PostType } from './PostCard.svelte';
+import type { IconName } from '$lib/components/shared/icons';
 
 export type { PostType };
 export type AspectRatio = '1:1' | '4:5' | '16:9';
@@ -22,7 +23,7 @@ export interface MediaPlate {
 	progress?: number;
 }
 
-export const POST_TYPES: { id: PostType; label: string; icon: string }[] = [
+export const POST_TYPES: { id: PostType; label: string; icon: IconName }[] = [
 	{ id: 'photo', label: 'Photo', icon: 'picture' },
 	{ id: 'story', label: 'Story', icon: 'play-alt' },
 	{ id: 'article', label: 'Article', icon: 'document' },

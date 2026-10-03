@@ -59,10 +59,14 @@ export interface AppConfig {
 	activity: PageSize;
 	/** Explore and tag-page grids. */
 	explore: PageSize;
+	/** A profile's posts grid. */
+	profile: PageSize;
 	/** Chat history pages and the conversations inbox. */
 	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
 	mediaUrlTtlSec: number;
+	/** Serve resized copies of our images through Cloudflare Image Transformations. */
+	imageTransforms: boolean;
 	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
 	auth: { blockedSignupEmails: ReadonlySet<string> };
 }
@@ -116,11 +120,13 @@ export const DEFAULT_CONFIG: AppConfig = {
 	saved: { defaultPageSize: 12, maxPageSize: 50 },
 	activity: { defaultPageSize: 20, maxPageSize: 50 },
 	explore: { defaultPageSize: 18, maxPageSize: 36 },
+	profile: { defaultPageSize: 18, maxPageSize: 36 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
 		inbox: { defaultPageSize: 20, maxPageSize: 50 }
 	},
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
+	imageTransforms: false,
 	auth: { blockedSignupEmails: new Set() }
 };
 
@@ -154,6 +160,13 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 };
 
 const PositiveInt = v.pipe(v.string(), v.trim(), v.regex(/^\d+$/), v.toNumber(), v.minValue(1));
+
+const OnOff = v.pipe(
+	v.string(),
+	v.trim(),
+	v.regex(/^(on|off)$/),
+	v.transform((value) => value === 'on')
+);
 
 const RateLimitVar = v.pipe(
 	v.string(),
@@ -257,6 +270,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 		saved: pageSize('SAVED', d.saved),
 		activity: pageSize('ACTIVITY', d.activity),
 		explore: pageSize('EXPLORE', d.explore),
+		profile: pageSize('PROFILE', d.profile),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),
 			inbox: pageSize('INBOX', d.chat.inbox)
@@ -265,6 +279,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 			read(vars, 'MEDIA_URL_TTL_SECONDS', PositiveInt, d.mediaUrlTtlSec),
 			MAX_SIGV4_TTL_SEC
 		),
+		imageTransforms: read(vars, 'IMAGE_TRANSFORMS', OnOff, d.imageTransforms),
 		auth: {
 			blockedSignupEmails: read(
 				vars,
