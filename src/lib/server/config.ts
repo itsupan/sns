@@ -16,6 +16,7 @@ export interface RateLimitRule {
 export type RateLimitName =
 	| 'createPost'
 	| 'createStory'
+	| 'draft'
 	| 'comment'
 	| 'reaction'
 	| 'storyReaction'
@@ -93,6 +94,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	rateLimits: {
 		createPost: { limit: 10, windowSec: 60 },
 		createStory: { limit: 10, windowSec: 60 },
+		draft: { limit: 30, windowSec: 60 },
 		comment: { limit: 20, windowSec: 60 },
 		reaction: { limit: 60, windowSec: 60 },
 		storyReaction: { limit: 60, windowSec: 60 },
@@ -160,6 +162,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	createPost: 'RATE_LIMIT_CREATE_POST',
 	createStory: 'RATE_LIMIT_CREATE_STORY',
+	draft: 'RATE_LIMIT_DRAFT',
 	comment: 'RATE_LIMIT_COMMENT',
 	reaction: 'RATE_LIMIT_REACTION',
 	storyReaction: 'RATE_LIMIT_STORY_REACTION',

@@ -30,6 +30,7 @@
 		"RATE_LIMIT_FOLLOW": "30/60",
 		"RATE_LIMIT_MUTE": "30/60",
 		"RATE_LIMIT_CREATE_STORY": "10/60",
+		"RATE_LIMIT_DRAFT": "30/60",
 		"RATE_LIMIT_UPLOAD_PRESIGN": "20/60",
 		"RATE_LIMIT_UPLOAD": "20/60",
 		"RATE_LIMIT_MEDIA_REFRESH": "60/60",
@@ -107,8 +108,9 @@
 		{ "tag": "v2", "new_sqlite_classes": ["RateLimiter"] }
 	],
 
-	// Daily at 03:00 UTC: worker.ts `scheduled` prunes the views of long-expired stories.
-	"triggers": { "crons": ["0 3 * * *"] },
+	// Every minute: worker.ts `scheduled` publishes due drafts, and at 03:00 UTC prunes the views
+	// of long-expired stories.
+	"triggers": { "crons": ["* * * * *"] },
 
 	"env": {
 		"production": {
@@ -132,6 +134,7 @@
 				"RATE_LIMIT_FOLLOW": "30/60",
 				"RATE_LIMIT_MUTE": "30/60",
 				"RATE_LIMIT_CREATE_STORY": "10/60",
+				"RATE_LIMIT_DRAFT": "30/60",
 				"RATE_LIMIT_UPLOAD_PRESIGN": "20/60",
 				"RATE_LIMIT_UPLOAD": "20/60",
 				"RATE_LIMIT_MEDIA_REFRESH": "60/60",

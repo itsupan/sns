@@ -28,17 +28,15 @@ import { requireNotBlocked } from '$lib/server/db/blocks';
 import { notifyStatement } from '$lib/server/db/notifications';
 
 /**
- * Validates a composer payload and stores the post with its media, tags and mentions in one
- * transaction; with `quoteOfId` it is a quote post of a post the author may see, whose author is
- * notified. Returns the new post in the `PostCard` shape with fresh media URLs.
- * The payload is loose on purpose: legacy and partial media and tag fields are tolerated.
+ * Checks a composer payload against the post rules and returns it normalized; throws a 400
+ * `ApiError` naming the offending field. The payload is loose on purpose: legacy and partial
+ * media and tag fields are tolerated.
  */
-export async function createPost(
-	db: Database,
+export function validatePostInput(
 	platform: App.Platform | undefined,
 	userId: string,
 	input: Record<string, unknown>
-): Promise<PostData> {
+) {
 	const content = typeof input.content === 'string' ? input.content.trim() : '';
 	if (!content) {
 		throw new ApiError(400, 'validation_failed', 'Post content is required', {
@@ -116,6 +114,41 @@ export async function createPost(
 		throw new ApiError(400, 'validation_failed', message, { tags: message });
 	}
 
+	return {
+		content,
+		title,
+		mediaItems,
+		aspectRatio,
+		location,
+		cameraMeta,
+		postType,
+		background,
+		tags
+	};
+}
+
+/**
+ * Validates a composer payload and stores the post with its media, tags and mentions in one
+ * transaction; with `quoteOfId` it is a quote post of a post the author may see, whose author is
+ * notified. Returns the new post in the `PostCard` shape with fresh media URLs.
+ */
+export async function createPost(
+	db: Database,
+	platform: App.Platform | undefined,
+	userId: string,
+	input: Record<string, unknown>
+): Promise<PostData> {
+	const {
+		content,
+		title,
+		mediaItems,
+		aspectRatio,
+		location,
+		cameraMeta,
+		postType,
+		background,
+		tags
+	} = validatePostInput(platform, userId, input);
 	const quoted =
 		typeof input.quoteOfId === 'string'
 			? await requireVisiblePost(db, userId, input.quoteOfId)

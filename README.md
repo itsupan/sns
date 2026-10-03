@@ -144,6 +144,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | Name             | Var                          | Endpoint                                                             | Default   |
 | ---------------- | ---------------------------- | -------------------------------------------------------------------- | --------- |
 | `createPost`     | `RATE_LIMIT_CREATE_POST`     | `POST /api/posts`                                                    | 10 / min  |
+| `draft`          | `RATE_LIMIT_DRAFT`           | save, edit or delete a draft (`/api/drafts`)                         | 30 / min  |
 | `comment`        | `RATE_LIMIT_COMMENT`         | `POST /api/posts/:id/comments`                                       | 20 / min  |
 | `reaction`       | `RATE_LIMIT_REACTION`        | `POST /api/comments/:id/reactions`                                   | 60 / min  |
 | `storyReaction`  | `RATE_LIMIT_STORY_REACTION`  | `POST /api/stories/:id/react`                                        | 60 / min  |
