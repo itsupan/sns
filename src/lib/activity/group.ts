@@ -69,9 +69,9 @@ export function actorNames(actors: ActivityGroup['actors']): string {
 	return `${first.name} and ${actors.length - 1} others`;
 }
 
-/** The sentence after the names. */
-export function activityVerb(group: ActivityGroup): string {
-	switch (group.type) {
+/** The sentence after the names, for a group or a single notification. */
+export function activityVerb({ type }: Pick<ActivityGroup, 'type'>): string {
+	switch (type) {
 		case 'like':
 			return 'liked your post';
 		case 'comment':

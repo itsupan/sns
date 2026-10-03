@@ -68,6 +68,10 @@ function withSecurityHeaders(response: Response): Response {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Prerendered pages (the offline fallback) are built without bindings and are the same for
+	// everyone: no database, session or rate limit.
+	if (building) return withSecurityHeaders(await resolve(event));
+
 	const db = getDb(event.platform);
 	const auth = createAuth(event.platform!.env, db, event.platform!.ctx);
 

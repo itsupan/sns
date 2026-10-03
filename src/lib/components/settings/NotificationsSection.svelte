@@ -1,9 +1,11 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
+	import { page } from '$app/state';
 	import { activityTypeLabels } from '$lib/activity/group';
 	import type { ActivityType } from '$lib/activity/types';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import PushNotificationsToggle from './PushNotificationsToggle.svelte';
 	import SettingsSection from './SettingsSection.svelte';
 	import Switch from './Switch.svelte';
 	import { rowClass } from './styles';
@@ -52,6 +54,9 @@
 </script>
 
 <SettingsSection id="settings-notifications" title="Notifications">
+	{#if page.data.pushPublicKey}
+		<PushNotificationsToggle publicKey={page.data.pushPublicKey} />
+	{/if}
 	{#each entries as [type, enabled] (type)}
 		<div class={rowClass}>
 			<span id="notification-pref-{type}">{activityTypeLabels[type]}</span>
