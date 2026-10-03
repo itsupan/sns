@@ -3,6 +3,7 @@
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import LoadMore from '$lib/components/shared/LoadMore.svelte';
+	import FollowRequests from '$lib/components/activity/FollowRequests.svelte';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
 	import { badges } from '$lib/utils/badges.svelte';
@@ -69,7 +70,9 @@
 		reaction: 'smile',
 		follow: 'user-add',
 		mention: 'at',
-		story_reaction: 'smile'
+		story_reaction: 'smile',
+		follow_request: 'user-add',
+		follow_accepted: 'check'
 	};
 </script>
 
@@ -79,6 +82,8 @@
 
 <main class="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
 	<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">Activity</h1>
+
+	<FollowRequests initial={data.requests} />
 
 	{#if groups.length === 0}
 		<div

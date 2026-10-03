@@ -15,7 +15,12 @@
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
 	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { readApiError } from '$lib/utils/api-error';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import {
+		FOLLOW_LABELS,
+		followStore,
+		followToast,
+		type FollowStatus
+	} from '$lib/utils/follow.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
@@ -158,8 +163,10 @@
 					id: post.author.id ?? post.author.handle.replace(/^@/, '')
 				})
 	);
-	let followingAuthor = $derived(
-		post.author.id ? followStore.isFollowing(post.author.id, post.author.isFollowing) : false
+	let followStatus = $derived<FollowStatus>(
+		post.author.id
+			? followStore.status(post.author.id, post.author.isFollowing ? 'following' : 'none')
+			: 'none'
 	);
 	let canFollow = $derived(showFollow && Boolean(post.author.id) && !isOwner);
 
@@ -173,10 +180,9 @@
 			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
 			return;
 		}
-		const next = !followingAuthor;
 		try {
-			await followStore.set(authorId, next);
-			toast.show(next ? `Following ${post.author.name}` : `Unfollowed ${post.author.name}`);
+			const { status } = await followStore.set(authorId, followStatus === 'none');
+			toast.show(followToast(status, post.author.name));
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -548,13 +554,14 @@
 							<span class="text-xs text-slate-400 dark:text-dark-subtle" aria-hidden="true">•</span>
 							<button
 								type="button"
-								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followingAuthor
+								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followStatus !==
+								'none'
 									? 'text-slate-500 dark:text-dark-muted hover:text-slate-800 dark:hover:text-dark-text'
 									: 'text-blue-600 dark:text-kizuna-blue hover:text-blue-700'}"
-								aria-pressed={followingAuthor}
+								aria-pressed={followStatus !== 'none'}
 								onclick={toggleFollowAuthor}
 							>
-								{followingAuthor ? 'Following' : 'Follow'}
+								{FOLLOW_LABELS[followStatus]}
 							</button>
 						{/if}
 					</div>

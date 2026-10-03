@@ -249,6 +249,35 @@ export const userFollow = sqliteTable(
 	]
 );
 
+/**
+ * A pending request from `requesterId` to follow the private account `targetId`. Approving it
+ * moves it to `user_follow`, so follow lists and counters only ever see accepted follows.
+ */
+export const followRequest = sqliteTable(
+	'follow_request',
+	{
+		requesterId: text('requester_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		targetId: text('target_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes requesting idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.requesterId, table.targetId] }),
+		// Incoming requests: WHERE target_id = ? ORDER BY created_at DESC, requester_id DESC.
+		index('follow_request_targetId_createdAt_idx').on(
+			table.targetId,
+			table.createdAt,
+			table.requesterId
+		)
+	]
+);
+
 /** A block: `blockerId` blocked `blockedId`. Blocks hide both users from each other everywhere. */
 export const userBlock = sqliteTable(
 	'user_block',
@@ -466,7 +495,9 @@ export const NOTIFICATION_TYPES = [
 	'reaction',
 	'follow',
 	'mention',
-	'story_reaction'
+	'story_reaction',
+	'follow_request',
+	'follow_accepted'
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

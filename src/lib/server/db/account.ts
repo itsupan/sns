@@ -7,6 +7,7 @@ import {
 	commentReaction,
 	conversation,
 	conversationMember,
+	followRequest,
 	message,
 	moderationAction,
 	notification,
@@ -24,7 +25,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 4;
+export const EXPORT_FORMAT_VERSION = 5;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -45,6 +46,8 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		reactions,
 		following,
 		followers,
+		followRequestsSent,
+		followRequestsReceived,
 		memberships,
 		notifications,
 		stories,
@@ -100,6 +103,24 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.from(userFollow)
 			.innerJoin(user, eq(user.id, userFollow.followerId))
 			.where(eq(userFollow.followingId, userId)),
+		db
+			.select({
+				userId: followRequest.targetId,
+				handle: user.handle,
+				since: followRequest.createdAt
+			})
+			.from(followRequest)
+			.innerJoin(user, eq(user.id, followRequest.targetId))
+			.where(eq(followRequest.requesterId, userId)),
+		db
+			.select({
+				userId: followRequest.requesterId,
+				handle: user.handle,
+				since: followRequest.createdAt
+			})
+			.from(followRequest)
+			.innerJoin(user, eq(user.id, followRequest.requesterId))
+			.where(eq(followRequest.targetId, userId)),
 		db
 			.select({ conversationId: conversationMember.conversationId })
 			.from(conversationMember)
@@ -225,6 +246,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			banned: profile.banned,
 			banReason: profile.banReason,
 			banExpires: profile.banExpires,
+			isPrivate: profile.isPrivate,
 			createdAt: profile.createdAt,
 			updatedAt: profile.updatedAt
 		},
@@ -242,6 +264,8 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		commentReactions: reactions,
 		following,
 		followers,
+		followRequestsSent,
+		followRequestsReceived,
 		// Deleted messages keep only their metadata, as in the app.
 		conversations: conversationIds.map((id) => ({
 			id,

@@ -5,6 +5,7 @@
 		LegalSection,
 		LogOutButton,
 		PrivacyDataSection,
+		PrivateAccountSection,
 		SecuritySection
 	} from '$lib/components/settings';
 	import type { PageProps } from './$types';
@@ -25,6 +26,7 @@
 		socialProviders={data.socialProviders}
 		sessions={data.sessions}
 	/>
+	<PrivateAccountSection userId={data.userId} isPrivate={data.isPrivate} />
 	<PrivacyDataSection hasPassword={data.hasPassword} />
 	<BlockedUsersSection users={data.blockedUsers} />
 	<LegalSection />

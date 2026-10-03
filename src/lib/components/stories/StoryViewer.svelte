@@ -9,7 +9,7 @@
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import { FOLLOW_LABELS, followStore } from '$lib/utils/follow.svelte';
 	import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
 	import { STORY_REACTIONS, type StoryReaction } from '$lib/reactions';
 	import type { Story, StoryGroup } from './stories.svelte';
@@ -304,10 +304,12 @@
 		else applyViewers(target, page);
 	}
 
+	const followStatusOf = (person: StoryViewer) =>
+		followStore.status(person.id, person.isFollowing ? 'following' : 'none');
+
 	async function toggleFollowViewer(person: StoryViewer) {
-		const next = !followStore.isFollowing(person.id, person.isFollowing);
 		try {
-			await followStore.set(person.id, next);
+			await followStore.set(person.id, followStatusOf(person) === 'none');
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -629,7 +631,7 @@
 					</li>
 				{:else}
 					{#each viewers as person (person.id)}
-						{@const following = followStore.isFollowing(person.id, person.isFollowing)}
+						{@const status = followStatusOf(person)}
 						<li class="flex items-center gap-3 px-3 py-2 rounded-2xl">
 							<a
 								href={resolve('/profile/[id]', { id: person.id })}
@@ -650,13 +652,14 @@
 							{/if}
 							<button
 								type="button"
-								class="shrink-0 h-8 px-4 rounded-full text-xs font-semibold border-0 cursor-pointer transition {following
+								class="shrink-0 h-8 px-4 rounded-full text-xs font-semibold border-0 cursor-pointer transition {status !==
+								'none'
 									? 'bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text'
 									: 'bg-blue-600 dark:bg-kizuna-blue text-white'}"
-								aria-pressed={following}
+								aria-pressed={status !== 'none'}
 								onclick={() => toggleFollowViewer(person)}
 							>
-								{following ? 'Following' : 'Follow'}
+								{FOLLOW_LABELS[status]}
 							</button>
 						</li>
 					{/each}

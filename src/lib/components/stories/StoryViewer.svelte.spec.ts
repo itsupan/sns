@@ -162,7 +162,10 @@ describe('StoryViewer', () => {
 					]
 				});
 			}
-			return Response.json({ following: init?.method === 'POST', followersCount: 1 });
+			return Response.json({
+				status: init?.method === 'POST' ? 'following' : 'none',
+				followersCount: 1
+			});
 		});
 		vi.stubGlobal('fetch', fetchMock);
 		const own: StoryGroup[] = [

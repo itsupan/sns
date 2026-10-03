@@ -13,14 +13,19 @@
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import { displayHandle, formatCount } from '$lib/utils/format';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import {
+		FOLLOW_LABELS,
+		followStore,
+		followToast,
+		type FollowStatus
+	} from '$lib/utils/follow.svelte';
 
 	import { profileStore, resolveProfile, type ProfileData } from '$lib/utils/profile.svelte';
 
 	interface Props {
 		profile?: Partial<ProfileData>;
 		class?: string;
-		onFollowChange?: (following: boolean) => void;
+		onFollowChange?: (status: FollowStatus) => void;
 		user?: Record<string, unknown> | null;
 		/** Block state between the viewer and this (other) user, for the Block / Unblock action. */
 		block?: { blocked: boolean; blockedBy: boolean };
@@ -77,12 +82,14 @@
 	});
 
 	// Shared with post cards, so following from the feed shows here too (and the other way round).
-	let loadedFollowing = $derived(customProfile?.isFollowing ?? false);
-	let isFollowing = $derived(
-		profile.id ? followStore.isFollowing(profile.id, loadedFollowing) : loadedFollowing
+	let loadedStatus = $derived(customProfile?.followStatus ?? 'none');
+	let followStatus = $derived(
+		profile.id ? followStore.status(profile.id, loadedStatus) : loadedStatus
 	);
 	let followersCount = $derived(
-		profile.followersCount + (isFollowing === loadedFollowing ? 0 : isFollowing ? 1 : -1)
+		profile.followersCount +
+			Number(followStatus === 'following') -
+			Number(loadedStatus === 'following')
 	);
 
 	async function toggleFollow() {
@@ -102,11 +109,10 @@
 		}
 
 		if (!profile.id || followStore.isPending(profile.id)) return;
-		const next = !isFollowing;
 		try {
-			await followStore.set(profile.id, next);
-			onFollowChange?.(next);
-			toast.show(next ? `Following ${profile.name}` : `Unfollowed ${profile.name}`);
+			const { status } = await followStore.set(profile.id, followStatus === 'none');
+			onFollowChange?.(status);
+			toast.show(followToast(status, profile.name));
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -476,17 +482,19 @@
 					<!-- Follow / Following Button -->
 					<button
 						type="button"
-						class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full flex items-center justify-center gap-1.5 font-semibold text-xs transition-all duration-150 cursor-pointer border {isFollowing
+						class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full flex items-center justify-center gap-1.5 font-semibold text-xs transition-all duration-150 cursor-pointer border {followStatus !==
+						'none'
 							? 'bg-black text-white dark:bg-white dark:text-black border-transparent sm:border-slate-200 sm:dark:border-dark-border sm:bg-slate-100 sm:dark:bg-dark-elevated sm:text-slate-900 sm:dark:text-white sm:hover:bg-dark-hover'
 							: 'bg-blue-600 text-white sm:bg-slate-950 sm:dark:bg-white sm:text-white sm:dark:text-slate-950 border-transparent hover:opacity-90'}"
+						aria-pressed={followStatus !== 'none'}
 						onclick={toggleFollow}
 					>
-						{#if isFollowing}
+						{#if followStatus === 'following'}
 							<Icon name="check" class="text-xs" />
-							<span>Following</span>
+						{/if}
+						<span>{FOLLOW_LABELS[followStatus]}</span>
+						{#if followStatus === 'following'}
 							<Icon name="angle-down" class="hidden sm:inline-block text-xs ml-0.5" />
-						{:else}
-							<span>Follow</span>
 						{/if}
 					</button>
 

@@ -30,6 +30,7 @@ import House from '@lucide/svelte/icons/house';
 import Image from '@lucide/svelte/icons/image';
 import LayoutGrid from '@lucide/svelte/icons/layout-grid';
 import Link from '@lucide/svelte/icons/link';
+import Lock from '@lucide/svelte/icons/lock';
 import LogOut from '@lucide/svelte/icons/log-out';
 import Mail from '@lucide/svelte/icons/mail';
 import MapPin from '@lucide/svelte/icons/map-pin';
@@ -101,6 +102,7 @@ export const ICONS = {
 	heart: Heart,
 	home: House,
 	link: Link,
+	lock: Lock,
 	'map-marker': MapPin,
 	'menu-burger': Menu,
 	'menu-dots': Ellipsis,
