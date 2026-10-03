@@ -13,6 +13,8 @@
 	let isAuthPage = $derived(
 		page.url.pathname === '/login' ||
 			page.url.pathname === '/signup' ||
+			page.url.pathname === '/forgot-password' ||
+			page.url.pathname === '/reset-password' ||
 			page.url.pathname.startsWith('/auth')
 	);
 </script>

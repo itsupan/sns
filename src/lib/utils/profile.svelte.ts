@@ -14,7 +14,6 @@ export interface ProfileData {
 	followersCount: number;
 	followingCount: number;
 	impressionsCount: number;
-	isVerified: boolean;
 	isFollowing: boolean;
 	isOwnProfile?: boolean;
 }
@@ -34,7 +33,6 @@ export const defaultProfile: ProfileData = {
 	followersCount: 18400,
 	followingCount: 620,
 	impressionsCount: 94200,
-	isVerified: true,
 	isFollowing: true,
 	isOwnProfile: false
 };
@@ -119,7 +117,6 @@ export function resolveProfile(
 		location: (user.location as string) ?? custom?.location ?? '',
 		cameraGear: (user.cameraGear as string) ?? custom?.cameraGear ?? '',
 		badgeText: (user.badgeText as string) ?? custom?.badgeText ?? '',
-		isVerified: Boolean(user.isVerified || user.emailVerified || custom?.isVerified),
 		postsCount: countOr(user.postsCount, custom?.postsCount),
 		followersCount: countOr(user.followersCount, custom?.followersCount),
 		followingCount: countOr(user.followingCount, custom?.followingCount),

@@ -35,6 +35,9 @@ export type RateLimitName =
 	| 'accountDelete'
 	| 'signIn'
 	| 'signUp'
+	| 'authEmail'
+	| 'passwordChange'
+	| 'sessionRevoke'
 	| 'profileUpdate'
 	| 'contentEdit'
 	| 'markRead'
@@ -67,7 +70,7 @@ export interface AppConfig {
 	mediaUrlTtlSec: number;
 	/** Serve resized copies of our images through Cloudflare Image Transformations. */
 	imageTransforms: boolean;
-	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
+	/** Normalized emails (see `normalizeEmail`) that may not sign up or be moved to. */
 	auth: { blockedSignupEmails: ReadonlySet<string> };
 }
 
@@ -96,6 +99,9 @@ export const DEFAULT_CONFIG: AppConfig = {
 		accountDelete: { limit: 5, windowSec: 3600 },
 		signIn: { limit: 10, windowSec: 60 },
 		signUp: { limit: 5, windowSec: 3600 },
+		authEmail: { limit: 5, windowSec: 3600 },
+		passwordChange: { limit: 10, windowSec: 3600 },
+		sessionRevoke: { limit: 30, windowSec: 60 },
 		profileUpdate: { limit: 10, windowSec: 60 },
 		contentEdit: { limit: 30, windowSec: 60 },
 		markRead: { limit: 120, windowSec: 60 },
@@ -153,6 +159,9 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	accountDelete: 'RATE_LIMIT_ACCOUNT_DELETE',
 	signIn: 'RATE_LIMIT_SIGN_IN',
 	signUp: 'RATE_LIMIT_SIGN_UP',
+	authEmail: 'RATE_LIMIT_AUTH_EMAIL',
+	passwordChange: 'RATE_LIMIT_PASSWORD_CHANGE',
+	sessionRevoke: 'RATE_LIMIT_SESSION_REVOKE',
 	profileUpdate: 'RATE_LIMIT_PROFILE_UPDATE',
 	contentEdit: 'RATE_LIMIT_CONTENT_EDIT',
 	markRead: 'RATE_LIMIT_MARK_READ',
