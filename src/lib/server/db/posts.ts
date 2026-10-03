@@ -3,7 +3,8 @@ import type { Database } from '.';
 import { post, postComment, postLike, postMedia, postTag, tag, user } from './schema';
 import { MAX_TAGS_PER_POST } from '$lib/constants/post-limits';
 import { notBlockedWith } from './blocks';
-import { notPrivateTo, visibleTo } from './visibility';
+import { notMutedBy } from './mutes';
+import { notPrivateTo, shownInFeedsTo } from './visibility';
 import { ApiError } from '$lib/server/api/errors';
 
 /** Every read or write of a post must exclude soft-deleted rows (see `post.deletedAt`). */
@@ -48,8 +49,8 @@ export function decodeCursor(raw: string): FeedCursor | null {
 /**
  * One feed page, newest first, using keyset pagination on (created_at, id) served by
  * `post_createdAt_id_idx`, so posts added while scrolling never shift later pages.
- * Fetches one extra row to know whether another page exists. Posts by users blocked in either
- * direction with `viewerId` are left out.
+ * Fetches one extra row to know whether another page exists. Posts kept out of `viewerId`'s feeds
+ * (see `shownInFeedsTo`) are left out.
  */
 export async function loadFeedPage(
 	db: Database,
@@ -75,7 +76,7 @@ export async function loadFeedPage(
 		.where(
 			and(
 				notDeleted,
-				visibleTo(viewerId, post.userId),
+				shownInFeedsTo(viewerId),
 				cursor
 					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined
@@ -297,7 +298,8 @@ export async function loadCommentPreviews(
 			and(
 				inArray(postComment.postId, postIds),
 				isNull(postComment.parentCommentId),
-				notBlockedWith(viewerId, postComment.userId)
+				notBlockedWith(viewerId, postComment.userId),
+				notMutedBy(viewerId, postComment.userId)
 			)
 		)
 		.as('ranked');

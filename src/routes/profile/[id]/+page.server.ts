@@ -13,6 +13,7 @@ import {
 } from '$lib/server/db/profiles';
 import { loadSavedPreview } from '$lib/server/db/saves';
 import { blockStatus } from '$lib/server/db/blocks';
+import { loadMutedIds } from '$lib/server/db/mutes';
 
 export const load: PageServerLoad = async ({ params, locals, url, platform }) => {
 	const rawId = params.id;
@@ -47,10 +48,11 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	// Either way round, a block shows a limited profile: no posts (`loadProfilePosts` leaves them
 	// out), no follow or message. A private account's posts are left out the same way until the
 	// viewer follows it.
-	const [block, firstPage, stats] = await Promise.all([
+	const [block, mutedIds, firstPage, stats] = await Promise.all([
 		viewerId && viewerId !== targetUser.id
 			? blockStatus(locals.db, viewerId, targetUser.id)
 			: { blocked: false, blockedBy: false },
+		loadMutedIds(locals.db, viewerId, [targetUser.id]),
 		loadProfilePosts(locals.db, targetUser.id, viewerId, {
 			limit: getConfig(platform?.env).profile.defaultPageSize
 		}),
@@ -99,6 +101,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		isOwnProfile,
 		isLocked,
 		block,
+		muted: mutedIds.has(targetUser.id),
 		posts: gridPosts,
 		nextCursor: firstPage.nextCursor,
 		saved,

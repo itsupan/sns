@@ -21,6 +21,7 @@
 		followToast,
 		type FollowStatus
 	} from '$lib/utils/follow.svelte';
+	import { muteStore } from '$lib/utils/mute.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
@@ -33,6 +34,8 @@
 		timeAgo?: string;
 		/** Whether the viewer follows this author (false when signed out or for your own posts). */
 		isFollowing?: boolean;
+		/** Whether the viewer muted this author. */
+		isMuted?: boolean;
 	}
 
 	export interface PostComment {
@@ -349,6 +352,30 @@
 			toast.show(message || 'Could not update saved posts');
 		} finally {
 			saveInFlight = false;
+		}
+	}
+
+	let authorMuted = $derived(
+		post.author.id ? muteStore.muted(post.author.id, post.author.isMuted) : false
+	);
+
+	async function toggleMuteAuthor() {
+		optionsOpen = false;
+		const authorId = post.author.id;
+		if (!authorId || muteStore.isPending(authorId)) return;
+		if (!$session.data?.user) {
+			toast.show('Please log in to mute accounts');
+			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
+			// eslint-disable-next-line svelte/no-navigation-without-resolve
+			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
+			return;
+		}
+		const mute = !authorMuted;
+		try {
+			await muteStore.set(authorId, mute);
+			toast.show(mute ? `Muted ${post.author.name}` : `Unmuted ${post.author.name}`);
+		} catch (err) {
+			toast.show(err instanceof Error ? err.message : 'Could not update mute');
 		}
 	}
 
@@ -901,6 +928,13 @@
 		<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
 		<SheetAction icon="link" label="Copy link" onclick={copyLink} />
 		{#if !isOwner}
+			{#if post.author.id}
+				<SheetAction
+					icon={authorMuted ? 'volume' : 'volume-mute'}
+					label={authorMuted ? `Unmute ${post.author.name}` : `Mute ${post.author.name}`}
+					onclick={toggleMuteAuthor}
+				/>
+			{/if}
 			<SheetAction icon="flag" label="Report" danger onclick={openReport} />
 		{/if}
 	</BottomSheet>

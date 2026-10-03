@@ -302,6 +302,47 @@ export const userBlock = sqliteTable(
 	]
 );
 
+/**
+ * A mute: `muterId` muted `mutedId`. One-way and silent: it hides `mutedId`'s posts, stories and
+ * comments from `muterId`'s feeds and their notifications, but a profile opened directly still
+ * shows everything.
+ */
+export const userMute = sqliteTable(
+	'user_mute',
+	{
+		muterId: text('muter_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		mutedId: text('muted_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// One row per pair: makes mute idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.muterId, table.mutedId] }),
+		// Cascading the muted user's account deletion: WHERE muted_id = ?.
+		index('user_mute_mutedId_idx').on(table.mutedId)
+	]
+);
+
+/** A word or phrase `userId` muted: posts containing it stay out of their feeds. Stored lowercased. */
+export const mutedKeyword = sqliteTable(
+	'muted_keyword',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		keyword: text('keyword').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [primaryKey({ columns: [table.userId, table.keyword] })]
+);
+
 /** Users tagged (@mentioned) in a post. */
 export const postMention = sqliteTable(
 	'post_mention',
