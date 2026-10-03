@@ -10,7 +10,11 @@ describe('root +layout.server.ts', () => {
 	it('tells every page whether images may be resized, off unless IMAGE_TRANSFORMS is on', () => {
 		expect(run({ IMAGE_TRANSFORMS: 'on' })).toMatchObject({ imageTransforms: true });
 		expect(run({ IMAGE_TRANSFORMS: 'off' })).toMatchObject({ imageTransforms: false });
-		expect(run({})).toEqual({ imageTransforms: false, turnstileSiteKey: null });
-		expect(run()).toEqual({ imageTransforms: false, turnstileSiteKey: null });
+		expect(run({})).toEqual({
+			imageTransforms: false,
+			turnstileSiteKey: null,
+			pushPublicKey: null
+		});
+		expect(run()).toEqual({ imageTransforms: false, turnstileSiteKey: null, pushPublicKey: null });
 	});
 });

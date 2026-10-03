@@ -14,11 +14,15 @@ import { cronToken } from './src/lib/server/cron-token';
 export { ChatRoom } from './src/lib/server/chat/chat-room';
 export { RateLimiter } from './src/lib/server/rate-limiter';
 
-/** Cron jobs due at `scheduledTime`: drafts every minute, story-view pruning daily at 03:00 UTC. */
+/**
+ * Cron jobs due at `scheduledTime`: drafts and push notifications every minute, story-view pruning
+ * daily at 03:00 UTC.
+ */
 function cronJobs(scheduledTime: number): string[] {
 	const at = new Date(scheduledTime);
 	const daily = at.getUTCHours() === 3 && at.getUTCMinutes() === 0;
-	return daily ? ['publish-drafts', 'prune-stories'] : ['publish-drafts'];
+	const everyMinute = ['publish-drafts', 'push-notifications'];
+	return daily ? [...everyMinute, 'prune-stories'] : everyMinute;
 }
 
 export default {

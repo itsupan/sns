@@ -52,6 +52,7 @@ describe('Profile Page', () => {
 				data: {
 					imageTransforms: false,
 					turnstileSiteKey: null,
+					pushPublicKey: null,
 					user: testUser,
 					posts: [],
 					nextCursor: null,
@@ -96,6 +97,7 @@ describe('Profile Page', () => {
 				data: {
 					imageTransforms: false,
 					turnstileSiteKey: null,
+					pushPublicKey: null,
 					user: newRegisteredUser,
 					posts: [],
 					nextCursor: null,
@@ -128,6 +130,7 @@ describe('Profile Page', () => {
 				data: {
 					imageTransforms: false,
 					turnstileSiteKey: null,
+					pushPublicKey: null,
 					user: testUser,
 					posts: [],
 					nextCursor: null,
@@ -148,6 +151,7 @@ describe('Profile Page', () => {
 				data: {
 					imageTransforms: false,
 					turnstileSiteKey: null,
+					pushPublicKey: null,
 					user: testUser,
 					posts: [],
 					nextCursor: null,

@@ -49,6 +49,7 @@
 		"RATE_LIMIT_CONTENT_EDIT": "30/60",
 		"RATE_LIMIT_MARK_READ": "120/60",
 		"RATE_LIMIT_STORY_VIEW": "120/60",
+		"RATE_LIMIT_PUSH_SUBSCRIBE": "10/60",
 		"UPLOAD_MAX_BYTES": "52428800",
 		"UPLOAD_ALLOWED_MIME_TYPES": "image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime",
 		"FEED_PAGE_SIZE": "10",
@@ -76,7 +77,10 @@
 		"IMAGE_TRANSFORMS": "off",
 		"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com",
 		// Turnstile on signup and password reset, with the TURNSTILE_SECRET_KEY secret (see README).
-		"TURNSTILE_SITE_KEY": ""
+		"TURNSTILE_SITE_KEY": "",
+		// Web Push, with the VAPID_PRIVATE_KEY secret (see README); off while any of the three is empty.
+		"VAPID_PUBLIC_KEY": "",
+		"VAPID_SUBJECT": ""
 	},
 	"secrets": {
 		"required": ["BETTER_AUTH_SECRET", "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "RESEND_API_KEY"]
@@ -109,8 +113,8 @@
 		{ "tag": "v2", "new_sqlite_classes": ["RateLimiter"] }
 	],
 
-	// Every minute: worker.ts `scheduled` publishes due drafts, and at 03:00 UTC prunes the views
-	// of long-expired stories.
+	// Every minute: worker.ts `scheduled` publishes due drafts and sends push notifications, and at
+	// 03:00 UTC prunes the views of long-expired stories.
 	"triggers": { "crons": ["* * * * *"] },
 
 	"env": {
@@ -154,6 +158,7 @@
 				"RATE_LIMIT_CONTENT_EDIT": "30/60",
 				"RATE_LIMIT_MARK_READ": "120/60",
 				"RATE_LIMIT_STORY_VIEW": "120/60",
+				"RATE_LIMIT_PUSH_SUBSCRIBE": "10/60",
 				"UPLOAD_MAX_BYTES": "52428800",
 				"UPLOAD_ALLOWED_MIME_TYPES": "image/jpeg,image/png,image/webp,image/gif,image/avif,video/mp4,video/webm,video/quicktime",
 				"FEED_PAGE_SIZE": "10",
@@ -181,7 +186,10 @@
 				"IMAGE_TRANSFORMS": "off",
 				"SIGNUP_BLOCKED_EMAILS": "sokthy99999@gmail.com",
 				// Turnstile on signup and password reset, with the TURNSTILE_SECRET_KEY secret (see README).
-				"TURNSTILE_SITE_KEY": ""
+				"TURNSTILE_SITE_KEY": "",
+				// Web Push, with the VAPID_PRIVATE_KEY secret (see README); off while any of the three is empty.
+				"VAPID_PUBLIC_KEY": "BPbvhyAhgQDuDrYYAqAijPaT2ugA6-Hf_4QnOIc41JVImSRtk_FTjLMNN4UluC_oIsUXskwLIJp4JXazGzpoZ5w",
+				"VAPID_SUBJECT": "https://sns.ecoapsara.com"
 			},
 			"routes": [{ "pattern": "sns.ecoapsara.com", "custom_domain": true }],
 			"secrets": {

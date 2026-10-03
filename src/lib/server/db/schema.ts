@@ -708,7 +708,13 @@ export const notification = sqliteTable(
 	(table) => [
 		uniqueIndex('notification_dedupeKey_unique').on(table.dedupeKey),
 		// Activity list and unread count: WHERE recipient_id = ? ORDER BY created_at DESC, id DESC.
-		index('notification_recipientId_createdAt_idx').on(table.recipientId, table.createdAt, table.id)
+		index('notification_recipientId_createdAt_idx').on(
+			table.recipientId,
+			table.createdAt,
+			table.id
+		),
+		// Push delivery: everything after the job's cursor, ORDER BY created_at, id.
+		index('notification_createdAt_id_idx').on(table.createdAt, table.id)
 	]
 );
 
@@ -737,6 +743,43 @@ export const notificationOptOut = sqliteTable(
 	},
 	(table) => [primaryKey({ columns: [table.userId, table.type] })]
 );
+
+/**
+ * A browser's Web Push subscription (`PushSubscription.toJSON()`). The endpoint is unique: a
+ * browser that subscribes again, possibly signed in as someone else, takes the row over.
+ */
+export const pushSubscription = sqliteTable(
+	'push_subscription',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		endpoint: text('endpoint').notNull(),
+		// The browser's P-256 public key and auth secret (base64url) that encrypt each message.
+		p256dh: text('p256dh').notNull(),
+		auth: text('auth').notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		// Last time the push service accepted a message for it.
+		lastSuccessAt: integer('last_success_at', { mode: 'timestamp_ms' })
+	},
+	(table) => [
+		uniqueIndex('push_subscription_endpoint_unique').on(table.endpoint),
+		// A user's devices, newest first: delivery, and the per-user cap.
+		index('push_subscription_userId_createdAt_idx').on(table.userId, table.createdAt)
+	]
+);
+
+/** Progress of a background job, e.g. the last notification the push job handled. */
+export const jobState = sqliteTable('job_state', {
+	name: text('name').primaryKey(),
+	value: text('value').notNull(),
+	updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+		.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+		.notNull()
+});
 
 export const REPORT_TARGET_TYPES = ['post', 'comment', 'user', 'message'] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
