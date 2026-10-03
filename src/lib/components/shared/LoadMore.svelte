@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { m } from '$lib/i18n';
+
 	/** Loads the next page when scrolled near, with a retry button if a page fails. */
 	let { onLoad, loading, error }: { onLoad: () => void; loading: boolean; error: string | null } =
 		$props();
@@ -26,14 +28,14 @@
 		<button
 			type="button"
 			class="text-xs font-medium underline text-slate-800 dark:text-slate-200 bg-transparent border-0 cursor-pointer"
-			onclick={onLoad}>Try again</button
+			onclick={onLoad}>{m.common_try_again()}</button
 		>
 	</div>
 {:else}
 	<div bind:this={sentinel} class="h-8 w-full" aria-hidden="true"></div>
 	{#if loading}
 		<p class="text-center text-xs text-slate-500 dark:text-dark-muted m-0" aria-live="polite">
-			Loading…
+			{m.common_loading()}
 		</p>
 	{/if}
 {/if}

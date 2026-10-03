@@ -1,3 +1,4 @@
+import { m } from '$lib/i18n';
 import { readApiError } from './api-error';
 
 /**
@@ -27,7 +28,7 @@ class MuteStore {
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				throw new Error(readApiError(body, 'Could not update mute').message);
+				throw new Error(readApiError(body, m.mute_error()).message);
 			}
 			this.overrides[userId] = mute;
 		} finally {

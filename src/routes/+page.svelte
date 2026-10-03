@@ -6,6 +6,7 @@
 	import RightSidebar from '$lib/components/feed/RightSidebar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import LoadMore from '$lib/components/shared/LoadMore.svelte';
+	import { m } from '$lib/i18n';
 	import type { PageData } from './$types';
 	import type { PostData } from '$lib/components/feed/PostCard.svelte';
 	import { readApiError } from '$lib/utils/api-error';
@@ -67,13 +68,13 @@
 				nextCursor?: string | null;
 			} | null;
 			if (!res.ok || !result) {
-				loadError = readApiError(result, 'Could not load more posts').message;
+				loadError = readApiError(result, m.feed_load_more_error()).message;
 				return;
 			}
 			paginatedPosts = [...paginatedPosts, ...(result.posts ?? [])];
 			loadedCursor = result.nextCursor ?? null;
 		} catch {
-			loadError = 'Could not load more posts';
+			loadError = m.feed_load_more_error();
 		} finally {
 			loadingMore = false;
 		}
@@ -81,12 +82,12 @@
 </script>
 
 <svelte:head>
-	<title>Kizuna — Journal & Visual Feed</title>
-	<meta name="description" content="A curated visual space for photographers and minimalists." />
+	<title>{m.feed_title()}</title>
+	<meta name="description" content={m.common_tagline()} />
 </svelte:head>
 
 <!-- Hidden H1 for accessibility and test suites -->
-<h1 class="sr-only">Kizuna home feed</h1>
+<h1 class="sr-only">{m.feed_heading()}</h1>
 
 <div
 	class="max-w-7xl mx-auto px-0 lg:px-4 xl:px-6 w-full flex justify-center lg:justify-between gap-0 lg:gap-4 xl:gap-8"
@@ -112,19 +113,21 @@
 				{#if data?.loadFailed}
 					<Icon name="exclamation" class="text-3xl text-slate-300" />
 					<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">
-						Could not load your feed
+						{m.feed_load_failed()}
 					</p>
 					<button
 						type="button"
 						class="text-xs font-medium underline text-slate-800 dark:text-slate-200"
-						onclick={() => invalidateAll()}>Try again</button
+						onclick={() => invalidateAll()}>{m.common_try_again()}</button
 					>
 				{:else}
 					<Icon name="picture" class="text-3xl text-slate-300" />
-					<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">No posts yet</p>
+					<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">
+						{m.feed_empty()}
+					</p>
 					<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-						Share the first one, or
-						<a href={resolve('/explore')} class="font-medium underline">find people on Explore</a>.
+						{m.feed_empty_hint()}
+						<a href={resolve('/explore')} class="font-medium underline">{m.feed_find_people()}</a>.
 					</p>
 				{/if}
 			</div>
@@ -139,9 +142,9 @@
 				>
 					<Icon name="check" class="text-base" />
 				</div>
-				<p class="text-sm font-medium text-slate-800 dark:text-slate-200">You're all caught up</p>
+				<p class="text-sm font-medium text-slate-800 dark:text-slate-200">{m.feed_caught_up()}</p>
 				<p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-					You've seen all recent posts from your feed.
+					{m.feed_caught_up_hint()}
 				</p>
 			</div>
 		{/if}

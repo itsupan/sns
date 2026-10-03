@@ -1,3 +1,4 @@
+import { m } from '$lib/i18n';
 import type { FollowStatus } from './follow.svelte';
 
 export interface ProfileData {
@@ -110,7 +111,7 @@ export function resolveProfile(
 
 	return {
 		id: (user.id as string) || custom?.id,
-		name: (user.name as string) || custom?.name || 'User',
+		name: (user.name as string) || custom?.name || m.common_user(),
 		handle: (user.handle as string | null)?.replace(/^@/, '') || custom?.handle || null,
 		avatar: (user.image as string) ?? custom?.avatar ?? '',
 		title: (user.title as string) ?? custom?.title ?? '',

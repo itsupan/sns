@@ -7,6 +7,7 @@
 	import { formatStoryDate } from '$lib/stories';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		open?: boolean;
@@ -70,14 +71,14 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not save the highlight').message);
+				toast.show(readApiError(body, m.highlight_save_error()).message);
 				return;
 			}
 			onSaved?.({ ...highlight, title: name, coverStoryId, stories });
-			toast.show('Highlight saved');
+			toast.show(m.highlight_saved());
 			open = false;
 		} catch {
-			toast.show('Could not save the highlight');
+			toast.show(m.highlight_save_error());
 		} finally {
 			saving = false;
 		}
@@ -87,10 +88,10 @@
 		'size-9 shrink-0 rounded-full flex items-center justify-center bg-transparent hover:bg-slate-100 dark:hover:bg-dark-elevated border-0 cursor-pointer text-slate-700 dark:text-dark-text disabled:opacity-30 disabled:cursor-default';
 </script>
 
-<BottomSheet bind:open title="Edit highlight" showTitle>
+<BottomSheet bind:open title={m.highlight_edit()} showTitle>
 	<form id="highlight-editor" class="flex flex-col gap-4 px-3 pb-2" onsubmit={save}>
 		<label class="flex flex-col gap-1.5 text-xs font-semibold text-slate-600 dark:text-dark-muted">
-			Title
+			{m.highlight_title()}
 			<input
 				bind:value={title}
 				type="text"
@@ -102,7 +103,7 @@
 
 		<fieldset class="m-0 p-0 border-0 flex flex-col gap-1">
 			<legend class="mb-1.5 text-xs font-semibold text-slate-600 dark:text-dark-muted">
-				Stories · pick the cover
+				{m.highlight_pick_cover()}
 			</legend>
 			{#each stories as story, index (story.id)}
 				{@const date = formatStoryDate(story.createdAt)}
@@ -114,7 +115,7 @@
 							class="sr-only peer"
 							checked={cover?.id === story.id}
 							onchange={() => (coverStoryId = story.id)}
-							aria-label={`Cover: story from ${date}`}
+							aria-label={m.highlight_cover_from(date)}
 						/>
 						<span
 							class="size-14 shrink-0 rounded-xl overflow-hidden bg-slate-100 dark:bg-dark-elevated ring-offset-2 ring-offset-white dark:ring-offset-dark-card peer-checked:ring-2 peer-checked:ring-blue-600 dark:peer-checked:ring-kizuna-blue peer-focus-visible:ring-2 peer-focus-visible:ring-slate-400"
@@ -124,7 +125,9 @@
 						<span class="flex flex-col min-w-0 leading-tight">
 							<span class="text-sm text-slate-900 dark:text-dark-text">{date}</span>
 							{#if cover?.id === story.id}
-								<span class="text-xs font-semibold text-blue-600 dark:text-kizuna-blue">Cover</span>
+								<span class="text-xs font-semibold text-blue-600 dark:text-kizuna-blue"
+									>{m.highlight_cover()}</span
+								>
 							{/if}
 						</span>
 					</label>
@@ -133,7 +136,7 @@
 						class={iconButton}
 						disabled={index === 0}
 						onclick={() => move(index, -1)}
-						aria-label={`Move story from ${date} earlier`}
+						aria-label={m.highlight_move_earlier(date)}
 					>
 						<Icon name="angle-down" class="rotate-180" />
 					</button>
@@ -142,7 +145,7 @@
 						class={iconButton}
 						disabled={index === stories.length - 1}
 						onclick={() => move(index, 1)}
-						aria-label={`Move story from ${date} later`}
+						aria-label={m.highlight_move_later(date)}
 					>
 						<Icon name="angle-down" />
 					</button>
@@ -151,14 +154,14 @@
 						class={iconButton}
 						disabled={stories.length === 1}
 						onclick={() => remove(story)}
-						aria-label={`Remove story from ${date}`}
+						aria-label={m.highlight_remove_story(date)}
 					>
 						<Icon name="cross" />
 					</button>
 				</div>
 			{:else}
 				<p class="m-0 py-4 text-center text-xs text-slate-500 dark:text-dark-muted">
-					No stories left. Add some from your archive.
+					{m.highlight_no_stories()}
 				</p>
 			{/each}
 		</fieldset>
@@ -171,7 +174,7 @@
 				class="h-10 px-4 rounded-full text-sm font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover"
 				onclick={() => (open = false)}
 			>
-				Cancel
+				{m.common_cancel()}
 			</button>
 			<button
 				type="submit"
@@ -179,7 +182,7 @@
 				class="h-10 px-5 rounded-full text-sm font-semibold bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-default"
 				disabled={saving || !title.trim()}
 			>
-				{saving ? 'Saving…' : 'Save'}
+				{saving ? m.common_saving() : m.common_save()}
 			</button>
 		</div>
 	{/snippet}

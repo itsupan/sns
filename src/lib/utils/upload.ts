@@ -1,3 +1,4 @@
+import { m } from '$lib/i18n';
 import { readApiError } from './api-error';
 export interface UploadOptions {
 	onProgress?: (percent: number) => void;
@@ -155,7 +156,7 @@ export async function getPresignedUploadUrl(
 	});
 
 	if (!response.ok) {
-		let errorMessage = `Failed to get presigned upload URL (${response.status})`;
+		let errorMessage = m.upload_presign_failed(response.status);
 		try {
 			errorMessage = readApiError(await response.json(), errorMessage).message;
 		} catch {
@@ -186,13 +187,13 @@ export async function uploadToR2(file: File, options: UploadOptions = {}): Promi
 
 	// Validate original file type
 	if (allowedTypes.length > 0 && file.type && !allowedTypes.includes(file.type)) {
-		throw new Error(`Invalid file type "${file.type}". Allowed types: ${allowedTypes.join(', ')}`);
+		throw new Error(m.upload_invalid_type(file.type, allowedTypes.join(', ')));
 	}
 
 	// Validate original file size
 	const maxSizeBytes = maxSizeMb * 1024 * 1024;
 	if (file.size > maxSizeBytes) {
-		throw new Error(`File size exceeds maximum allowed limit of ${maxSizeMb}MB`);
+		throw new Error(m.upload_too_large(maxSizeMb));
 	}
 
 	// Step 1: Resize/compress for where the image will be shown (see IMAGE_PRESETS).
@@ -223,16 +224,12 @@ export async function uploadToR2(file: File, options: UploadOptions = {}): Promi
 					onProgress(100);
 					resolve();
 				} else {
-					reject(
-						new Error(
-							`Direct R2 upload failed with status ${xhr.status}: ${xhr.statusText || 'Upload Error'}`
-						)
-					);
+					reject(new Error(m.upload_failed(xhr.status, xhr.statusText)));
 				}
 			};
 
-			xhr.onerror = () => reject(new Error('Network error during direct upload to Cloudflare R2'));
-			xhr.onabort = () => reject(new Error('Upload was aborted'));
+			xhr.onerror = () => reject(new Error(m.upload_network_error()));
+			xhr.onabort = () => reject(new Error(m.upload_aborted()));
 
 			xhr.send(fileToUpload);
 		});
@@ -246,9 +243,7 @@ export async function uploadToR2(file: File, options: UploadOptions = {}): Promi
 		});
 
 		if (!putResponse.ok) {
-			throw new Error(
-				`Direct R2 upload failed with status ${putResponse.status}: ${putResponse.statusText || 'Upload Error'}`
-			);
+			throw new Error(m.upload_failed(putResponse.status, putResponse.statusText));
 		}
 
 		onProgress?.(100);

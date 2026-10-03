@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
+	import { locale, m } from '$lib/i18n';
 	import TextPostPicker from './TextPostPicker.svelte';
 	import PollEditor from './PollEditor.svelte';
 	import MediaAltFields from './MediaAltFields.svelte';
@@ -78,7 +79,7 @@
 	<div
 		class="flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-dark-elevated rounded-2xl"
 		role="radiogroup"
-		aria-label="Post type"
+		aria-label={m.composer_post_type()}
 	>
 		{#each POST_TYPES as type (type.id)}
 			<button
@@ -124,7 +125,11 @@
 							preload="metadata"
 						></video>
 					{:else}
-						<img src={plate.previewUrl} alt="Plate preview" class="w-full h-full object-cover" />
+						<img
+							src={plate.previewUrl}
+							alt={m.composer_plate_preview()}
+							class="w-full h-full object-cover"
+						/>
 					{/if}
 
 					<!-- Delete Button -->
@@ -132,7 +137,7 @@
 						type="button"
 						onclick={() => draft.removePlate(plate.id)}
 						class="absolute top-1.5 right-1.5 size-6 rounded-full bg-black/75 text-white flex items-center justify-center text-xs border-0 cursor-pointer shadow-sm active:scale-90"
-						aria-label="Remove plate"
+						aria-label={m.composer_remove_plate()}
 					>
 						✕
 					</button>
@@ -142,8 +147,8 @@
 						class="absolute bottom-1.5 left-1.5 px-2 py-0.5 rounded-full bg-black/70 backdrop-blur-xs text-white text-[10px] font-semibold"
 					>
 						{idx === 0
-							? `Primary · 1/${draft.mediaPlates.length}`
-							: `${idx + 1}/${draft.mediaPlates.length}`}
+							? m.composer_plate_primary(draft.mediaPlates.length)
+							: m.composer_plate_position(idx + 1, draft.mediaPlates.length)}
 					</div>
 
 					<!-- Upload Progress Overlay -->
@@ -164,7 +169,7 @@
 				class="shrink-0 w-24 aspect-[4/5] rounded-2xl border-2 border-dashed border-slate-200 dark:border-dark-border flex flex-col items-center justify-center gap-1 text-slate-500 dark:text-dark-muted bg-transparent cursor-pointer active:scale-95 transition"
 			>
 				<Icon name="plus" class="text-lg" />
-				<span class="text-[11px] font-medium">Add Plate</span>
+				<span class="text-[11px] font-medium">{m.composer_add_plate()}</span>
 			</button>
 		</div>
 	{/if}
@@ -180,7 +185,7 @@
 		>
 			<div class="flex items-center gap-2 text-slate-600 dark:text-dark-muted font-medium">
 				<Icon name="crop" class="text-sm" />
-				<span>Canvas Ratio</span>
+				<span>{m.composer_canvas_ratio()}</span>
 			</div>
 			<div class="flex items-center gap-1">
 				{#each ASPECT_RATIOS as r (r.id)}
@@ -203,7 +208,7 @@
 		<input
 			type="text"
 			bind:value={draft.title}
-			placeholder="Article title..."
+			placeholder={m.composer_article_title()}
 			class="w-full text-base font-bold text-slate-950 dark:text-white bg-transparent border-b border-slate-200 dark:border-dark-border pb-2 focus:outline-none"
 		/>
 	{/if}
@@ -211,8 +216,8 @@
 	<!-- Caption & Intent Textarea with Character Counter -->
 	<div class="flex flex-col gap-1.5">
 		<div class="flex items-center justify-between text-xs text-slate-400">
-			<span class="font-medium text-slate-600 dark:text-dark-muted">Caption & Intent</span>
-			<span>{draft.content.length} / {draft.maxLength.toLocaleString()}</span>
+			<span class="font-medium text-slate-600 dark:text-dark-muted">{m.composer_caption()}</span>
+			<span>{draft.content.length} / {draft.maxLength.toLocaleString(locale)}</span>
 		</div>
 		<FormatToolbar target={contentInput} class="mb-1" />
 		<textarea
@@ -222,8 +227,8 @@
 			use:formatShortcuts
 			rows="3"
 			maxlength={draft.maxLength}
-			placeholder="Share an architectural observation, exhibition note..."
-			aria-label="Post content"
+			placeholder={m.composer_content_placeholder()}
+			aria-label={m.composer_content_label()}
 			enterkeyhint="enter"
 			class="w-full min-h-24 max-h-[30dvh] resize-none bg-slate-50 dark:bg-dark-elevated/40 rounded-2xl p-3 text-sm leading-relaxed text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 		></textarea>
@@ -261,7 +266,7 @@
 			<input
 				type="text"
 				bind:value={draft.location}
-				placeholder="Exhibition Space / Location (e.g. Fondazione Prada)"
+				placeholder={m.composer_location_placeholder()}
 				class="flex-1 bg-transparent border-0 text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
 			/>
 		</div>
@@ -274,7 +279,11 @@
 					class="flex-1 flex items-center justify-center gap-2 h-10 rounded-xl bg-slate-100 dark:bg-dark-elevated text-xs font-semibold text-slate-700 dark:text-dark-text border-0 cursor-pointer active:scale-95 transition"
 				>
 					<Icon name="picture" class="text-sm text-blue-600 dark:text-kizuna-blue" />
-					<span>{draft.mediaPlates.length > 0 ? 'Add more stills' : 'Attach Stills / Media'}</span>
+					<span
+						>{draft.mediaPlates.length > 0
+							? m.composer_add_more_media()
+							: m.composer_attach_media()}</span
+					>
 				</button>
 			{/if}
 
@@ -282,7 +291,7 @@
 				type="text"
 				bind:value={draft.tagInput}
 				onkeydown={(e) => draft.handleTagKeydown(e)}
-				placeholder="#tag (Enter)"
+				placeholder={m.composer_tag_placeholder()}
 				class="w-32 h-10 px-3 text-xs bg-slate-100/70 dark:bg-dark-elevated text-slate-800 dark:text-dark-text placeholder:text-slate-400 rounded-xl border-0 focus:outline-none"
 			/>
 		</div>

@@ -85,6 +85,7 @@
 	import { TEXT_BACKGROUNDS } from '$lib/post-backgrounds';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { authClient } from '$lib/auth-client';
+	import { m } from '$lib/i18n';
 	import SharePostModal from './SharePostModal.svelte';
 	import PostCommentsModal from './PostCommentsModal.svelte';
 	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
@@ -172,12 +173,12 @@
 	async function toggleFollowAuthor() {
 		const authorId = post.author.id;
 		if (!authorId || followStore.isPending(authorId)) return;
-		if (!(await requireSignIn('Please log in to follow curators'))) return;
+		if (!(await requireSignIn(m.follow_log_in()))) return;
 		try {
 			const { status } = await followStore.set(authorId, followStatus === 'none');
 			toast.show(followToast(status, post.author.name));
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+			toast.show(err instanceof Error ? err.message : m.follow_error());
 		}
 	}
 	let editOpen = $state(false);
@@ -390,7 +391,7 @@
 		} catch (err) {
 			savedOverride = savedOnServer;
 			const message = err instanceof Error && err.message ? err.message : '';
-			toast.show(message || 'Could not update saved posts');
+			toast.show(message || m.post_save_error());
 		} finally {
 			saveInFlight = false;
 		}
@@ -404,13 +405,13 @@
 		optionsOpen = false;
 		const authorId = post.author.id;
 		if (!authorId || muteStore.isPending(authorId)) return;
-		if (!(await requireSignIn('Please log in to mute accounts'))) return;
+		if (!(await requireSignIn(m.post_log_in_to_mute()))) return;
 		const mute = !authorMuted;
 		try {
 			await muteStore.set(authorId, mute);
-			toast.show(mute ? `Muted ${post.author.name}` : `Unmuted ${post.author.name}`);
+			toast.show(mute ? m.mute_muted(post.author.name) : m.mute_unmuted(post.author.name));
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update mute');
+			toast.show(err instanceof Error ? err.message : m.mute_error());
 		}
 	}
 
@@ -418,16 +419,16 @@
 
 	async function openReport() {
 		optionsOpen = false;
-		if (!(await requireSignIn('Please log in to report posts'))) return;
+		if (!(await requireSignIn(m.post_log_in_to_report()))) return;
 		reportOpen = true;
 	}
 
 	async function toggleSave() {
-		if (!(await requireSignIn('Please log in to save posts'))) return;
+		if (!(await requireSignIn(m.post_log_in_to_save()))) return;
 		const next = !isSaved;
 		savedOverride = next;
 		haptic();
-		toast.show(next ? 'Saved to your collection' : 'Removed from saved');
+		toast.show(next ? m.post_saved() : m.post_unsaved());
 		onSave?.(next);
 		await syncSave();
 	}
@@ -467,7 +468,7 @@
 	}
 
 	async function openRepost() {
-		if (await requireSignIn('Please log in to repost')) repostOpen = true;
+		if (await requireSignIn(m.post_log_in_to_repost())) repostOpen = true;
 	}
 
 	let repostInFlight = false;
@@ -486,7 +487,7 @@
 				repostsCount?: number;
 			} | null;
 			if (!res.ok || typeof body?.reposted !== 'boolean') {
-				toast.show(readApiError(body, 'Could not update your repost').message);
+				toast.show(readApiError(body, m.post_repost_error()).message);
 				return;
 			}
 			repostedOverride = body.reposted;
@@ -494,9 +495,9 @@
 				repostsDelta = body.repostsCount - (post.repostsCount ?? 0);
 			}
 			haptic();
-			toast.show(body.reposted ? 'Reposted' : 'Repost removed');
+			toast.show(body.reposted ? m.post_reposted() : m.post_repost_removed());
 		} catch {
-			toast.show('Could not update your repost');
+			toast.show(m.post_repost_error());
 		} finally {
 			repostInFlight = false;
 		}
@@ -525,10 +526,10 @@
 		optionsOpen = false;
 		try {
 			await navigator.clipboard.writeText(postUrl());
-			toast.show('Link copied');
+			toast.show(m.post_link_copied());
 			handleShared();
 		} catch {
-			toast.show('Could not copy link');
+			toast.show(m.post_copy_link_error());
 		}
 	}
 
@@ -553,15 +554,15 @@
 			const res = await fetch(`/api/posts/${post.id}`, { method: 'DELETE' });
 			if (!res.ok && res.status !== 404) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not delete this post').message);
+				toast.show(readApiError(body, m.post_delete_error()).message);
 				return;
 			}
 			confirmDeleteOpen = false;
 			deleted = true;
-			toast.show('Post deleted');
+			toast.show(m.post_deleted());
 			onDelete?.(post.id);
 		} catch {
-			toast.show('Could not delete this post');
+			toast.show(m.post_delete_error());
 		} finally {
 			deleting = false;
 		}
@@ -576,14 +577,14 @@
 			const res = await fetch(`/api/posts/${post.id}/pin`, { method: pin ? 'PUT' : 'DELETE' });
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not update pinned posts').message);
+				toast.show(readApiError(body, m.post_pin_error()).message);
 				return;
 			}
 			pinnedOverride = pin;
-			toast.show(pin ? 'Pinned to your profile' : 'Unpinned from your profile');
+			toast.show(pin ? m.post_pinned() : m.post_unpinned());
 			onUpdate?.({ ...post, pinned: pin });
 		} catch {
-			toast.show('Could not update pinned posts');
+			toast.show(m.post_pin_error());
 		} finally {
 			pinning = false;
 		}
@@ -598,14 +599,14 @@
 		id={post.id}
 		class="post-card w-full flex flex-col bg-white dark:bg-dark-card border-y lg:border border-slate-100 dark:border-dark-border rounded-none lg:rounded-3xl pt-3 pb-2 lg:p-7 mb-2 lg:mb-6 shadow-none lg:shadow-xs dark:shadow-none transition-colors duration-200 {className}"
 		aria-labelledby={post.title ? `post-title-${post.id}` : undefined}
-		aria-label={post.title ? undefined : `Post by ${post.author.name}`}
+		aria-label={post.title ? undefined : m.post_by(post.author.name)}
 	>
 		{#if showPinned && isPinned}
 			<p
 				class="flex items-center gap-1.5 px-4 lg:px-0 mb-2 text-xs font-semibold text-slate-500 dark:text-dark-muted"
 			>
 				<Icon name="pin" class="text-xs" />
-				Pinned
+				{m.post_pinned_label()}
 			</p>
 		{/if}
 		{#if post.repostedBy}
@@ -614,7 +615,7 @@
 			>
 				<Icon name="arrows-repeat" class="text-sm" />
 				{#if post.repostedBy.id === $session.data?.user?.id}
-					<span>You reposted</span>
+					<span>{m.post_you_reposted()}</span>
 				{:else}
 					<a
 						href={resolve('/profile/[id]', { id: post.repostedBy.id })}
@@ -622,7 +623,7 @@
 					>
 						{post.repostedBy.name}
 					</a>
-					<span class="shrink-0">reposted</span>
+					<span class="shrink-0">{m.post_reposted_by_suffix()}</span>
 				{/if}
 			</p>
 		{/if}
@@ -633,7 +634,7 @@
 				<a
 					href={profileHref}
 					class="shrink-0 rounded-full"
-					aria-label={`View ${post.author.name}'s profile`}
+					aria-label={m.post_view_profile(post.author.name)}
 				>
 					<Avatar src={post.author.avatar} name={post.author.name} size="md" />
 				</a>
@@ -676,7 +677,7 @@
 			<button
 				type="button"
 				class="size-11 -mr-2 shrink-0 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-800 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-hover active:scale-90 transition cursor-pointer border-0 bg-transparent"
-				aria-label="Post options"
+				aria-label={m.post_options()}
 				aria-haspopup="dialog"
 				onclick={() => (optionsOpen = true)}
 			>
@@ -726,7 +727,7 @@
 							ontouchstart={(e) => e.stopPropagation()}
 							ontouchend={(e) => e.stopPropagation()}
 							role="region"
-							aria-label="Video playback fallback"
+							aria-label={m.post_video_fallback()}
 						>
 							<div
 								class="size-12 rounded-full bg-white/10 flex items-center justify-center text-xl text-white"
@@ -734,9 +735,9 @@
 								<Icon name="play-alt" />
 							</div>
 							<div class="flex flex-col gap-1 max-w-xs">
-								<p class="text-sm font-semibold">Video format not supported inline</p>
+								<p class="text-sm font-semibold">{m.post_video_unsupported()}</p>
 								<p class="text-xs text-slate-400">
-									Your browser could not stream this video directly in the feed.
+									{m.post_video_unsupported_hint()}
 								</p>
 							</div>
 							<div class="flex items-center gap-2">
@@ -747,7 +748,7 @@
 									rel="noopener noreferrer"
 									class="px-4 py-2 rounded-xl bg-white text-slate-950 text-xs font-semibold hover:bg-slate-100 transition no-underline shadow-xs"
 								>
-									Open video in new tab
+									{m.post_open_video()}
 								</a>
 								<!-- eslint-enable svelte/no-navigation-without-resolve -->
 								<button
@@ -758,7 +759,7 @@
 									}}
 									class="px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-white text-xs font-semibold transition cursor-pointer border-0"
 								>
-									Retry
+									{m.common_retry()}
 								</button>
 							</div>
 						</div>
@@ -779,7 +780,7 @@
 						>
 							<source src={activeMediaUrl} type={getVideoType(activeMediaUrl)} />
 							<track kind="captions" />
-							Your browser does not support the video tag.
+							{m.post_video_tag_unsupported()}
 						</video>
 					{/if}
 				{:else}
@@ -787,7 +788,7 @@
 						src={activeMediaUrl}
 						alt={currentMedia.alt ||
 							post.title ||
-							`Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+							m.post_photo_alt(post.author.name, activeSlide + 1)}
 						srcset={imageSrcset(activeMediaUrl, FEED_IMAGE_WIDTHS)}
 						sizes="(min-width: 672px) 672px, 100vw"
 						class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
@@ -805,7 +806,7 @@
 				{#if allMedia.length > 1}
 					<div
 						class="carousel-counter absolute top-3 right-3 px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-white text-[11px] font-semibold tracking-wider select-none shadow-xs z-10"
-						aria-label={`Slide ${activeSlide + 1} of ${allMedia.length}`}
+						aria-label={m.post_slide_of(activeSlide + 1, allMedia.length)}
 					>
 						{activeSlide + 1}/{allMedia.length}
 					</div>
@@ -816,7 +817,7 @@
 							type="button"
 							class="absolute left-2.5 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 border-0 cursor-pointer z-10 shadow-sm"
 							onclick={prevSlide}
-							aria-label="Previous slide"
+							aria-label={m.post_previous_slide()}
 						>
 							<Icon name="angle-left" class="text-sm" />
 						</button>
@@ -827,7 +828,7 @@
 							type="button"
 							class="absolute right-2.5 top-1/2 -translate-y-1/2 size-8 rounded-full bg-black/50 hover:bg-black/75 backdrop-blur-sm text-white flex items-center justify-center transition-all opacity-0 group-hover:opacity-100 sm:opacity-0 sm:group-hover:opacity-100 border-0 cursor-pointer z-10 shadow-sm"
 							onclick={nextSlide}
-							aria-label="Next slide"
+							aria-label={m.post_next_slide()}
 						>
 							<Icon name="angle-right" class="text-sm" />
 						</button>
@@ -837,7 +838,7 @@
 					<div
 						class="carousel-dots absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-black/40 backdrop-blur-sm z-10 select-none"
 						role="tablist"
-						aria-label="Slide indicators"
+						aria-label={m.post_slide_indicators()}
 					>
 						{#each allMedia as item, idx (item.url + idx)}
 							<button
@@ -847,7 +848,7 @@
 									? 'w-4 h-1.5 bg-white'
 									: 'size-1.5 bg-white/50 hover:bg-white/75'}"
 								onclick={(e) => goToSlide(idx, e)}
-								aria-label={`Go to slide ${idx + 1}`}
+								aria-label={m.post_go_to_slide(idx + 1)}
 								aria-selected={idx === activeSlide}
 							></button>
 						{/each}
@@ -886,7 +887,7 @@
 						? 'text-rose-500 font-semibold'
 						: 'hover:text-slate-900 dark:hover:text-dark-text'}"
 					onclick={toggleLike}
-					aria-label="Like post"
+					aria-label={m.post_like()}
 					aria-pressed={isLiked}
 				>
 					{#key likePop}
@@ -902,7 +903,7 @@
 				<button
 					type="button"
 					class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
-					aria-label="Comments"
+					aria-label={m.comment_comments()}
 					onclick={() => (commentsOpen = true)}
 				>
 					<Icon name="comment" class="text-xl lg:text-base" />
@@ -914,7 +915,7 @@
 					class="{actionButton} px-2 {isReposted
 						? 'text-emerald-600 dark:text-emerald-400 font-semibold'
 						: 'hover:text-slate-900 dark:hover:text-dark-text'}"
-					aria-label="Repost"
+					aria-label={m.post_repost()}
 					aria-haspopup="dialog"
 					aria-pressed={isReposted}
 					onclick={openRepost}
@@ -931,7 +932,7 @@
 						? 'text-blue-600 dark:text-kizuna-blue'
 						: 'hover:text-slate-900 dark:hover:text-dark-text'}"
 					onclick={toggleSave}
-					aria-label={isSaved ? 'Remove bookmark' : 'Save bookmark'}
+					aria-label={isSaved ? m.post_remove_bookmark() : m.post_save_bookmark()}
 					aria-pressed={isSaved}
 				>
 					<Icon name="bookmark" type={isSaved ? 'sr' : 'rr'} class="text-xl lg:text-base" />
@@ -940,7 +941,7 @@
 				<button
 					type="button"
 					class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
-					aria-label="Share post"
+					aria-label={m.post_share()}
 					onclick={openShare}
 				>
 					<Icon name="paper-plane" class="text-xl lg:text-base" />
@@ -976,7 +977,7 @@
 							aria-expanded={expanded}
 							onclick={() => (expanded = !expanded)}
 						>
-							{expanded ? 'See less' : 'See more'}
+							{expanded ? m.post_see_less() : m.post_see_more()}
 						</button>
 					{/if}
 				</div>
@@ -1022,7 +1023,7 @@
 					<span
 						class="reply-link text-[11px] font-medium text-slate-500 dark:text-dark-muted shrink-0"
 					>
-						View all {formatCount(displayCommentsCount)}
+						{m.post_view_all_comments(formatCount(displayCommentsCount))}
 					</span>
 				</button>
 			{/if}
@@ -1032,17 +1033,17 @@
 
 <!-- Mounted only while open: a feed of idle cards carries no dialogs. -->
 {#if optionsOpen}
-	<BottomSheet bind:open={optionsOpen} title="Post options">
+	<BottomSheet bind:open={optionsOpen} title={m.post_options()}>
 		{#if isOwner}
-			<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+			<SheetAction icon="pencil" label={m.post_edit()} onclick={openEdit} />
 			<SheetAction
 				icon={isPinned ? 'pin-off' : 'pin'}
-				label={isPinned ? 'Unpin' : 'Pin to profile'}
+				label={isPinned ? m.post_unpin() : m.post_pin()}
 				onclick={togglePin}
 			/>
 			<SheetAction
 				icon="trash"
-				label="Delete post"
+				label={m.post_delete()}
 				danger
 				onclick={() => {
 					optionsOpen = false;
@@ -1052,23 +1053,25 @@
 		{/if}
 		<SheetAction
 			icon="bookmark"
-			label={isSaved ? 'Remove from saved' : 'Save'}
+			label={isSaved ? m.post_remove_from_saved() : m.common_save()}
 			onclick={() => {
 				optionsOpen = false;
 				toggleSave();
 			}}
 		/>
-		<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
-		<SheetAction icon="link" label="Copy link" onclick={copyLink} />
+		<SheetAction icon="paper-plane" label={m.post_share_action()} onclick={openShare} />
+		<SheetAction icon="link" label={m.post_copy_link()} onclick={copyLink} />
 		{#if !isOwner}
 			{#if post.author.id}
 				<SheetAction
 					icon={authorMuted ? 'volume' : 'volume-mute'}
-					label={authorMuted ? `Unmute ${post.author.name}` : `Mute ${post.author.name}`}
+					label={authorMuted
+						? m.post_unmute_author(post.author.name)
+						: m.post_mute_author(post.author.name)}
 					onclick={toggleMuteAuthor}
 				/>
 			{/if}
-			<SheetAction icon="flag" label="Report" danger onclick={openReport} />
+			<SheetAction icon="flag" label={m.post_report()} danger onclick={openReport} />
 		{/if}
 	</BottomSheet>
 {/if}
@@ -1078,9 +1081,9 @@
 {/if}
 
 {#if confirmDeleteOpen}
-	<BottomSheet bind:open={confirmDeleteOpen} title="Delete post?" showTitle>
+	<BottomSheet bind:open={confirmDeleteOpen} title={m.post_confirm_delete()} showTitle>
 		<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
-			This removes the post from your profile and everyone's feed. You can't undo this.
+			{m.post_delete_hint()}
 		</p>
 		{#snippet footer()}
 			<div class="flex justify-end gap-2">
@@ -1089,7 +1092,7 @@
 					class="h-10 px-4 rounded-full text-sm font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover"
 					onclick={() => (confirmDeleteOpen = false)}
 				>
-					Cancel
+					{m.common_cancel()}
 				</button>
 				<button
 					type="button"
@@ -1097,7 +1100,7 @@
 					disabled={deleting}
 					onclick={deletePost}
 				>
-					{deleting ? 'Deleting…' : 'Delete'}
+					{deleting ? m.common_deleting() : m.common_delete()}
 				</button>
 			</div>
 		{/snippet}
@@ -1113,13 +1116,13 @@
 {/if}
 
 {#if repostOpen}
-	<BottomSheet bind:open={repostOpen} title="Repost">
+	<BottomSheet bind:open={repostOpen} title={m.post_repost()}>
 		<SheetAction
 			icon="arrows-repeat"
-			label={isReposted ? 'Undo repost' : 'Repost'}
+			label={isReposted ? m.post_undo_repost() : m.post_repost()}
 			onclick={toggleRepost}
 		/>
-		<SheetAction icon="pencil" label="Quote" onclick={openQuote} />
+		<SheetAction icon="pencil" label={m.post_quote_action()} onclick={openQuote} />
 	</BottomSheet>
 {/if}
 

@@ -7,6 +7,7 @@
 		MIN_POLL_OPTIONS,
 		POLL_DURATIONS
 	} from '$lib/polls';
+	import { m } from '$lib/i18n';
 	import type { PostDraft } from './post-draft.svelte';
 
 	let { draft }: { draft: PostDraft } = $props();
@@ -48,7 +49,9 @@
 	<fieldset
 		class="flex flex-col gap-2 m-0 p-3 rounded-2xl border border-slate-200 dark:border-dark-border"
 	>
-		<legend class="px-1 text-xs font-semibold text-slate-600 dark:text-dark-muted">Poll</legend>
+		<legend class="px-1 text-xs font-semibold text-slate-600 dark:text-dark-muted">
+			{m.poll_label()}
+		</legend>
 		{#each draft.pollOptions as option, idx (option.id)}
 			<div class="flex items-center gap-2">
 				<input
@@ -56,15 +59,15 @@
 					bind:value={option.label}
 					type="text"
 					maxlength={MAX_POLL_OPTION_LENGTH}
-					placeholder={`Option ${idx + 1}`}
-					aria-label={`Option ${idx + 1}`}
+					placeholder={m.poll_option(idx + 1)}
+					aria-label={m.poll_option(idx + 1)}
 					class="flex-1 min-w-0 h-10 px-3 rounded-xl bg-slate-50 dark:bg-dark-elevated/50 text-sm text-slate-900 dark:text-dark-text placeholder:text-slate-400 border-0 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 				/>
 				{#if draft.pollOptions.length > MIN_POLL_OPTIONS}
 					<button
 						type="button"
 						class="size-9 shrink-0 rounded-full flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-hover border-0 bg-transparent cursor-pointer"
-						aria-label={`Remove option ${idx + 1}`}
+						aria-label={m.poll_remove_option(idx + 1)}
 						onclick={() => removeOption(option.id, idx)}
 					>
 						<Icon name="cross" class="text-sm" />
@@ -79,14 +82,14 @@
 				onclick={addOption}
 			>
 				<Icon name="plus" class="text-xs" />
-				Add option
+				{m.poll_add_option()}
 			</button>
 		{/if}
 		<div class="flex items-center justify-between gap-2 pt-1">
 			<label
 				class="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-dark-muted"
 			>
-				Poll length
+				{m.poll_length()}
 				<select
 					bind:value={draft.pollDuration}
 					class="h-9 px-2 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-elevated text-xs text-slate-900 dark:text-dark-text"
@@ -101,7 +104,7 @@
 				class="h-9 px-3 rounded-xl text-xs font-semibold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 border-0 bg-transparent cursor-pointer"
 				onclick={removePoll}
 			>
-				Remove poll
+				{m.poll_remove()}
 			</button>
 		</div>
 	</fieldset>
@@ -113,6 +116,6 @@
 		onclick={addPoll}
 	>
 		<Icon name="plus" class="text-xs" />
-		Add poll
+		{m.poll_add()}
 	</button>
 {/if}

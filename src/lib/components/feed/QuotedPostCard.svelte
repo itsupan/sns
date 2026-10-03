@@ -4,6 +4,7 @@
 	import { stripFormatting } from '$lib/formatting';
 	import { GRID_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { resolve } from '$app/paths';
+	import { m } from '$lib/i18n';
 	import type { QuotedPost } from './PostCard.svelte';
 
 	interface Props {
@@ -20,7 +21,7 @@
 	<a
 		href={resolve('/post/[id]', { id: quoted.id })}
 		class="flex gap-3 p-3 rounded-2xl border border-slate-200 dark:border-dark-border no-underline hover:bg-slate-50 dark:hover:bg-dark-elevated transition-colors"
-		aria-label={`Quoted post by ${quoted.author.name}`}
+		aria-label={m.post_quoted_by(quoted.author.name)}
 		data-testid="quoted-post"
 	>
 		<div class="flex-1 min-w-0 flex flex-col gap-1">
@@ -80,6 +81,6 @@
 		class="m-0 p-3 rounded-2xl border border-slate-200 dark:border-dark-border text-sm text-slate-500 dark:text-dark-muted"
 		data-testid="quoted-post"
 	>
-		This post is unavailable.
+		{m.post_unavailable()}
 	</p>
 {/if}

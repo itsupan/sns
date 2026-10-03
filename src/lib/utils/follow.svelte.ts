@@ -1,24 +1,25 @@
+import { m } from '$lib/i18n';
 import { readApiError } from './api-error';
 
 /** The viewer's relation to an account: following it, asked to (a private account), or neither. */
 export type FollowStatus = 'none' | 'requested' | 'following';
 
 export const FOLLOW_LABELS: Record<FollowStatus, string> = {
-	none: 'Follow',
-	requested: 'Requested',
-	following: 'Following'
+	none: m.follow_status_none(),
+	requested: m.follow_status_requested(),
+	following: m.follow_status_following()
 };
 
 /** Toast after a Follow button click settled on `status`. */
 export function followToast(status: FollowStatus, name: string): string {
-	if (status === 'none') return `Unfollowed ${name}`;
-	return status === 'requested' ? `Requested to follow ${name}` : `Following ${name}`;
+	if (status === 'none') return m.follow_toast_unfollowed(name);
+	return status === 'requested' ? m.follow_toast_requested(name) : m.follow_toast_following(name);
 }
 
 /** Accessible name of a Follow button for `name`, saying what a click does. */
 export function followActionLabel(status: FollowStatus, name: string): string {
-	if (status === 'none') return `Follow ${name}`;
-	return status === 'requested' ? `Withdraw follow request to ${name}` : `Unfollow ${name}`;
+	if (status === 'none') return m.follow_action_follow(name);
+	return status === 'requested' ? m.follow_action_withdraw(name) : m.follow_action_unfollow(name);
 }
 
 /**
@@ -66,7 +67,7 @@ class FollowStore {
 			} | null;
 			const status = body?.status;
 			if (!res.ok || !status || !Object.hasOwn(FOLLOW_LABELS, status)) {
-				throw new Error(readApiError(body, 'Could not update follow').message);
+				throw new Error(readApiError(body, m.follow_error()).message);
 			}
 			this.overrides[userId] = status;
 			return { status, followersCount: body?.followersCount };

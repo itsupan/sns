@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import SettingsSection from './SettingsSection.svelte';
 	import {
 		buttonClass,
@@ -30,7 +31,7 @@
 			const res = await fetch('/api/account/export');
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.error(readApiError(body, 'Could not prepare your data').message);
+				toast.error(readApiError(body, m.settings_export_error()).message);
 				return;
 			}
 			const name =
@@ -42,9 +43,9 @@
 			a.download = name;
 			a.click();
 			URL.revokeObjectURL(href);
-			toast.success('Your data is downloading');
+			toast.success(m.settings_export_started());
 		} catch {
-			toast.error('Could not prepare your data');
+			toast.error(m.settings_export_error());
 		} finally {
 			exporting = false;
 		}
@@ -82,25 +83,25 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				deleteError = readApiError(body, 'Could not delete your account').message;
+				deleteError = readApiError(body, m.settings_delete_error()).message;
 				return;
 			}
-			toast.success('Your account has been deleted');
+			toast.success(m.settings_deleted());
 			// Sessions were deleted with the account; a full load drops any cached signed-in state.
 			await goto(resolve('/'), { invalidateAll: true });
 		} catch {
-			deleteError = 'Could not delete your account';
+			deleteError = m.settings_delete_error();
 		} finally {
 			deleting = false;
 		}
 	}
 </script>
 
-<SettingsSection id="settings-data" title="Privacy & data">
+<SettingsSection id="settings-data" title={m.settings_data()}>
 	<div class={rowClass}>
 		<div class="flex flex-col min-w-0">
-			<span>Download your data</span>
-			<span class={hintClass}>Profile, posts, comments, follows and messages as a JSON file</span>
+			<span>{m.settings_download_data()}</span>
+			<span class={hintClass}>{m.settings_download_data_hint()}</span>
 		</div>
 		<button
 			type="button"
@@ -109,15 +110,13 @@
 			disabled={exporting}
 			aria-busy={exporting}
 		>
-			{exporting ? 'Preparing…' : 'Download'}
+			{exporting ? m.settings_preparing() : m.settings_download()}
 		</button>
 	</div>
 	<div class={rowClass}>
 		<div class="flex flex-col min-w-0">
-			<span class="text-red-600 dark:text-red-400">Delete account</span>
-			<span class={hintClass}
-				>Permanently removes your profile, posts, comments, follows and messages</span
-			>
+			<span class="text-red-600 dark:text-red-400">{m.settings_delete_account()}</span>
+			<span class={hintClass}>{m.settings_delete_account_hint()}</span>
 		</div>
 		<button
 			type="button"
@@ -126,7 +125,7 @@
 			aria-expanded={deleteOpen}
 			aria-controls="delete-account-panel"
 		>
-			Delete
+			{m.common_delete()}
 		</button>
 	</div>
 	{#if deleteOpen}
@@ -136,11 +135,13 @@
 			onsubmit={deleteAccount}
 		>
 			<p class="m-0 text-sm text-slate-700 dark:text-dark-muted">
-				This cannot be undone. Everything you have posted and your messages will be deleted for
-				good. Download your data first if you want a copy.
+				{m.settings_delete_warning()}
 			</p>
 			<label class={fieldClass}>
-				<span>Type <strong>DELETE</strong> to confirm</span>
+				<span
+					>{m.settings_delete_confirm_before()} <strong>DELETE</strong>
+					{m.settings_delete_confirm_after()}</span
+				>
 				<input
 					type="text"
 					bind:value={deleteConfirm}
@@ -152,7 +153,7 @@
 			</label>
 			{#if hasPassword}
 				<label class={fieldClass}>
-					<span>Password</span>
+					<span>{m.settings_password()}</span>
 					<input
 						type="password"
 						bind:value={deletePassword}
@@ -165,14 +166,14 @@
 				<p class={errorClass} role="alert">{deleteError}</p>
 			{/if}
 			<div class="flex justify-end gap-2">
-				<button type="button" class={buttonClass} onclick={closeDelete}>Cancel</button>
+				<button type="button" class={buttonClass} onclick={closeDelete}>{m.common_cancel()}</button>
 				<button
 					type="submit"
 					class="h-9 px-4 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-700 border-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
 					disabled={!canDelete}
 					aria-busy={deleting}
 				>
-					{deleting ? 'Deleting…' : 'Delete my account'}
+					{deleting ? m.common_deleting() : m.settings_delete_my_account()}
 				</button>
 			</div>
 		</form>

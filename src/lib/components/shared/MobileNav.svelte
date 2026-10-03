@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/state';
+	import { m } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import { navItems, activeNavId, openComposer, type NavItem } from './nav-items';
 	import { badges } from '$lib/utils/badges.svelte';
@@ -31,7 +32,7 @@
 
 <nav
 	class="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-white/95 dark:bg-dark-card/95 backdrop-blur-md border-t border-slate-200 dark:border-dark-border pb-safe {className}"
-	aria-label="Mobile Navigation"
+	aria-label={m.nav_mobile_label()}
 >
 	<ul class="h-14 flex items-stretch list-none m-0 p-0">
 		{#each tabs as item (item.id)}
@@ -41,7 +42,7 @@
 					<button
 						type="button"
 						class="flex-1 flex items-center justify-center border-0 bg-transparent cursor-pointer group"
-						aria-label="Create post"
+						aria-label={m.nav_create_post()}
 						onclick={(e) => handleTab(e, item)}
 					>
 						<span
@@ -66,7 +67,7 @@
 								<span
 									class="absolute -top-0.5 -right-1 size-2.5 rounded-full bg-rose-600 ring-2 ring-white dark:ring-dark-card"
 								></span>
-								<span class="sr-only">, {badges.activity} new</span>
+								<span class="sr-only">{m.nav_new_badge(badges.activity)}</span>
 							{/if}
 						</span>
 						<span class="text-[11px] leading-none {isActive ? 'font-semibold' : 'font-medium'}">

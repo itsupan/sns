@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { themeManager } from '$lib/utils/theme.svelte';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		class?: string;
@@ -19,8 +20,8 @@
 		type="button"
 		class="theme-toggle inline-flex items-center justify-center size-9 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-600 dark:text-dark-text hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-dark-hover transition-all duration-150 cursor-pointer border border-slate-200/60 dark:border-dark-border {className}"
 		onclick={() => themeManager.toggleTheme()}
-		aria-label={themeManager.isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-		title={themeManager.isDark ? 'Switch to light mode' : 'Switch to dark mode'}
+		aria-label={themeManager.isDark ? m.settings_theme_light_mode() : m.settings_theme_dark_mode()}
+		title={themeManager.isDark ? m.settings_theme_light_mode() : m.settings_theme_dark_mode()}
 	>
 		{#if themeManager.isDark}
 			<!-- Sun Icon -->
@@ -62,7 +63,7 @@
 	<div
 		class="inline-flex items-center p-0.5 bg-slate-100 dark:bg-dark-elevated rounded-lg border border-slate-200 dark:border-dark-border text-xs {className}"
 		role="radiogroup"
-		aria-label="Theme mode"
+		aria-label={m.settings_theme_label()}
 	>
 		<button
 			type="button"
@@ -74,7 +75,7 @@
 				: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text'}"
 			onclick={() => themeManager.setTheme('light')}
 		>
-			Light
+			{m.settings_theme_light()}
 		</button>
 		<button
 			type="button"
@@ -86,7 +87,7 @@
 				: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text'}"
 			onclick={() => themeManager.setTheme('system')}
 		>
-			System
+			{m.settings_theme_system()}
 		</button>
 		<button
 			type="button"
@@ -98,7 +99,7 @@
 				: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text'}"
 			onclick={() => themeManager.setTheme('dark')}
 		>
-			Dark
+			{m.settings_theme_dark()}
 		</button>
 	</div>
 {/if}

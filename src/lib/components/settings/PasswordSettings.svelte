@@ -3,6 +3,7 @@
 	import { authClient } from '$lib/auth-client';
 	import { newPasswordError } from '$lib/utils/password';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import {
 		buttonClass,
 		errorClass,
@@ -46,7 +47,7 @@
 		error =
 			(currentPassword
 				? newPasswordError(newPassword, confirmPassword)
-				: 'Please enter your current password.') ?? '';
+				: m.settings_password_current_required()) ?? '';
 		if (error) return;
 		saving = true;
 		try {
@@ -58,16 +59,16 @@
 			if (result.error) {
 				error =
 					result.error.code === 'INVALID_PASSWORD'
-						? 'Your current password is incorrect.'
-						: result.error.message || 'Could not change your password';
+						? m.settings_password_incorrect()
+						: result.error.message || m.settings_password_error();
 				return;
 			}
-			toast.success('Password changed. Your other sessions were signed out.');
+			toast.success(m.settings_password_changed());
 			close();
 			// Every session was replaced, this one included.
 			await invalidateAll();
 		} catch {
-			error = 'Could not change your password';
+			error = m.settings_password_error();
 		} finally {
 			saving = false;
 		}
@@ -76,7 +77,7 @@
 
 {#if hasPassword}
 	<div class={rowClass}>
-		<span>Password</span>
+		<span>{m.settings_password()}</span>
 		<button
 			type="button"
 			class={buttonClass}
@@ -84,13 +85,13 @@
 			aria-expanded={open}
 			aria-controls="change-password-panel"
 		>
-			Change
+			{m.common_change()}
 		</button>
 	</div>
 	{#if open}
 		<form id="change-password-panel" class={panelClass} onsubmit={changePassword} novalidate>
 			<label class={fieldClass}>
-				<span>Current password</span>
+				<span>{m.settings_current_password()}</span>
 				<input
 					type="password"
 					bind:value={currentPassword}
@@ -99,7 +100,7 @@
 				/>
 			</label>
 			<label class={fieldClass}>
-				<span>New password</span>
+				<span>{m.settings_new_password()}</span>
 				<input
 					type="password"
 					bind:value={newPassword}
@@ -108,7 +109,7 @@
 				/>
 			</label>
 			<label class={fieldClass}>
-				<span>Confirm new password</span>
+				<span>{m.settings_confirm_new_password()}</span>
 				<input
 					type="password"
 					bind:value={confirmPassword}
@@ -116,21 +117,21 @@
 					class={inputClass}
 				/>
 			</label>
-			<p class="m-0 {hintClass}">Changing it signs you out everywhere else.</p>
+			<p class="m-0 {hintClass}">{m.settings_password_hint()}</p>
 			{#if error}
 				<p class={errorClass} role="alert">{error}</p>
 			{/if}
 			<div class="flex justify-end gap-2">
-				<button type="button" class={buttonClass} onclick={close}>Cancel</button>
+				<button type="button" class={buttonClass} onclick={close}>{m.common_cancel()}</button>
 				<button type="submit" class={primaryButtonClass} disabled={saving} aria-busy={saving}>
-					{saving ? 'Saving…' : 'Change password'}
+					{saving ? m.common_saving() : m.settings_change_password()}
 				</button>
 			</div>
 		</form>
 	{/if}
 {:else}
 	<div class={rowClass}>
-		<span>Sign-in method</span>
+		<span>{m.settings_sign_in_method()}</span>
 		<span class="text-sm text-slate-500 dark:text-dark-muted">{signInMethods}</span>
 	</div>
 {/if}

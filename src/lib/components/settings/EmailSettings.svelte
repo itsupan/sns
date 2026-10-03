@@ -7,6 +7,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { emailChangedUrl, emailLinkResult, emailVerifiedUrl } from '$lib/utils/email-links';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import {
 		buttonClass,
 		errorClass,
@@ -42,10 +43,10 @@
 				email,
 				callbackURL: emailVerifiedUrl
 			});
-			if (error) toast.error(error.message || 'Could not send the email');
-			else toast.success(`We sent a verification link to ${email}`);
+			if (error) toast.error(error.message || m.settings_email_send_error());
+			else toast.success(m.settings_email_verification_sent(email));
 		} catch {
-			toast.error('Could not send the email');
+			toast.error(m.settings_email_send_error());
 		} finally {
 			resending = false;
 		}
@@ -74,17 +75,17 @@
 				callbackURL: emailChangedUrl(target)
 			});
 			if (error) {
-				changeError = error.message || 'Could not change your email';
+				changeError = error.message || m.settings_email_change_error();
 				return;
 			}
 			toast.success(
 				emailVerified
-					? `Check ${email} for a link to approve the change`
-					: `Check ${target} for a link to confirm it`
+					? m.settings_email_check_approve(email)
+					: m.settings_email_check_confirm(target)
 			);
 			closeChange();
 		} catch {
-			changeError = 'Could not change your email';
+			changeError = m.settings_email_change_error();
 		} finally {
 			changing = false;
 		}
@@ -98,7 +99,7 @@
 		<Icon name="exclamation" class="mt-0.5 shrink-0" />
 		<div class="flex flex-col items-start gap-2 min-w-0">
 			<p class="m-0 text-sm">
-				Your email address isn't verified yet. Open the link we email you to confirm it's yours.
+				{m.settings_email_unverified_notice()}
 			</p>
 			<button
 				type="button"
@@ -107,20 +108,20 @@
 				disabled={resending}
 				aria-busy={resending}
 			>
-				{resending ? 'Sending…' : 'Resend verification email'}
+				{resending ? m.common_sending() : m.settings_email_resend()}
 			</button>
 		</div>
 	</div>
 {/if}
 <div class={rowClass}>
 	<div class="flex flex-col min-w-0">
-		<span>Email</span>
+		<span>{m.settings_email()}</span>
 		<span class="{hintClass} truncate">
 			{email} ·
 			{#if emailVerified}
-				<span class="text-emerald-700 dark:text-emerald-400">Verified</span>
+				<span class="text-emerald-700 dark:text-emerald-400">{m.settings_email_verified()}</span>
 			{:else}
-				<span class="text-amber-700 dark:text-amber-400">Not verified</span>
+				<span class="text-amber-700 dark:text-amber-400">{m.settings_email_not_verified()}</span>
 			{/if}
 		</span>
 	</div>
@@ -131,20 +132,20 @@
 		aria-expanded={changeOpen}
 		aria-controls="change-email-panel"
 	>
-		Change
+		{m.common_change()}
 	</button>
 </div>
 {#if changeOpen}
 	<form id="change-email-panel" class={panelClass} onsubmit={changeEmail}>
 		<p class="m-0 text-sm text-slate-700 dark:text-dark-muted">
 			{#if emailVerified}
-				We'll email {email} to approve the change, then send a link to the new address to finish.
+				{m.settings_email_change_verified(email)}
 			{:else}
-				We'll send a link to the new address. Your email changes when you open it.
+				{m.settings_email_change_unverified()}
 			{/if}
 		</p>
 		<label class={fieldClass}>
-			<span>New email</span>
+			<span>{m.settings_new_email()}</span>
 			<input
 				type="email"
 				bind:value={newEmail}
@@ -159,14 +160,14 @@
 			<p class={errorClass} role="alert">{changeError}</p>
 		{/if}
 		<div class="flex justify-end gap-2">
-			<button type="button" class={buttonClass} onclick={closeChange}>Cancel</button>
+			<button type="button" class={buttonClass} onclick={closeChange}>{m.common_cancel()}</button>
 			<button
 				type="submit"
 				class={primaryButtonClass}
 				disabled={!newEmail.trim() || changing}
 				aria-busy={changing}
 			>
-				{changing ? 'Sending…' : 'Send link'}
+				{changing ? m.common_sending() : m.settings_send_link()}
 			</button>
 		</div>
 	</form>

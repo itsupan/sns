@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import Switch from './Switch.svelte';
 	import { hintClass, rowClass } from './styles';
 
@@ -13,15 +14,14 @@
 	let { publicKey }: Props = $props();
 
 	const ENDPOINT = '/api/push/subscriptions';
-	const FAILED = 'Could not update push notifications';
 
 	let status = $state<'loading' | 'unsupported' | 'denied' | 'off' | 'on'>('loading');
 	let saving = $state(false);
 	const hint = $derived(
 		status === 'unsupported'
-			? 'This browser cannot receive push notifications. On iPhone and iPad, add Kizuna to your Home Screen first.'
+			? m.settings_push_unsupported()
 			: status === 'denied'
-				? 'Notifications are blocked for this site. Allow them in your browser settings.'
+				? m.settings_push_denied()
 				: null
 	);
 
@@ -56,7 +56,7 @@
 			body: JSON.stringify(body)
 		});
 		if (res.ok) return null;
-		return readApiError(await res.json().catch(() => null), FAILED).message;
+		return readApiError(await res.json().catch(() => null), m.settings_push_error()).message;
 	}
 
 	async function subscribe(registration: ServiceWorkerRegistration) {
@@ -97,7 +97,7 @@
 			const registration = await navigator.serviceWorker.ready;
 			await (status === 'on' ? unsubscribe(registration) : subscribe(registration));
 		} catch {
-			toast.error(FAILED);
+			toast.error(m.settings_push_error());
 		} finally {
 			saving = false;
 		}
@@ -106,7 +106,7 @@
 
 <div class={rowClass}>
 	<span class="flex flex-col min-w-0">
-		<span id="push-notifications-label">Push notifications on this device</span>
+		<span id="push-notifications-label">{m.settings_push_label()}</span>
 		{#if hint}
 			<span id="push-notifications-hint" class={hintClass}>{hint}</span>
 		{/if}

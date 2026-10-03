@@ -6,6 +6,7 @@
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
 	import type { FollowRequestPage, FollowRequestUser } from '$lib/activity/types';
+	import { m } from '$lib/i18n';
 
 	let { initial }: { initial: FollowRequestPage } = $props();
 
@@ -34,13 +35,15 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.error(readApiError(body, 'Could not update the request').message);
+				toast.error(readApiError(body, m.activity_request_error()).message);
 				return;
 			}
 			handledIds = [...handledIds, person.id];
-			toast.success(approve ? `${person.name} now follows you` : 'Request declined');
+			toast.success(
+				approve ? m.activity_request_approved(person.name) : m.activity_request_declined()
+			);
 		} catch {
-			toast.error('Could not update the request');
+			toast.error(m.activity_request_error());
 		} finally {
 			busyId = null;
 		}
@@ -54,14 +57,14 @@
 			const res = await fetch(`/api/follow-requests?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load follow requests').message;
+				loadError = readApiError(body, m.activity_requests_load_error()).message;
 				return;
 			}
 			const page = body as FollowRequestPage;
 			more = [...more, ...page.users];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load follow requests';
+			loadError = m.activity_requests_load_error();
 		} finally {
 			loadingMore = false;
 		}
@@ -74,7 +77,7 @@
 			id="follow-requests-title"
 			class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0"
 		>
-			Follow requests
+			{m.activity_follow_requests()}
 		</h2>
 		<ul
 			class="list-none m-0 p-0 rounded-3xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card divide-y divide-slate-100 dark:divide-dark-border overflow-hidden"
@@ -100,15 +103,15 @@
 						type="button"
 						class="shrink-0 h-8 px-4 rounded-full text-xs font-semibold border-0 cursor-pointer bg-blue-600 dark:bg-kizuna-blue text-white disabled:opacity-50"
 						disabled={busy}
-						aria-label="Approve {person.name}"
-						onclick={() => respond(person, true)}>Approve</button
+						aria-label={m.activity_approve_name(person.name)}
+						onclick={() => respond(person, true)}>{m.activity_approve()}</button
 					>
 					<button
 						type="button"
 						class="shrink-0 h-8 px-4 rounded-full text-xs font-semibold border-0 cursor-pointer bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text disabled:opacity-50"
 						disabled={busy}
-						aria-label="Decline {person.name}"
-						onclick={() => respond(person, false)}>Decline</button
+						aria-label={m.activity_decline_name(person.name)}
+						onclick={() => respond(person, false)}>{m.activity_decline()}</button
 					>
 				</li>
 			{/each}

@@ -1,13 +1,11 @@
 <script lang="ts">
 	import AuthCard from '$lib/components/auth/AuthCard.svelte';
+	import { m } from '$lib/i18n';
 </script>
 
 <svelte:head>
-	<title>Log In — Kizuna</title>
-	<meta
-		name="description"
-		content="Log in to Kizuna, a curated visual space for photographers and minimalists."
-	/>
+	<title>{m.auth_log_in_title()}</title>
+	<meta name="description" content={m.auth_log_in_description()} />
 </svelte:head>
 
 <main

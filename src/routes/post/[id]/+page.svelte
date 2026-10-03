@@ -6,6 +6,7 @@
 	import RightSidebar from '$lib/components/feed/RightSidebar.svelte';
 	import PostCard from '$lib/components/feed/PostCard.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import { m } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -14,14 +15,14 @@
 
 	let pageTitle = $derived(
 		post.title
-			? `${post.title} — ${post.author.name} on Kizuna`
-			: `Post by ${post.author.name} on Kizuna`
+			? m.post_page_title(post.title, post.author.name)
+			: m.post_page_title_untitled(post.author.name)
 	);
 
 	let metaDescription = $derived(
 		post.description
 			? stripFormatting(post.description).replace(/\s+/g, ' ').trim().slice(0, 160)
-			: `Curated visual observation by ${post.author.name} on Kizuna.`
+			: m.post_page_description(post.author.name)
 	);
 
 	function toAbsoluteUrl(pathOrUrl: string | undefined | null, origin: string): string {
@@ -48,13 +49,13 @@
 
 	// Separate image and video media
 	const imageMedia = $derived(
-		post.mediaItems?.find((m) => !isVideoUrl(m.url, m.type))?.url ||
+		post.mediaItems?.find((item) => !isVideoUrl(item.url, item.type))?.url ||
 			(!isVideoUrl(post.mediaUrl || '', post.mediaType) ? post.mediaUrl : null) ||
 			(!isVideoUrl(post.image || '') ? post.image : null)
 	);
 
 	const videoMedia = $derived(
-		post.mediaItems?.find((m) => isVideoUrl(m.url, m.type))?.url ||
+		post.mediaItems?.find((item) => isVideoUrl(item.url, item.type))?.url ||
 			(isVideoUrl(post.mediaUrl || '', post.mediaType) ? post.mediaUrl : null) ||
 			(isVideoUrl(post.image || '') ? post.image : null)
 	);
@@ -133,9 +134,9 @@
 				>
 					<Icon name="arrow-left" class="text-[10px]" />
 				</span>
-				<span>Back to feed</span>
+				<span>{m.post_back_to_feed()}</span>
 			</a>
-			<span class="text-xs text-slate-400 dark:text-dark-muted">Kizuna Journal</span>
+			<span class="text-xs text-slate-400 dark:text-dark-muted">{m.post_journal()}</span>
 		</div>
 
 		<!-- The Post -->

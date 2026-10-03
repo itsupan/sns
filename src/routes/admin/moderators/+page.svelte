@@ -17,6 +17,7 @@
 	import { readApiError } from '$lib/utils/api-error';
 	import { displayHandle } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -66,16 +67,16 @@
 			});
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				grantError = readApiError(body, 'Could not add the moderator').message;
+				grantError = readApiError(body, m.moderation_add_error()).message;
 				return;
 			}
 			const added = (body as { user: Staff }).user;
 			granted = [added, ...granted];
 			revoked = revoked.filter((id) => id !== added.id);
 			grantInput = '';
-			toast.success(`${added.name} is now a moderator`);
+			toast.success(m.moderation_now_moderator(added.name));
 		} catch {
-			grantError = 'Could not add the moderator';
+			grantError = m.moderation_add_error();
 		} finally {
 			granting = false;
 		}
@@ -90,15 +91,17 @@
 				method: 'DELETE'
 			});
 			if (!res.ok) {
-				toast.error(readApiError(await res.json().catch(() => null), 'Could not revoke').message);
+				toast.error(
+					readApiError(await res.json().catch(() => null), m.moderation_revoke_error()).message
+				);
 				return;
 			}
 			revoked = [...revoked, target.id];
 			granted = granted.filter((u) => u.id !== target.id);
 			revokeOpen = false;
-			toast.success(`${target.name} is no longer a moderator`);
+			toast.success(m.moderation_no_longer_moderator(target.name));
 		} catch {
-			toast.error('Could not revoke');
+			toast.error(m.moderation_revoke_error());
 		} finally {
 			revokeBusy = false;
 		}
@@ -116,13 +119,16 @@
 				body: '{}'
 			});
 			if (!res.ok) {
-				liftError = readApiError(await res.json().catch(() => null), 'Could not lift').message;
+				liftError = readApiError(
+					await res.json().catch(() => null),
+					m.moderation_lift_error()
+				).message;
 				return;
 			}
 			liftInput = '';
-			toast.success('Suspension lifted');
+			toast.success(m.moderation_lifted());
 		} catch {
-			liftError = 'Could not lift the suspension';
+			liftError = m.moderation_lift_suspension_error();
 		} finally {
 			lifting = false;
 		}
@@ -136,23 +142,23 @@
 			const res = await fetch(`/api/admin/moderators?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load moderators').message;
+				loadError = readApiError(body, m.moderation_moderators_load_error()).message;
 				return;
 			}
 			const page = body as { users: Staff[]; nextCursor: string | null };
 			more = [...more, ...page.users];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load moderators';
+			loadError = m.moderation_moderators_load_error();
 		} finally {
 			loadingMore = false;
 		}
 	}
 </script>
 
-<svelte:head><title>Moderators · Kizuna</title></svelte:head>
+<svelte:head><title>{m.moderation_moderators_title()}</title></svelte:head>
 
-<SettingsSection id="admin-staff" title="Moderators and admins">
+<SettingsSection id="admin-staff" title={m.moderation_staff()}>
 	{#each staff as member (member.id)}
 		<div class={rowClass}>
 			<div class="flex items-center gap-3 min-w-0">
@@ -173,7 +179,7 @@
 						revokeOpen = true;
 					}}
 				>
-					Revoke
+					{m.moderation_revoke()}
 				</button>
 			{/if}
 		</div>
@@ -183,7 +189,7 @@
 	<LoadMore onLoad={loadMore} loading={loadingMore} error={loadError} />
 {/if}
 
-<SettingsSection id="admin-grant" title="Add a moderator">
+<SettingsSection id="admin-grant" title={m.moderation_add()}>
 	<form
 		class={panelClass}
 		onsubmit={(e) => {
@@ -192,8 +198,13 @@
 		}}
 	>
 		<label class={fieldClass}>
-			<span>Handle or user id</span>
-			<input class={inputClass} bind:value={grantInput} autocomplete="off" placeholder="@handle" />
+			<span>{m.moderation_user_field()}</span>
+			<input
+				class={inputClass}
+				bind:value={grantInput}
+				autocomplete="off"
+				placeholder={m.moderation_user_placeholder()}
+			/>
 		</label>
 		{#if grantError}<p role="alert" class={errorClass}>{grantError}</p>{/if}
 		<button
@@ -201,12 +212,12 @@
 			class="{primaryButtonClass} self-end"
 			disabled={!grantInput.trim() || granting}
 		>
-			{granting ? 'Adding…' : 'Make moderator'}
+			{granting ? m.common_adding() : m.moderation_make_moderator()}
 		</button>
 	</form>
 </SettingsSection>
 
-<SettingsSection id="admin-lift" title="Lift a suspension">
+<SettingsSection id="admin-lift" title={m.moderation_lift_title()}>
 	<form
 		class={panelClass}
 		onsubmit={(e) => {
@@ -215,25 +226,32 @@
 		}}
 	>
 		<label class={fieldClass}>
-			<span>Handle or user id</span>
-			<input class={inputClass} bind:value={liftInput} autocomplete="off" placeholder="@handle" />
+			<span>{m.moderation_user_field()}</span>
+			<input
+				class={inputClass}
+				bind:value={liftInput}
+				autocomplete="off"
+				placeholder={m.moderation_user_placeholder()}
+			/>
 		</label>
 		{#if liftError}<p role="alert" class={errorClass}>{liftError}</p>{/if}
 		<button type="submit" class="{buttonClass} self-end" disabled={!liftInput.trim() || lifting}>
-			{lifting ? 'Lifting…' : 'Lift suspension'}
+			{lifting ? m.moderation_lifting() : m.moderation_lift()}
 		</button>
 	</form>
 </SettingsSection>
 
-<BottomSheet bind:open={revokeOpen} title="Revoke moderator" showTitle>
+<BottomSheet bind:open={revokeOpen} title={m.moderation_revoke_title()} showTitle>
 	<p class="m-0 px-2 text-sm text-slate-600 dark:text-dark-muted">
-		{revoking?.name} will lose access to the moderation queue right away.
+		{m.moderation_revoke_hint(revoking?.name ?? '')}
 	</p>
 	{#snippet footer()}
 		<div class="flex justify-end gap-2">
-			<button type="button" class={buttonClass} onclick={() => (revokeOpen = false)}>Cancel</button>
+			<button type="button" class={buttonClass} onclick={() => (revokeOpen = false)}
+				>{m.common_cancel()}</button
+			>
 			<button type="button" class={dangerButtonClass} disabled={revokeBusy} onclick={revoke}>
-				{revokeBusy ? 'Revoking…' : 'Revoke'}
+				{revokeBusy ? m.moderation_revoking() : m.moderation_revoke()}
 			</button>
 		</div>
 	{/snippet}

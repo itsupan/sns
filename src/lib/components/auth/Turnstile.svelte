@@ -42,6 +42,7 @@
 
 <script lang="ts">
 	import { page } from '$app/state';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		/** The solved challenge, sent as `x-captcha-response`; empty until solved and after expiry. */
@@ -92,7 +93,7 @@
 	<div {@attach widget(page.data.turnstileSiteKey)}></div>
 	{#if failed}
 		<p class="m-0 text-[13px] text-red-700 dark:text-red-300" role="alert">
-			The security check could not load. Check your connection and reload the page.
+			{m.auth_captcha_failed()}
 		</p>
 	{/if}
 {/if}

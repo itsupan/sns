@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { locale, m } from '$lib/i18n';
 	import { readApiError } from '$lib/utils/api-error';
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
@@ -82,7 +83,7 @@
 	}
 
 	function processFiles(files: FileList | File[]) {
-		if (!requireLogin('Please log in to upload media')) return;
+		if (!requireLogin(m.composer_log_in_to_upload())) return;
 		// Adding a photo to a text post turns it into a photo post.
 		if (draft.isText) draft.selectedType = 'photo';
 		draft.processFiles(files);
@@ -106,7 +107,7 @@
 
 	async function publish() {
 		if (isPublishDisabled) return;
-		if (!requireLogin('Please log in to publish a post')) return;
+		if (!requireLogin(m.composer_log_in_to_publish())) return;
 
 		isSubmitting = true;
 		try {
@@ -125,15 +126,15 @@
 
 			if (!res.ok) {
 				const data = await res.json().catch(() => null);
-				throw new Error(readApiError(data, 'Failed to publish post').message);
+				throw new Error(readApiError(data, m.composer_publish_failed()).message);
 			}
 
 			const data = (await res.json()) as { post: PostData };
 			onPublish?.(data.post);
-			toast.show('Post published successfully');
+			toast.show(m.composer_published());
 			clearComposer();
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Could not publish post';
+			const message = err instanceof Error ? err.message : m.composer_publish_error();
 			toast.show(message);
 		} finally {
 			isSubmitting = false;
@@ -168,11 +169,11 @@
 		try {
 			const res = await fetch(`/api/drafts/${encodeURIComponent(draftId)}`);
 			const data = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(data, 'Could not open the draft').message);
+			if (!res.ok) throw new Error(readApiError(data, m.draft_open_error()).message);
 			draft.loadDraft((data as { draft: DraftData }).draft);
 			openComposer();
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not open the draft');
+			toast.show(err instanceof Error ? err.message : m.draft_open_error());
 		}
 	});
 
@@ -234,12 +235,12 @@
 		onclick={() => (sheetOpen = true)}
 		aria-haspopup="dialog"
 	>
-		Share an observation…
+		{m.composer_prompt()}
 	</button>
 	<button
 		type="button"
 		class="size-11 rounded-full flex items-center justify-center text-slate-600 dark:text-dark-muted border-0 bg-transparent cursor-pointer active:scale-90 active:bg-slate-100 dark:active:bg-dark-hover transition"
-		aria-label="Add photo"
+		aria-label={m.composer_add_photo()}
 		onclick={() => {
 			draft.selectedType = 'photo';
 			sheetOpen = true;
@@ -250,20 +251,20 @@
 </div>
 
 <!-- 2. MOBILE BOTTOMSHEET COMPOSER (Matching Mockup 0) -->
-<BottomSheet bind:open={sheetOpen} title="Create post" showTitle>
+<BottomSheet bind:open={sheetOpen} title={m.nav_create_post()} showTitle>
 	<PostComposerFields
 		{draft}
 		id="mobile-composer"
 		onsubmit={publish}
 		allowPoll
-		beforeAddMedia={() => requireLogin('Please log in to upload media')}
+		beforeAddMedia={() => requireLogin(m.composer_log_in_to_upload())}
 	/>
 	<div class="px-3 pb-3">
 		<DraftControls
 			{draft}
 			id="mobile-composer"
 			disabled={isPublishDisabled}
-			beforeSave={() => requireLogin('Please log in to save a draft')}
+			beforeSave={() => requireLogin(m.draft_log_in())}
 			onsaved={clearComposer}
 		/>
 	</div>
@@ -277,7 +278,7 @@
 				}}
 				class="px-5 h-12 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-text font-semibold text-xs border-0 cursor-pointer"
 			>
-				Cancel
+				{m.common_cancel()}
 			</button>
 			<button
 				type="submit"
@@ -285,7 +286,7 @@
 				disabled={isPublishDisabled}
 				class="flex-1 h-12 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-sm border-0 cursor-pointer active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
 			>
-				<span>{isSubmitting ? 'Publishing…' : 'Publish'}</span>
+				<span>{isSubmitting ? m.composer_publishing() : m.composer_publish()}</span>
 				<Icon name="arrow-right" class="text-xs" />
 			</button>
 		</div>
@@ -300,14 +301,14 @@
 	ondragleave={handleDragLeave}
 	ondrop={handleDrop}
 	role="region"
-	aria-label="Create Post"
+	aria-label={m.composer_region()}
 >
 	<form onsubmit={handleSubmit} class="flex flex-col gap-3.5">
 		{#if draft.selectedType === 'article'}
 			<input
 				type="text"
 				bind:value={draft.title}
-				placeholder="Article title..."
+				placeholder={m.composer_article_title()}
 				class="w-full text-base sm:text-lg font-bold text-slate-950 dark:text-white bg-transparent border-b border-slate-100 dark:border-dark-border pb-2 focus:outline-none placeholder:text-slate-400"
 			/>
 		{/if}
@@ -323,8 +324,8 @@
 					use:formatShortcuts
 					rows="2"
 					maxlength={draft.maxLength}
-					placeholder="Share an architectural observation, exhibition note..."
-					aria-label="Post content"
+					placeholder={m.composer_content_placeholder()}
+					aria-label={m.composer_content_label()}
 					class="w-full min-h-16 py-1 px-1 text-[15px] bg-transparent text-slate-900 dark:text-dark-text placeholder:text-slate-400 dark:placeholder:text-dark-subtle border-0 focus:outline-none transition-all duration-150 resize-none leading-relaxed"
 				></textarea>
 				<MentionSuggest target={inlineInput} />
@@ -346,7 +347,7 @@
 									class="text-slate-500 dark:text-dark-muted font-medium flex items-center gap-1"
 								>
 									<Icon name="crop" class="text-xs" />
-									<span>Canvas:</span>
+									<span>{m.composer_canvas()}</span>
 								</span>
 								<div
 									class="inline-flex items-center p-0.5 rounded-lg bg-slate-200/60 dark:bg-dark-elevated text-[11px]"
@@ -359,7 +360,7 @@
 											r.id
 												? 'bg-white dark:bg-dark-card text-slate-950 dark:text-white shadow-xs font-semibold'
 												: 'text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white'}"
-											title={`Aspect ratio ${r.label} (${r.sub})`}
+											title={m.composer_ratio_title(r.label, r.sub)}
 										>
 											{r.label}
 										</button>
@@ -369,14 +370,14 @@
 
 							<div class="flex items-center gap-3">
 								<span class="text-[11px] font-mono text-slate-400">
-									Plate {draft.activePlateIndex + 1} of {draft.mediaPlates.length}
+									{m.composer_plate_of(draft.activePlateIndex + 1, draft.mediaPlates.length)}
 								</span>
 								<button
 									type="button"
 									onclick={() => draft.removeAllMedia()}
 									class="text-[11px] text-slate-400 hover:text-red-500 transition border-0 bg-transparent cursor-pointer"
 								>
-									Clear all
+									{m.composer_clear_all()}
 								</button>
 							</div>
 						</div>
@@ -403,7 +404,7 @@
 								{:else}
 									<img
 										src={draft.activePlate.previewUrl}
-										alt="Active plate"
+										alt={m.composer_active_plate()}
 										class="w-full h-full object-contain"
 									/>
 								{/if}
@@ -412,9 +413,10 @@
 								<div
 									class="absolute top-3 left-3 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-white text-[11px] font-mono tracking-wider shadow-xs"
 								>
-									PLATE {String(draft.activePlateIndex + 1).padStart(2, '0')} OF {String(
-										draft.mediaPlates.length
-									).padStart(2, '0')}
+									{m.composer_plate_badge(
+										String(draft.activePlateIndex + 1).padStart(2, '0'),
+										String(draft.mediaPlates.length).padStart(2, '0')
+									)}
 								</div>
 
 								<!-- Delete Active Plate Button -->
@@ -422,7 +424,7 @@
 									type="button"
 									onclick={() => draft.removePlate(draft.activePlate.id)}
 									class="absolute top-3 right-3 size-8 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center text-sm transition cursor-pointer border-0 shadow-md active:scale-95"
-									aria-label="Remove media"
+									aria-label={m.composer_remove_media()}
 								>
 									✕
 								</button>
@@ -451,7 +453,7 @@
 									{:else}
 										<img
 											src={plate.previewUrl}
-											alt={`Plate ${idx + 1}`}
+											alt={m.composer_plate(idx + 1)}
 											class="w-full h-full object-cover"
 										/>
 									{/if}
@@ -477,10 +479,10 @@
 								type="button"
 								onclick={() => fileInputDesktop?.click()}
 								class="shrink-0 size-16 sm:size-20 rounded-xl border-2 border-dashed border-slate-300 dark:border-dark-border flex flex-col items-center justify-center gap-1 text-slate-500 dark:text-dark-muted hover:border-slate-400 dark:hover:border-slate-600 transition bg-transparent cursor-pointer"
-								title="Add another plate"
+								title={m.composer_add_another_plate()}
 							>
 								<Icon name="plus" class="text-base" />
-								<span class="text-[10px] font-medium">Add</span>
+								<span class="text-[10px] font-medium">{m.common_add()}</span>
 							</button>
 						</div>
 
@@ -494,7 +496,7 @@
 						class="w-full py-6 border-2 border-dashed border-slate-950 dark:border-white rounded-2xl bg-slate-100 dark:bg-dark-elevated flex flex-col items-center justify-center text-xs font-semibold text-slate-900 dark:text-white gap-1 animate-pulse"
 					>
 						<Icon name="upload" class="text-xl" />
-						<span>Drop photos or videos to add as plates</span>
+						<span>{m.composer_drop_media()}</span>
 					</div>
 				{/if}
 
@@ -507,7 +509,7 @@
 						<input
 							type="text"
 							bind:value={draft.location}
-							placeholder="Exhibition space or location (e.g. Fondazione Prada, Milano)"
+							placeholder={m.composer_location_example()}
 							class="flex-1 bg-transparent border-0 text-xs text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
 						/>
 						<button
@@ -517,7 +519,7 @@
 								showLocationInput = false;
 							}}
 							class="text-slate-400 hover:text-slate-700 dark:hover:text-white border-0 bg-transparent cursor-pointer p-0 text-xs shrink-0"
-							title="Clear location"
+							title={m.composer_clear_location()}
 						>
 							✕
 						</button>
@@ -536,7 +538,7 @@
 									type="button"
 									onclick={() => draft.removeTag(tag)}
 									class="text-slate-400 hover:text-slate-700 dark:hover:text-white border-0 bg-transparent cursor-pointer p-0 text-xs leading-none"
-									aria-label={`Remove tag ${tag}`}
+									aria-label={m.composer_remove_tag(tag)}
 								>
 									×
 								</button>
@@ -550,7 +552,7 @@
 								type="text"
 								bind:value={draft.tagInput}
 								onkeydown={(e) => draft.handleTagKeydown(e)}
-								placeholder="tag (Enter)"
+								placeholder={m.composer_tag_input_placeholder()}
 								class="w-20 bg-transparent border-0 text-xs text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
 							/>
 						</div>
@@ -567,7 +569,7 @@
 			<div
 				class="flex items-center gap-1.5 xl:gap-2 flex-wrap"
 				role="radiogroup"
-				aria-label="Post type"
+				aria-label={m.composer_post_type()}
 			>
 				<!-- Post type segmented control -->
 				<div
@@ -596,8 +598,8 @@
 						type="button"
 						onclick={() => fileInputDesktop?.click()}
 						class="size-7 xl:size-8 rounded-full flex items-center justify-center text-slate-500 hover:text-blue-600 dark:text-dark-muted dark:hover:text-kizuna-blue hover:bg-slate-100 dark:hover:bg-dark-elevated transition border-0 bg-transparent cursor-pointer shrink-0"
-						title="Attach Photos or Videos"
-						aria-label="Add media"
+						title={m.composer_attach_title()}
+						aria-label={m.composer_add_media()}
 					>
 						<Icon name="picture" class="text-sm" />
 					</button>
@@ -611,8 +613,8 @@
 					draft.location
 						? 'bg-slate-200 dark:bg-dark-elevated text-slate-900 dark:text-white'
 						: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-elevated bg-transparent'}"
-					title="Add spatial location"
-					aria-label="Add location"
+					title={m.composer_location_title()}
+					aria-label={m.composer_add_location()}
 				>
 					<Icon name="map-marker" class="text-xs" />
 				</button>
@@ -625,8 +627,8 @@
 					draft.tags.length > 0
 						? 'bg-slate-200 dark:bg-dark-elevated text-slate-900 dark:text-white'
 						: 'text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-elevated bg-transparent'}"
-					title="Add tags"
-					aria-label="Add tags"
+					title={m.composer_add_tags()}
+					aria-label={m.composer_add_tags()}
 				>
 					<Icon name="hashtag" class="text-xs" />
 				</button>
@@ -646,8 +648,8 @@
 						type="button"
 						onclick={() => (studioModalOpen = true)}
 						class="size-7 xl:size-8 rounded-full flex items-center justify-center text-slate-400 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-dark-elevated transition border-0 bg-transparent cursor-pointer shrink-0"
-						title="Open Studio Creation Suite"
-						aria-label="Studio mode"
+						title={m.composer_studio_open()}
+						aria-label={m.composer_studio_mode()}
 					>
 						<Icon name="expand" class="text-xs" />
 					</button>
@@ -659,7 +661,7 @@
 					disabled={isPublishDisabled}
 					class="publish-btn bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-xs px-4 xl:px-5 py-1.5 xl:py-2 rounded-full cursor-pointer hover:bg-slate-800 dark:hover:bg-slate-100 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-150 border-0 shadow-xs flex items-center gap-1.5 shrink-0"
 				>
-					<span>{isSubmitting ? 'Publishing…' : 'Publish'}</span>
+					<span>{isSubmitting ? m.composer_publishing() : m.composer_publish()}</span>
 					<Icon name="arrow-right" class="text-[10px]" />
 				</button>
 			</div>
@@ -669,14 +671,14 @@
 			{draft}
 			id="inline-composer"
 			disabled={isPublishDisabled}
-			beforeSave={() => requireLogin('Please log in to save a draft')}
+			beforeSave={() => requireLogin(m.draft_log_in())}
 			onsaved={clearComposer}
 		/>
 	</form>
 </div>
 
 <!-- 4. DESKTOP STUDIO CREATION SUITE MODAL (Mockup 1) -->
-<Modal bind:open={studioModalOpen} label="Studio Creation Suite">
+<Modal bind:open={studioModalOpen} label={m.composer_studio()}>
 	<div
 		class="w-full max-w-5xl bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]"
 	>
@@ -686,11 +688,11 @@
 		>
 			<div class="flex items-center gap-3">
 				<span class="text-xs font-mono tracking-widest text-slate-400 uppercase">
-					Studio Creation Suite
+					{m.composer_studio()}
 				</span>
 				<span class="text-slate-300 dark:text-dark-border">/</span>
 				<span class="text-sm font-semibold text-slate-900 dark:text-white">
-					Curatorial Composition
+					{m.composer_studio_subtitle()}
 				</span>
 			</div>
 
@@ -700,7 +702,7 @@
 					onclick={() => (studioModalOpen = false)}
 					class="px-4 py-2 rounded-full text-xs font-semibold text-slate-600 dark:text-dark-muted hover:bg-slate-100 dark:hover:bg-dark-hover border-0 cursor-pointer transition"
 				>
-					Close
+					{m.common_close()}
 				</button>
 				<button
 					type="button"
@@ -708,7 +710,7 @@
 					disabled={isPublishDisabled}
 					class="px-6 py-2 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-xs border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center gap-1.5 shadow-xs"
 				>
-					<span>{isSubmitting ? 'Publishing…' : 'Publish Entry'}</span>
+					<span>{isSubmitting ? m.composer_publishing() : m.composer_publish_entry()}</span>
 					<Icon name="arrow-right" class="text-xs" />
 				</button>
 			</div>
@@ -722,7 +724,9 @@
 				<div
 					class="flex items-center justify-between p-2 rounded-2xl bg-slate-100 dark:bg-dark-elevated text-xs"
 				>
-					<span class="font-medium text-slate-600 dark:text-dark-muted px-2">Frame Standard</span>
+					<span class="font-medium text-slate-600 dark:text-dark-muted px-2"
+						>{m.composer_frame_standard()}</span
+					>
 					<div class="flex items-center gap-1">
 						{#each ratios as r (r.id)}
 							<button
@@ -762,7 +766,7 @@
 						{:else}
 							<img
 								src={draft.activePlate.previewUrl}
-								alt="Active exhibition plate"
+								alt={m.composer_active_exhibition_plate()}
 								class="w-full h-full object-contain"
 							/>
 						{/if}
@@ -770,16 +774,17 @@
 						<div
 							class="absolute top-4 left-4 px-3 py-1 rounded-full bg-black/70 backdrop-blur-md text-white text-[11px] font-mono tracking-wider shadow-sm"
 						>
-							PLATE {String(draft.activePlateIndex + 1).padStart(2, '0')} OF {String(
-								draft.mediaPlates.length
-							).padStart(2, '0')}
+							{m.composer_plate_badge(
+								String(draft.activePlateIndex + 1).padStart(2, '0'),
+								String(draft.mediaPlates.length).padStart(2, '0')
+							)}
 						</div>
 
 						<button
 							type="button"
 							onclick={() => draft.removePlate(draft.activePlate.id)}
 							class="absolute top-4 right-4 size-8 rounded-full bg-black/75 hover:bg-black text-white flex items-center justify-center text-sm transition cursor-pointer border-0 shadow-md"
-							aria-label="Remove plate"
+							aria-label={m.composer_remove_plate()}
 						>
 							✕
 						</button>
@@ -788,13 +793,13 @@
 							class="flex flex-col items-center justify-center text-slate-500 gap-2 p-6 text-center"
 						>
 							<Icon name="picture" class="text-4xl text-slate-600" />
-							<span class="text-sm font-semibold text-slate-400">No media attached</span>
+							<span class="text-sm font-semibold text-slate-400">{m.composer_no_media()}</span>
 							<button
 								type="button"
 								onclick={() => fileInputStudio?.click()}
 								class="px-5 py-2 rounded-full bg-white text-slate-950 font-semibold text-xs border-0 cursor-pointer mt-2"
 							>
-								Select Media Plates
+								{m.composer_select_media()}
 							</button>
 						</div>
 					{/if}
@@ -806,9 +811,9 @@
 						class="flex items-center justify-between text-xs text-slate-500 dark:text-dark-muted"
 					>
 						<span class="font-semibold text-slate-800 dark:text-dark-text">
-							Exhibition Sequence ({draft.mediaPlates.length} Plates)
+							{m.composer_sequence(draft.mediaPlates.length)}
 						</span>
-						<span class="text-[11px]">Click plate to inspect</span>
+						<span class="text-[11px]">{m.composer_sequence_hint()}</span>
 					</div>
 
 					<div class="flex items-center gap-3 overflow-x-auto pb-1 no-scrollbar">
@@ -832,7 +837,7 @@
 								{:else}
 									<img
 										src={plate.previewUrl}
-										alt={`Plate ${idx + 1}`}
+										alt={m.composer_plate(idx + 1)}
 										class="w-full h-full object-cover"
 									/>
 								{/if}
@@ -857,10 +862,10 @@
 							type="button"
 							onclick={() => fileInputStudio?.click()}
 							class="shrink-0 size-20 rounded-2xl border-2 border-dashed border-slate-300 dark:border-dark-border flex flex-col items-center justify-center gap-1 text-slate-500 dark:text-dark-muted hover:border-slate-400 transition bg-transparent cursor-pointer"
-							title="Add plate"
+							title={m.composer_add_plate_title()}
 						>
 							<Icon name="plus" class="text-base" />
-							<span class="text-[10px] font-medium">Add Plate</span>
+							<span class="text-[10px] font-medium">{m.composer_add_plate()}</span>
 						</button>
 					</div>
 
@@ -876,13 +881,13 @@
 						for="studio-title"
 						class="text-xs font-semibold text-slate-700 dark:text-dark-muted"
 					>
-						EXHIBITION TITLE
+						{m.composer_exhibition_title()}
 					</label>
 					<input
 						id="studio-title"
 						type="text"
 						bind:value={draft.title}
-						placeholder="Monoliths of Silence: Structural Brutalism..."
+						placeholder={m.composer_exhibition_title_placeholder()}
 						class="w-full px-4 py-2.5 rounded-2xl bg-slate-100 dark:bg-dark-elevated text-sm font-semibold text-slate-900 dark:text-dark-text border-0 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 					/>
 				</div>
@@ -893,9 +898,9 @@
 						class="flex items-center justify-between text-xs text-slate-500 dark:text-dark-muted"
 					>
 						<label for="studio-narrative" class="font-semibold text-slate-700 dark:text-dark-muted">
-							CURATORIAL NARRATIVE
+							{m.composer_narrative()}
 						</label>
-						<span>{draft.content.length} / {draft.maxLength.toLocaleString()}</span>
+						<span>{draft.content.length} / {draft.maxLength.toLocaleString(locale)}</span>
 					</div>
 					<FormatToolbar target={studioInput} />
 					<textarea
@@ -905,7 +910,7 @@
 						use:formatShortcuts
 						rows="5"
 						maxlength={draft.maxLength}
-						placeholder="Examining the monolithic concrete structures erected across during the late twentieth century..."
+						placeholder={m.composer_narrative_placeholder()}
 						class="w-full resize-none rounded-2xl p-4 text-sm leading-relaxed bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text placeholder:text-slate-400 border-0 focus:outline-none focus:ring-1 focus:ring-slate-950 dark:focus:ring-white"
 					></textarea>
 					<MentionSuggest target={studioInput} />
@@ -917,7 +922,7 @@
 						for="studio-location"
 						class="text-xs font-semibold text-slate-700 dark:text-dark-muted"
 					>
-						SPATIAL LOCATION / GALLERY CONTEXT
+						{m.composer_spatial_location()}
 					</label>
 					<div
 						class="flex items-center gap-2 px-3 py-2.5 rounded-2xl bg-slate-100 dark:bg-dark-elevated text-sm text-slate-900 dark:text-dark-text"
@@ -927,7 +932,7 @@
 							id="studio-location"
 							type="text"
 							bind:value={draft.location}
-							placeholder="Fondazione Prada, Milano"
+							placeholder={m.composer_gallery_placeholder()}
 							class="flex-1 bg-transparent border-0 text-sm focus:outline-none text-slate-900 dark:text-dark-text"
 						/>
 					</div>
@@ -936,7 +941,7 @@
 				<!-- Tags -->
 				<div class="flex flex-col gap-2">
 					<span class="text-xs font-semibold text-slate-700 dark:text-dark-muted">
-						CURATED DESCRIPTORS & TAGS
+						{m.composer_descriptors()}
 					</span>
 					<div class="flex items-center gap-1.5 flex-wrap">
 						{#each draft.tags as tag (tag)}
@@ -959,7 +964,7 @@
 							type="text"
 							bind:value={draft.tagInput}
 							onkeydown={(e) => draft.handleTagKeydown(e)}
-							placeholder="#add-tag and press Enter"
+							placeholder={m.composer_add_tag_placeholder()}
 							class="flex-1 px-3 py-2 rounded-xl bg-slate-100 dark:bg-dark-elevated text-xs text-slate-900 dark:text-dark-text border-0 focus:outline-none"
 						/>
 						<button
@@ -967,7 +972,7 @@
 							onclick={() => draft.addTag()}
 							class="px-4 py-2 rounded-xl bg-slate-200 dark:bg-dark-hover text-xs font-semibold text-slate-800 dark:text-white border-0 cursor-pointer"
 						>
-							+ Add
+							{m.composer_add_tag()}
 						</button>
 					</div>
 				</div>

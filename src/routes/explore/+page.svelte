@@ -10,6 +10,7 @@
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
 	import type { ExploreTile, SuggestedCreator } from '$lib/explore/types';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -34,7 +35,7 @@
 			const res = await fetch(`/api/explore?page=${nextPage}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load more posts').message;
+				loadError = readApiError(body, m.feed_load_more_error()).message;
 				return;
 			}
 			const page = body as { tiles: ExploreTile[]; hasMore: boolean };
@@ -42,7 +43,7 @@
 			moreHasMore = page.hasMore;
 			nextPage++;
 		} catch {
-			loadError = 'Could not load more posts';
+			loadError = m.feed_load_more_error();
 		} finally {
 			loading = false;
 		}
@@ -50,7 +51,7 @@
 
 	async function toggleFollow(creator: SuggestedCreator) {
 		if (!data.signedIn) {
-			toast.show('Please log in to follow curators');
+			toast.show(m.follow_log_in());
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() is the base; only a query is added
 			await goto(`${resolve('/login')}?redirectTo=${encodeURIComponent('/explore')}`);
 			return;
@@ -59,21 +60,20 @@
 		try {
 			await followStore.set(creator.id, next);
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+			toast.show(err instanceof Error ? err.message : m.follow_error());
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Explore · Kizuna</title>
-	<meta
-		name="description"
-		content="Discover photographers, trending tags and new work on Kizuna."
-	/>
+	<title>{m.explore_title()}</title>
+	<meta name="description" content={m.explore_description()} />
 </svelte:head>
 
 <main class="w-full max-w-3xl mx-auto py-6 flex flex-col gap-6">
-	<h1 class="px-4 text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">Explore</h1>
+	<h1 class="px-4 text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">
+		{m.nav_explore()}
+	</h1>
 
 	{#if data.trending.length > 0}
 		<section aria-labelledby="trending-heading" class="flex flex-col gap-2">
@@ -81,7 +81,7 @@
 				id="trending-heading"
 				class="px-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-dark-muted m-0"
 			>
-				Trending tags
+				{m.explore_trending()}
 			</h2>
 			<ul class="flex gap-2 overflow-x-auto no-scrollbar px-4 list-none m-0 p-0">
 				{#each data.trending as t (t.slug)}
@@ -105,7 +105,7 @@
 				id="creators-heading"
 				class="px-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-dark-muted m-0"
 			>
-				Creators to follow
+				{m.explore_creators()}
 			</h2>
 			<ul class="flex gap-3 overflow-x-auto no-scrollbar list-none m-0 p-0">
 				{#each data.suggestions as creator (creator.id)}
@@ -123,8 +123,11 @@
 							>
 							<span class="text-[11px] text-slate-500 dark:text-dark-muted truncate w-full">
 								{creator.mutuals > 0
-									? `Followed by ${creator.mutuals} you follow`
-									: `${formatCount(creator.followersCount)} followers`}
+									? m.explore_followed_by(creator.mutuals)
+									: m.explore_followers(
+											creator.followersCount,
+											formatCount(creator.followersCount)
+										)}
 							</span>
 						</a>
 						<button
@@ -146,15 +149,15 @@
 		</section>
 	{/if}
 
-	<section aria-label="Posts to discover">
+	<section aria-label={m.explore_posts_label()}>
 		{#if tiles.length === 0}
 			<div class="mx-4 py-16 flex flex-col items-center gap-2 text-center">
 				<Icon name="compass-alt" class="text-3xl text-slate-300" />
 				<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">
-					Nothing new to explore yet
+					{m.explore_empty()}
 				</p>
 				<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-					New posts from people you don't follow will show up here.
+					{m.explore_empty_hint()}
 				</p>
 			</div>
 		{:else}

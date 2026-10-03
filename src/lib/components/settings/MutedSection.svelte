@@ -6,6 +6,7 @@
 	import { readApiError } from '$lib/utils/api-error';
 	import { muteStore } from '$lib/utils/mute.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import SettingsSection from './SettingsSection.svelte';
 	import {
 		buttonClass,
@@ -31,9 +32,9 @@
 	async function unmute(id: string, name: string) {
 		try {
 			await muteStore.set(id, false);
-			toast.success(`Unmuted ${name}`);
+			toast.success(m.mute_unmuted(name));
 		} catch (err) {
-			toast.error(err instanceof Error ? err.message : 'Could not unmute');
+			toast.error(err instanceof Error ? err.message : m.settings_unmute_error());
 		}
 	}
 
@@ -63,14 +64,14 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.error(readApiError(body, 'Could not mute that word').message);
+				toast.error(readApiError(body, m.settings_mute_word_error()).message);
 				return;
 			}
 			added = [keyword, ...added.filter((k) => k !== keyword)];
 			removed = removed.filter((k) => k !== keyword);
 			draft = '';
 		} catch {
-			toast.error('Could not mute that word');
+			toast.error(m.settings_mute_word_error());
 		} finally {
 			adding = false;
 		}
@@ -86,19 +87,19 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.error(readApiError(body, 'Could not unmute that word').message);
+				toast.error(readApiError(body, m.settings_unmute_word_error()).message);
 				return;
 			}
 			removed = [...removed, keyword];
 		} catch {
-			toast.error('Could not unmute that word');
+			toast.error(m.settings_unmute_word_error());
 		} finally {
 			removing = null;
 		}
 	}
 </script>
 
-<SettingsSection id="settings-muted" title="Muted">
+<SettingsSection id="settings-muted" title={m.settings_muted()}>
 	{#each mutedUsers as u (u.id)}
 		<div class={rowClass}>
 			<a
@@ -118,19 +119,19 @@
 				disabled={muteStore.isPending(u.id)}
 				aria-busy={muteStore.isPending(u.id)}
 			>
-				{muteStore.isPending(u.id) ? 'Unmuting…' : 'Unmute'}
+				{muteStore.isPending(u.id) ? m.settings_unmuting() : m.settings_unmute()}
 			</button>
 		</div>
 	{:else}
 		<p class="{rowClass} m-0 text-sm text-slate-500 dark:text-dark-muted">
-			You haven't muted anyone.
+			{m.settings_no_muted()}
 		</p>
 	{/each}
 	<form class={panelClass} onsubmit={addKeyword}>
 		<label for="muted-keyword" class={fieldClass}>
-			<span>Muted words</span>
+			<span>{m.settings_muted_words()}</span>
 			<span id="muted-keyword-hint" class={hintClass}>
-				Posts containing a muted word or phrase stay out of your feed, Explore and tag pages. Up to {MAX_MUTED_KEYWORDS}.
+				{m.settings_muted_words_hint(MAX_MUTED_KEYWORDS)}
 			</span>
 		</label>
 		<div class="flex gap-2">
@@ -150,11 +151,11 @@
 				disabled={!draft.trim() || adding || full}
 				aria-busy={adding}
 			>
-				{adding ? 'Muting…' : 'Mute'}
+				{adding ? m.settings_muting() : m.settings_mute()}
 			</button>
 		</div>
 		{#if mutedKeywords.length > 0}
-			<ul class="m-0 p-0 list-none flex flex-wrap gap-2" aria-label="Muted words">
+			<ul class="m-0 p-0 list-none flex flex-wrap gap-2" aria-label={m.settings_muted_words()}>
 				{#each mutedKeywords as keyword (keyword)}
 					<li
 						class="inline-flex items-center gap-1 h-8 pl-3 pr-1 rounded-full bg-slate-100 dark:bg-dark-elevated text-sm text-slate-900 dark:text-dark-text"
@@ -165,7 +166,7 @@
 							class="size-6 rounded-full flex items-center justify-center border-0 bg-transparent cursor-pointer text-slate-500 dark:text-dark-muted hover:bg-slate-200 dark:hover:bg-dark-hover disabled:opacity-60"
 							onclick={() => removeKeyword(keyword)}
 							disabled={removing === keyword}
-							aria-label={`Unmute "${keyword}"`}
+							aria-label={m.settings_unmute_word(keyword)}
 						>
 							<Icon name="cross" class="text-xs" />
 						</button>

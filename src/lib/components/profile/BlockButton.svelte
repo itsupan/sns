@@ -5,6 +5,7 @@
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import { followStore } from '$lib/utils/follow.svelte';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		userId: string;
@@ -28,15 +29,15 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				throw new Error(readApiError(body, 'Could not update block').message);
+				throw new Error(readApiError(body, m.block_error()).message);
 			}
 			// Blocking removed any follow between us on the server.
 			if (block) followStore.forget(userId);
 			confirmOpen = false;
-			toast.show(block ? `Blocked ${name}` : `Unblocked ${name}`);
+			toast.show(block ? m.block_blocked(name) : m.block_unblocked(name));
 			await invalidateAll();
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update block');
+			toast.show(err instanceof Error ? err.message : m.block_error());
 		} finally {
 			saving = false;
 		}
@@ -49,18 +50,16 @@
 	onclick={() => (confirmOpen = true)}
 >
 	<Icon name="ban" class="text-sm" />
-	<span>{blocked ? 'Unblock' : 'Block'}</span>
+	<span>{blocked ? m.block_unblock() : m.block_block()}</span>
 </button>
 
 <BottomSheet
 	bind:open={confirmOpen}
-	title={blocked ? `Unblock ${name}?` : `Block ${name}?`}
+	title={blocked ? m.block_confirm_unblock(name) : m.block_confirm_block(name)}
 	showTitle
 >
 	<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
-		{blocked
-			? 'They will be able to see your posts, follow you and message you again.'
-			: "You won't see each other's posts or comments, and they can't follow or message you. Any follows between you are removed. They aren't told."}
+		{blocked ? m.block_unblock_hint() : m.block_block_hint()}
 	</p>
 	{#snippet footer()}
 		<div class="flex justify-end gap-2">
@@ -69,7 +68,7 @@
 				class="h-10 px-4 rounded-full text-sm font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover"
 				onclick={() => (confirmOpen = false)}
 			>
-				Cancel
+				{m.common_cancel()}
 			</button>
 			<button
 				type="button"
@@ -81,9 +80,9 @@
 				onclick={apply}
 			>
 				{#if saving}
-					{blocked ? 'Unblocking…' : 'Blocking…'}
+					{blocked ? m.block_unblocking() : m.block_blocking()}
 				{:else}
-					{blocked ? 'Unblock' : 'Block'}
+					{blocked ? m.block_unblock() : m.block_block()}
 				{/if}
 			</button>
 		</div>

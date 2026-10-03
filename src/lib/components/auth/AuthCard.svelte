@@ -9,6 +9,7 @@
 	import { toast } from '$lib/utils/toast.svelte';
 	import Button from '$lib/components/shared/Button.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import { m } from '$lib/i18n';
 	import AuthAlert from './AuthAlert.svelte';
 	import AuthPanel from './AuthPanel.svelte';
 	import PasswordField from './PasswordField.svelte';
@@ -70,7 +71,7 @@
 				callbackURL: effectiveRedirect
 			});
 		} catch (err: unknown) {
-			const msg = err instanceof Error ? err.message : 'Google authentication failed';
+			const msg = err instanceof Error ? err.message : m.auth_google_failed();
 			errorMessage = msg;
 			toast.error(msg);
 			googleLoading = false;
@@ -86,14 +87,14 @@
 		const trimmedName = name.trim();
 
 		if (!trimmedEmail || !password) {
-			errorMessage = 'Please fill in all required fields.';
+			errorMessage = m.auth_fill_required();
 			toast.error(errorMessage);
 			return;
 		}
 
 		if (mode === 'signup') {
 			if (!trimmedName) {
-				errorMessage = 'Please enter your name.';
+				errorMessage = m.auth_enter_name();
 				toast.error(errorMessage);
 				return;
 			}
@@ -106,7 +107,7 @@
 			}
 
 			if (!agreeToTerms) {
-				errorMessage = `Please confirm you're ${MIN_AGE} or older and agree to the Terms to continue.`;
+				errorMessage = m.auth_confirm_age(MIN_AGE);
 				toast.error(errorMessage);
 				return;
 			}
@@ -124,7 +125,7 @@
 				});
 
 				if (result.error) {
-					errorMessage = result.error.message || 'Invalid email or password. Please try again.';
+					errorMessage = result.error.message || m.auth_invalid_credentials();
 					toast.error(errorMessage);
 					loading = false;
 				} else if ('twoFactorRedirect' in result.data) {
@@ -133,8 +134,8 @@
 						`${resolve('/login/two-factor')}?redirectTo=${encodeURIComponent(effectiveRedirect)}`
 					);
 				} else {
-					successMessage = 'Signed in successfully! Redirecting...';
-					toast.success('Signed in successfully! Welcome back.');
+					successMessage = m.auth_signed_in();
+					toast.success(m.auth_welcome_back());
 					setTimeout(() => {
 						// eslint-disable-next-line svelte/no-navigation-without-resolve
 						goto(effectiveRedirect);
@@ -151,13 +152,13 @@
 				turnstile?.reset();
 
 				if (result.error) {
-					errorMessage = result.error.message || 'Could not create account. Please try again.';
+					errorMessage = result.error.message || m.auth_signup_failed();
 					toast.error(errorMessage);
 					loading = false;
 				} else {
 					// The new account stays signed in and sets up its profile; the verification email
 					// is already on its way.
-					toast.success('Account created! Check your inbox to verify your email.');
+					toast.success(m.auth_account_created());
 					// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() is the base; only a query is added
 					await goto(`${resolve('/welcome')}?redirectTo=${encodeURIComponent(effectiveRedirect)}`, {
 						invalidateAll: true
@@ -165,7 +166,7 @@
 				}
 			}
 		} catch (err: unknown) {
-			const msg = err instanceof Error ? err.message : 'An unexpected error occurred.';
+			const msg = err instanceof Error ? err.message : m.common_unexpected_error();
 			errorMessage = msg;
 			toast.error(msg);
 			loading = false;
@@ -178,7 +179,7 @@
 	<div
 		class="tab-switcher grid grid-cols-2 bg-[#f1f3f5] dark:bg-dark-elevated p-1 rounded-[10px] mb-5 gap-1 transition-colors duration-150"
 		role="tablist"
-		aria-label="Authentication Mode"
+		aria-label={m.auth_mode_label()}
 	>
 		<button
 			type="button"
@@ -190,7 +191,7 @@
 				: ''}"
 			onclick={() => switchMode('login')}
 		>
-			Log In
+			{m.auth_log_in_tab()}
 		</button>
 		<button
 			type="button"
@@ -202,7 +203,7 @@
 				: ''}"
 			onclick={() => switchMode('signup')}
 		>
-			Sign Up
+			{m.auth_sign_up_tab()}
 		</button>
 	</div>
 
@@ -213,14 +214,14 @@
 			class="google-btn w-full h-[46px] flex items-center justify-center gap-2.5 bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] text-sm font-medium text-slate-800 dark:text-dark-text hover:bg-slate-50 dark:hover:bg-dark-hover hover:border-slate-300 dark:hover:border-dark-hover disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-all duration-150 box-border shadow-xs"
 			onclick={handleGoogleSignIn}
 			disabled={googleLoading || loading}
-			aria-label="Continue with Google"
+			aria-label={m.auth_continue_google()}
 		>
 			{#if googleLoading}
 				<span
 					class="btn-spinner inline-block size-4 border-2 border-slate-400 border-r-slate-900 dark:border-r-white rounded-full animate-spin"
 					aria-hidden="true"
 				></span>
-				<span>Connecting to Google...</span>
+				<span>{m.auth_connecting_google()}</span>
 			{:else}
 				<svg
 					class="google-icon shrink-0"
@@ -246,7 +247,7 @@
 						d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
 					/>
 				</svg>
-				<span class="google-btn-text font-medium">Continue with Google</span>
+				<span class="google-btn-text font-medium">{m.auth_continue_google()}</span>
 			{/if}
 		</button>
 	</div>
@@ -257,7 +258,7 @@
 		<span
 			class="divider-text text-[11px] font-semibold text-slate-400 dark:text-dark-muted tracking-wider uppercase whitespace-nowrap"
 		>
-			{mode === 'login' ? 'OR SIGN IN WITH EMAIL' : 'OR SIGN UP WITH EMAIL'}
+			{mode === 'login' ? m.auth_divider_sign_in() : m.auth_divider_sign_up()}
 		</span>
 		<span class="divider-line flex-1 h-px bg-slate-200 dark:bg-dark-border"></span>
 	</div>
@@ -275,13 +276,13 @@
 	<form onsubmit={handleSubmit} class="auth-form flex flex-col gap-4.5" novalidate>
 		{#if mode === 'signup'}
 			<div class="form-group flex flex-col gap-1.5">
-				<label for="name" class={labelClass}>Full name</label>
+				<label for="name" class={labelClass}>{m.auth_full_name()}</label>
 				<input
 					id="name"
 					name="name"
 					type="text"
 					bind:value={name}
-					placeholder="Elena Vance"
+					placeholder={m.auth_name_placeholder()}
 					required
 					autocomplete="name"
 					enterkeyhint="next"
@@ -291,13 +292,13 @@
 		{/if}
 
 		<div class="form-group flex flex-col gap-1.5">
-			<label for="email" class={labelClass}>Email address</label>
+			<label for="email" class={labelClass}>{m.auth_email()}</label>
 			<input
 				id="email"
 				name="email"
 				type="email"
 				bind:value={email}
-				placeholder="elena.vance@studio.com"
+				placeholder={m.auth_email_placeholder()}
 				required
 				autocomplete="email"
 				inputmode="email"
@@ -310,13 +311,15 @@
 		<PasswordField
 			id="password"
 			name="password"
-			label="Password"
+			label={m.auth_password()}
 			bind:value={password}
 			autocomplete={mode === 'login' ? 'current-password' : 'new-password'}
 		>
 			{#snippet aside()}
 				{#if mode === 'login'}
-					<a href={resolve('/forgot-password')} class="text-[13px] {linkClass}">Forgot password?</a>
+					<a href={resolve('/forgot-password')} class="text-[13px] {linkClass}"
+						>{m.auth_forgot_password()}</a
+					>
 				{/if}
 			{/snippet}
 		</PasswordField>
@@ -325,7 +328,7 @@
 			<PasswordField
 				id="confirm-password"
 				name="confirmPassword"
-				label="Confirm password"
+				label={m.auth_confirm_password()}
 				bind:value={confirmPassword}
 				autocomplete="new-password"
 			/>
@@ -343,7 +346,7 @@
 						class="checkbox-input size-4 rounded border-slate-300 dark:border-dark-input-border dark:bg-dark-elevated accent-slate-950 dark:accent-kizuna-blue cursor-pointer"
 					/>
 					<span class="checkbox-label text-slate-600 dark:text-dark-muted text-[13px]"
-						>Remember me</span
+						>{m.auth_remember_me()}</span
 					>
 				</label>
 			{:else}
@@ -355,19 +358,19 @@
 						required
 					/>
 					<span class="checkbox-label text-slate-600 dark:text-dark-muted text-[13px]"
-						>I'm {MIN_AGE} or older and agree to the
+						>{m.auth_agree_prefix(MIN_AGE)}
 						<a
 							href={resolve('/legal/terms')}
 							class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
 							target="_blank"
-							rel="noopener">Terms</a
+							rel="noopener">{m.legal_terms_label()}</a
 						>
-						and
+						{m.common_and()}
 						<a
 							href={resolve('/legal/privacy')}
 							class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
 							target="_blank"
-							rel="noopener">Privacy Policy</a
+							rel="noopener">{m.legal_privacy_title()}</a
 						></span
 					>
 				</label>
@@ -380,7 +383,7 @@
 
 		<!-- Primary Button Component (Black) -->
 		<Button type="submit" variant="primary" size="lg" fullWidth {loading}>
-			<span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
+			<span>{mode === 'login' ? m.auth_sign_in() : m.auth_create_account()}</span>
 			<Icon
 				name="arrow-right"
 				class="arrow-icon ml-1 text-base transition-transform duration-150 group-hover:translate-x-0.5"
@@ -393,22 +396,22 @@
 		class="bottom-switch mt-5 text-center text-[13px] text-slate-600 dark:text-dark-muted flex items-center justify-center gap-1.5"
 	>
 		{#if mode === 'login'}
-			<span>Don't have an account?</span>
+			<span>{m.auth_no_account()}</span>
 			<button
 				type="button"
 				class="switch-link bg-transparent border-none p-0 text-inherit font-semibold text-slate-900 dark:text-dark-text cursor-pointer hover:underline hover:text-blue-600 dark:hover:text-kizuna-blue transition-colors duration-150"
 				onclick={() => switchMode('signup')}
 			>
-				Sign up
+				{m.auth_sign_up_link()}
 			</button>
 		{:else}
-			<span>Already have an account?</span>
+			<span>{m.auth_have_account()}</span>
 			<button
 				type="button"
 				class="switch-link bg-transparent border-none p-0 text-inherit font-semibold text-slate-900 dark:text-dark-text cursor-pointer hover:underline hover:text-blue-600 dark:hover:text-kizuna-blue transition-colors duration-150"
 				onclick={() => switchMode('login')}
 			>
-				Log in
+				{m.auth_log_in_link()}
 			</button>
 		{/if}
 	</div>
@@ -418,19 +421,19 @@
 		<p
 			class="footer-disclaimer mt-4.5 text-xs leading-relaxed text-slate-500 dark:text-dark-subtle text-center max-w-[20rem] mx-auto"
 		>
-			By continuing, you agree to Kizuna's
+			{m.auth_disclaimer_prefix()}
 			<a
 				href={resolve('/legal/terms')}
 				class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
 				target="_blank"
-				rel="noopener">Terms of Service</a
+				rel="noopener">{m.legal_terms_title()}</a
 			>
-			and
+			{m.common_and()}
 			<a
 				href={resolve('/legal/privacy')}
 				class="underline underline-offset-2 hover:text-slate-900 dark:hover:text-dark-text"
 				target="_blank"
-				rel="noopener">Privacy Policy</a
+				rel="noopener">{m.legal_privacy_title()}</a
 			>.
 		</p>
 	{/if}

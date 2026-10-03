@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
+	import { m } from '$lib/i18n';
 	import PostComposerFields from './PostComposerFields.svelte';
 	import { PostDraft } from './post-draft.svelte';
 	import type { PostData } from './PostCard.svelte';
@@ -55,21 +56,21 @@
 			});
 			const body = (await res.json().catch(() => null)) as { post?: PostEdits } | null;
 			if (!res.ok || !body?.post) {
-				toast.show(readApiError(body, 'Could not save your changes').message);
+				toast.show(readApiError(body, m.post_edit_error()).message);
 				return;
 			}
 			onSaved?.(body.post);
 			open = false;
-			toast.show('Post updated');
+			toast.show(m.post_updated());
 		} catch {
-			toast.show('Could not save your changes');
+			toast.show(m.post_edit_error());
 		} finally {
 			saving = false;
 		}
 	}
 </script>
 
-<BottomSheet bind:open title="Edit post" showTitle>
+<BottomSheet bind:open title={m.post_edit()} showTitle>
 	<PostComposerFields {draft} id="edit-post-{post.id}" onsubmit={save} alwaysShowTitle={hadTitle} />
 
 	{#snippet footer()}
@@ -79,7 +80,7 @@
 				onclick={() => (open = false)}
 				class="px-5 h-12 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-text font-semibold text-xs border-0 cursor-pointer"
 			>
-				Cancel
+				{m.common_cancel()}
 			</button>
 			<button
 				type="submit"
@@ -87,7 +88,7 @@
 				disabled={saveDisabled}
 				class="flex-1 h-12 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-sm border-0 cursor-pointer active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
 			>
-				<span>{saving ? 'Saving…' : 'Save changes'}</span>
+				<span>{saving ? m.common_saving() : m.post_save_changes()}</span>
 				<Icon name="check" class="text-xs" />
 			</button>
 		</div>

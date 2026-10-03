@@ -1,6 +1,7 @@
 import type { PostType } from '$lib/components/feed/PostCard.svelte';
 import type { TextBackground } from '$lib/post-backgrounds';
 import type { PollInput } from '$lib/polls';
+import { locale } from '$lib/i18n';
 
 /** Drafts one user may keep at a time. */
 export const MAX_DRAFTS_PER_USER = 50;
@@ -35,12 +36,12 @@ export interface DraftData {
 	updatedAt: string;
 }
 
-const publishAtFormat = new Intl.DateTimeFormat(undefined, {
+const publishAtFormat = new Intl.DateTimeFormat(locale, {
 	dateStyle: 'medium',
 	timeStyle: 'short'
 });
 
-/** A publish time in the viewer's locale and time zone: "Oct 3, 2026, 4:05 PM". */
+/** A publish time in the UI's locale and the viewer's time zone: "Oct 3, 2026, 4:05 PM". */
 export function formatPublishAt(iso: string): string {
 	return publishAtFormat.format(new Date(iso));
 }

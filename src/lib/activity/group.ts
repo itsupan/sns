@@ -1,3 +1,4 @@
+import { m } from '$lib/i18n';
 import type { ActivityItem, ActivityType } from './types';
 
 /** Notifications shown as one row: "Bob and 2 others liked your post". */
@@ -65,49 +66,49 @@ export function groupActivity(items: ActivityItem[]): ActivityGroup[] {
 export function actorNames(actors: ActivityGroup['actors']): string {
 	const [first, second] = actors;
 	if (actors.length === 1) return first.name;
-	if (actors.length === 2) return `${first.name} and ${second.name}`;
-	return `${first.name} and ${actors.length - 1} others`;
+	if (actors.length === 2) return m.activity_two_actors(first.name, second.name);
+	return m.activity_actor_and_others(first.name, actors.length - 1);
 }
 
 /** The sentence after the names, for a group or a single notification. */
 export function activityVerb({ type }: Pick<ActivityGroup, 'type'>): string {
 	switch (type) {
 		case 'like':
-			return 'liked your post';
+			return m.activity_verb_like();
 		case 'comment':
-			return 'commented on your post';
+			return m.activity_verb_comment();
 		case 'reply':
-			return 'replied to your comment';
+			return m.activity_verb_reply();
 		case 'reaction':
-			return 'reacted to your comment';
+			return m.activity_verb_reaction();
 		case 'follow':
-			return 'started following you';
+			return m.activity_verb_follow();
 		case 'mention':
-			return 'tagged you in a post';
+			return m.activity_verb_mention();
 		case 'story_reaction':
-			return 'reacted to your story';
+			return m.activity_verb_story_reaction();
 		case 'follow_request':
-			return 'asked to follow you';
+			return m.activity_verb_follow_request();
 		case 'follow_accepted':
-			return 'accepted your follow request';
+			return m.activity_verb_follow_accepted();
 		case 'repost':
-			return 'reposted your post';
+			return m.activity_verb_repost();
 		case 'quote':
-			return 'quoted your post';
+			return m.activity_verb_quote();
 	}
 }
 
 /** What each type of notification is about, as named in notification settings. */
 export const activityTypeLabels: Record<ActivityType, string> = {
-	like: 'Likes on your posts',
-	comment: 'Comments on your posts',
-	reply: 'Replies to your comments',
-	reaction: 'Reactions to your comments',
-	follow: 'New followers',
-	mention: 'Tags in posts',
-	story_reaction: 'Reactions to your stories',
-	follow_request: 'Follow requests',
-	follow_accepted: 'Accepted follow requests',
-	repost: 'Reposts of your posts',
-	quote: 'Quotes of your posts'
+	like: m.activity_type_like(),
+	comment: m.activity_type_comment(),
+	reply: m.activity_type_reply(),
+	reaction: m.activity_type_reaction(),
+	follow: m.activity_type_follow(),
+	mention: m.activity_type_mention(),
+	story_reaction: m.activity_type_story_reaction(),
+	follow_request: m.activity_type_follow_request(),
+	follow_accepted: m.activity_type_follow_accepted(),
+	repost: m.activity_type_repost(),
+	quote: m.activity_type_quote()
 };

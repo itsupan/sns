@@ -1,9 +1,10 @@
 <script lang="ts">
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import { m } from '$lib/i18n';
 </script>
 
 <svelte:head>
-	<title>Offline · Kizuna</title>
+	<title>{m.offline_title()}</title>
 </svelte:head>
 
 <main class="w-full flex-1 flex flex-col items-center justify-center px-4 sm:px-6 py-12 sm:py-20">
@@ -15,16 +16,18 @@
 		>
 			<Icon name="exclamation" class="text-2xl sm:text-3xl" />
 		</div>
-		<h1 class="text-2xl font-bold text-slate-950 dark:text-white m-0 mb-2">You're offline</h1>
+		<h1 class="text-2xl font-bold text-slate-950 dark:text-white m-0 mb-2">
+			{m.offline_heading()}
+		</h1>
 		<p class="text-sm leading-relaxed text-slate-600 dark:text-dark-muted max-w-md m-0 mb-8">
-			Kizuna needs a connection to load this page. Check your network and try again.
+			{m.offline_text()}
 		</p>
 		<button
 			type="button"
 			onclick={() => location.reload()}
 			class="h-11 px-6 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 font-semibold text-xs inline-flex items-center justify-center hover:opacity-90 active:scale-95 transition-all border-0 cursor-pointer shadow-xs"
 		>
-			Try again
+			{m.common_try_again()}
 		</button>
 	</div>
 </main>

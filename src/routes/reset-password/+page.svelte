@@ -10,6 +10,7 @@
 	import Button from '$lib/components/shared/Button.svelte';
 	import { newPasswordError } from '$lib/utils/password';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 
 	// better-auth sends a valid email link here with `?token=`, and a stale one with `?error=`.
 	const token = $derived(page.url.searchParams.get('token'));
@@ -32,13 +33,13 @@
 			if (error?.code === 'INVALID_TOKEN') {
 				rejected = true;
 			} else if (error) {
-				errorMessage = error.message || 'Could not reset your password. Please try again.';
+				errorMessage = error.message || m.auth_reset_error();
 			} else {
-				toast.success('Your password has been reset. Log in with your new password.');
+				toast.success(m.auth_reset_done());
 				await goto(resolve('/login'));
 			}
 		} catch {
-			errorMessage = 'Could not reset your password. Please try again.';
+			errorMessage = m.auth_reset_error();
 		} finally {
 			loading = false;
 		}
@@ -46,19 +47,19 @@
 </script>
 
 <svelte:head>
-	<title>Reset Password — Kizuna</title>
-	<meta name="description" content="Choose a new password for your Kizuna account." />
+	<title>{m.auth_reset_title()}</title>
+	<meta name="description" content={m.auth_reset_description()} />
 </svelte:head>
 
 <main
 	class="min-h-screen min-h-dvh flex flex-col justify-start sm:justify-center items-center pt-safe pb-safe px-0 sm:p-6 bg-white sm:bg-slate-50 dark:bg-dark-canvas transition-colors duration-200"
 >
 	<div class="w-full my-auto flex justify-center">
-		<AuthPanel subtitle="Choose a new password for your account.">
+		<AuthPanel subtitle={m.auth_reset_subtitle()}>
 			{#if invalid}
-				<AuthAlert type="error">This reset link is invalid or has expired.</AuthAlert>
+				<AuthAlert type="error">{m.auth_reset_link_invalid()}</AuthAlert>
 				<p class="m-0 text-center text-[13px]">
-					<a href={resolve('/forgot-password')} class={linkClass}>Request a new link</a>
+					<a href={resolve('/forgot-password')} class={linkClass}>{m.auth_request_new_link()}</a>
 				</p>
 			{:else}
 				{#if errorMessage}
@@ -68,24 +69,24 @@
 					<PasswordField
 						id="new-password"
 						name="newPassword"
-						label="New password"
+						label={m.auth_new_password()}
 						bind:value={newPassword}
 						autocomplete="new-password"
 					/>
 					<PasswordField
 						id="confirm-password"
 						name="confirmPassword"
-						label="Confirm password"
+						label={m.auth_confirm_password()}
 						bind:value={confirmPassword}
 						autocomplete="new-password"
 					/>
 					<Button type="submit" variant="primary" size="lg" fullWidth {loading}>
-						Reset password
+						{m.auth_reset_password()}
 					</Button>
 				</form>
 			{/if}
 			<p class="mt-5 mb-0 text-center text-[13px]">
-				<a href={resolve('/login')} class={linkClass}>Back to log in</a>
+				<a href={resolve('/login')} class={linkClass}>{m.auth_back_to_log_in()}</a>
 			</p>
 		</AuthPanel>
 	</div>

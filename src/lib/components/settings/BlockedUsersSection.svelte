@@ -3,6 +3,7 @@
 	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import SettingsSection from './SettingsSection.svelte';
 	import { buttonClass, hintClass, rowClass } from './styles';
 
@@ -23,20 +24,20 @@
 			const res = await fetch(`/api/users/${encodeURIComponent(id)}/block`, { method: 'DELETE' });
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.error(readApiError(body, 'Could not unblock').message);
+				toast.error(readApiError(body, m.settings_unblock_error()).message);
 				return;
 			}
 			unblockedIds = [...unblockedIds, id];
-			toast.success(`Unblocked ${name}`);
+			toast.success(m.block_unblocked(name));
 		} catch {
-			toast.error('Could not unblock');
+			toast.error(m.settings_unblock_error());
 		} finally {
 			unblocking = null;
 		}
 	}
 </script>
 
-<SettingsSection id="settings-blocked" title="Blocked users">
+<SettingsSection id="settings-blocked" title={m.settings_blocked_users()}>
 	{#each blockedUsers as u (u.id)}
 		<div class={rowClass}>
 			<a
@@ -56,12 +57,12 @@
 				disabled={unblocking === u.id}
 				aria-busy={unblocking === u.id}
 			>
-				{unblocking === u.id ? 'Unblocking…' : 'Unblock'}
+				{unblocking === u.id ? m.block_unblocking() : m.block_unblock()}
 			</button>
 		</div>
 	{:else}
 		<p class="{rowClass} m-0 text-sm text-slate-500 dark:text-dark-muted">
-			You haven't blocked anyone.
+			{m.settings_no_blocked()}
 		</p>
 	{/each}
 </SettingsSection>

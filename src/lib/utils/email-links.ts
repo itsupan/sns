@@ -1,4 +1,5 @@
 import { resolve } from '$app/paths';
+import { m } from '$lib/i18n';
 
 /*
  * Links in verification and email-change emails return to Settings with the outcome in the query.
@@ -12,8 +13,8 @@ export function emailChangedUrl(newEmail: string): string {
 }
 
 const LINK_ERRORS: Record<string, string> = {
-	TOKEN_EXPIRED: 'This link has expired. Request a new one.',
-	INVALID_USER: 'This link is for a different account.'
+	TOKEN_EXPIRED: m.settings_link_expired(),
+	INVALID_USER: m.settings_link_wrong_account()
 };
 
 export interface EmailLinkResult {
@@ -24,13 +25,13 @@ export interface EmailLinkResult {
 /** What to tell someone who arrived from an email link, or `null` if they did not. */
 export function emailLinkResult(params: URLSearchParams, email: string): EmailLinkResult | null {
 	const error = params.get('error');
-	if (error) return { type: 'error', text: LINK_ERRORS[error] ?? 'This link is invalid.' };
-	if (params.has('verified')) return { type: 'success', text: 'Your email is verified' };
+	if (error) return { type: 'error', text: LINK_ERRORS[error] ?? m.settings_link_invalid() };
+	if (params.has('verified')) return { type: 'success', text: m.settings_email_now_verified() };
 	const newEmail = params.get('newEmail');
 	if (!newEmail) return null;
 	// A verified account moves in two steps that share this URL: approve from the current address,
 	// then confirm from the new one.
 	return newEmail.toLowerCase() === email.toLowerCase()
-		? { type: 'success', text: `Your email is now ${newEmail}` }
-		: { type: 'success', text: `Approved. Open the link we sent to ${newEmail} to finish.` };
+		? { type: 'success', text: m.settings_email_now(newEmail) }
+		: { type: 'success', text: m.settings_email_approved(newEmail) };
 }

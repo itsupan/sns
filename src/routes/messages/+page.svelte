@@ -7,6 +7,7 @@
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
 	import type { InboxItem } from '$lib/chat/types';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -31,14 +32,14 @@
 			const res = await fetch(`/api/conversations?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load conversations').message;
+				loadError = readApiError(body, m.chat_inbox_load_error()).message;
 				return;
 			}
 			const page = body as { conversations: InboxItem[]; nextCursor: string | null };
 			more = [...more, ...page.conversations];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load conversations';
+			loadError = m.chat_inbox_load_error();
 		} finally {
 			loadingMore = false;
 		}
@@ -60,26 +61,28 @@
 
 	function preview(c: InboxItem): string {
 		if (!c.lastMessage) return '';
-		const prefix = c.lastMessage.senderId === data.viewerId ? 'You: ' : '';
-		return `${prefix}${c.lastMessage.content}`;
+		const { senderId, content } = c.lastMessage;
+		return senderId === data.viewerId ? m.chat_preview_mine(content) : content;
 	}
 </script>
 
 <svelte:head>
-	<title>Messages · Kizuna</title>
+	<title>{m.chat_inbox_title()}</title>
 </svelte:head>
 
 <main class="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
-	<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">Messages</h1>
+	<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">
+		{m.chat_messages_label()}
+	</h1>
 
 	{#if conversations.length === 0}
 		<div
 			class="rounded-3xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card py-16 px-6 flex flex-col items-center gap-2 text-center"
 		>
 			<Icon name="comment-alt" class="text-3xl text-slate-300" />
-			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">No messages yet</p>
+			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">{m.chat_empty()}</p>
 			<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-				Open someone’s profile and tap Message to start a conversation.
+				{m.chat_empty_hint()}
 			</p>
 		</div>
 	{:else}
@@ -117,7 +120,7 @@
 						{#if c.unreadCount > 0}
 							<span
 								class="min-w-5 h-5 px-1.5 rounded-full bg-blue-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0"
-								aria-label="{c.unreadCount} unread"
+								aria-label={m.chat_unread(c.unreadCount)}
 							>
 								{c.unreadCount > 99 ? '99+' : c.unreadCount}
 							</span>

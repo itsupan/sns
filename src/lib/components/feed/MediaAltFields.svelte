@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { MAX_ALT_LENGTH } from '$lib/constants/post-limits';
+	import { m } from '$lib/i18n';
 	import type { PostDraft } from './post-draft.svelte';
 
 	let { draft }: { draft: PostDraft } = $props();
@@ -15,13 +16,13 @@
 				>
 					<img src={plate.previewUrl} alt="" class="size-8 rounded-md object-cover shrink-0" />
 					<span class="shrink-0 font-medium text-slate-600 dark:text-dark-muted">
-						Alt text <span class="sr-only">for image {idx + 1}</span>
+						{m.composer_alt_text()} <span class="sr-only">{m.composer_alt_text_for(idx + 1)}</span>
 					</span>
 					<input
 						type="text"
 						bind:value={plate.alt}
 						maxlength={MAX_ALT_LENGTH}
-						placeholder="Describe this image for people who can't see it"
+						placeholder={m.composer_alt_text_placeholder()}
 						class="flex-1 min-w-0 bg-transparent border-0 text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none"
 					/>
 				</label>

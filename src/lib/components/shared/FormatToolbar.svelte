@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { formatTextarea, type FormatKind } from '$lib/formatting-editor';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		/** The textarea the buttons format. */
@@ -10,14 +11,18 @@
 	let { target, class: className = '' }: Props = $props();
 
 	const buttons: { kind: FormatKind; label: string; text: string; style: string }[] = [
-		{ kind: 'bold', label: 'Bold (Ctrl+B)', text: 'B', style: 'font-bold' },
-		{ kind: 'italic', label: 'Italic (Ctrl+I)', text: 'I', style: 'italic' },
-		{ kind: 'underline', label: 'Underline (Ctrl+U)', text: 'U', style: 'underline' },
-		{ kind: 'list', label: 'Bulleted list', text: '•', style: 'font-bold' }
+		{ kind: 'bold', label: m.composer_format_bold(), text: 'B', style: 'font-bold' },
+		{ kind: 'italic', label: m.composer_format_italic(), text: 'I', style: 'italic' },
+		{ kind: 'underline', label: m.composer_format_underline(), text: 'U', style: 'underline' },
+		{ kind: 'list', label: m.composer_format_list(), text: '•', style: 'font-bold' }
 	];
 </script>
 
-<div class="flex items-center gap-1 {className}" role="toolbar" aria-label="Text formatting">
+<div
+	class="flex items-center gap-1 {className}"
+	role="toolbar"
+	aria-label={m.composer_format_label()}
+>
 	{#each buttons as b (b.kind)}
 		<button
 			type="button"

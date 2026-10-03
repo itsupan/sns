@@ -1,6 +1,7 @@
 import { readApiError } from '$lib/utils/api-error';
 import type { StoryReaction } from '$lib/reactions';
 import type { StoryAudience } from '$lib/stories';
+import { m } from '$lib/i18n';
 
 /** One story as returned by `/api/stories` (media URL already signed for viewing). */
 export interface Story {
@@ -56,7 +57,7 @@ class StoriesStore {
 		try {
 			const res = await fetcher('/api/stories');
 			const body = (await res.json().catch(() => null)) as { groups?: StoryGroup[] } | null;
-			if (!res.ok) throw new Error(readApiError(body, 'Could not load stories').message);
+			if (!res.ok) throw new Error(readApiError(body, m.story_load_error()).message);
 			this.groups = body?.groups ?? [];
 			this.seenHere = {};
 		} catch {

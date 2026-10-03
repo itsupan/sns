@@ -2,19 +2,20 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { LEGAL_LAST_UPDATED } from '$lib/constants/legal';
+	import { m } from '$lib/i18n';
 
 	let { children } = $props();
 
 	const tabs = [
-		{ href: resolve('/legal/terms'), label: 'Terms of Service' },
-		{ href: resolve('/legal/privacy'), label: 'Privacy Policy' },
-		{ href: resolve('/legal/cookies'), label: 'Cookie Policy' },
-		{ href: resolve('/legal/guidelines'), label: 'Community Guidelines' }
+		{ href: resolve('/legal/terms'), label: m.legal_terms_title() },
+		{ href: resolve('/legal/privacy'), label: m.legal_privacy_title() },
+		{ href: resolve('/legal/cookies'), label: m.legal_cookies_title() },
+		{ href: resolve('/legal/guidelines'), label: m.legal_guidelines_title() }
 	];
 </script>
 
 <main class="legal w-full max-w-3xl mx-auto px-4 py-8 sm:py-12">
-	<nav aria-label="Legal documents" class="flex flex-wrap gap-2 mb-8">
+	<nav aria-label={m.legal_documents()} class="flex flex-wrap gap-2 mb-8">
 		{#each tabs as tab (tab.href)}
 			{@const active = page.url.pathname === tab.href}
 			<!-- eslint-disable svelte/no-navigation-without-resolve -- hrefs come from resolve() above -->
@@ -34,7 +35,7 @@
 		class="bg-white dark:bg-dark-card border border-slate-100 dark:border-dark-border rounded-2xl p-5 sm:p-8"
 	>
 		{@render children()}
-		<p class="updated">Last updated {LEGAL_LAST_UPDATED}</p>
+		<p class="updated">{m.legal_last_updated(LEGAL_LAST_UPDATED)}</p>
 	</article>
 </main>
 

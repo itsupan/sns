@@ -1,6 +1,7 @@
 <script lang="ts">
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import type { IconName } from '$lib/components/shared/icons';
+	import { m } from '$lib/i18n';
 
 	export type TabId = 'grid' | 'saved';
 	export type ViewMode = 'grid' | 'feed' | 'compact';
@@ -31,15 +32,15 @@
 	}
 
 	const allTabs: TabDef[] = [
-		{ id: 'grid', label: 'Curated Grid', icon: 'apps' },
-		{ id: 'saved', label: 'Saved', icon: 'bookmark' }
+		{ id: 'grid', label: m.profile_tab_grid(), icon: 'apps' },
+		{ id: 'saved', label: m.profile_tab_saved(), icon: 'bookmark' }
 	];
 	let tabs = $derived(allTabs.filter((t) => showSaved || t.id !== 'saved'));
 
 	const viewModes: { id: ViewMode; label: string; icon: IconName }[] = [
-		{ id: 'grid', label: 'Grid layout', icon: 'apps' },
-		{ id: 'feed', label: 'Feed layout', icon: 'border-all' },
-		{ id: 'compact', label: 'Compact layout', icon: 'menu-burger' }
+		{ id: 'grid', label: m.profile_view_grid(), icon: 'apps' },
+		{ id: 'feed', label: m.profile_view_feed(), icon: 'border-all' },
+		{ id: 'compact', label: m.profile_view_compact(), icon: 'menu-burger' }
 	];
 
 	function selectTab(id: TabId) {

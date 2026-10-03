@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ComponentProps } from 'svelte';
+	import { m } from '$lib/i18n';
 	import EmailSettings from './EmailSettings.svelte';
 	import PasswordSettings from './PasswordSettings.svelte';
 	import SessionList from './SessionList.svelte';
@@ -12,7 +13,7 @@
 	let { email, emailVerified, hasPassword, socialProviders, sessions }: Props = $props();
 </script>
 
-<SettingsSection id="settings-security" title="Security">
+<SettingsSection id="settings-security" title={m.settings_security()}>
 	<EmailSettings {email} {emailVerified} />
 	<PasswordSettings {hasPassword} {socialProviders} />
 	<SessionList {sessions} />

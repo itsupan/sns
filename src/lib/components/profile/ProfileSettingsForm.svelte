@@ -4,6 +4,7 @@
 	import Button from '$lib/components/shared/Button.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { authClient } from '$lib/auth-client';
+	import { m } from '$lib/i18n';
 	import AvatarUpload from './AvatarUpload.svelte';
 
 	export interface UserProfileData {
@@ -134,37 +135,36 @@
 		const errors: Record<string, string> = {};
 
 		if (!name.trim()) {
-			errors.name = 'Name is required';
+			errors.name = m.profile_name_required();
 		} else if (name.trim().length > 100) {
-			errors.name = 'Name cannot exceed 100 characters';
+			errors.name = m.profile_name_too_long();
 		}
 
 		if (handle.trim()) {
 			const cleanHandle = handle.trim().replace(/^@/, '');
 			if (!/^[a-z0-9_.-]{1,30}$/i.test(cleanHandle)) {
-				errors.handle =
-					'Handle can only contain letters, numbers, dots, and underscores (1-30 chars)';
+				errors.handle = m.profile_handle_invalid();
 			}
 		}
 
 		if (bio && bio.length > 500) {
-			errors.bio = 'Bio cannot exceed 500 characters';
+			errors.bio = m.profile_bio_too_long();
 		}
 
 		if (title && title.length > 100) {
-			errors.title = 'Title cannot exceed 100 characters';
+			errors.title = m.profile_title_too_long();
 		}
 
 		if (website && website.length > 255) {
-			errors.website = 'Website URL cannot exceed 255 characters';
+			errors.website = m.profile_website_too_long();
 		}
 
 		if (location && location.length > 100) {
-			errors.location = 'Location cannot exceed 100 characters';
+			errors.location = m.profile_location_too_long();
 		}
 
 		if (cameraGear && cameraGear.length > 200) {
-			errors.cameraGear = 'Camera gear cannot exceed 200 characters';
+			errors.cameraGear = m.profile_camera_too_long();
 		}
 
 		fieldErrors = errors;
@@ -177,7 +177,7 @@
 		fieldErrors = {};
 
 		if (!currentUserId) {
-			formError = 'User ID could not be identified. Please make sure you are logged in.';
+			formError = m.profile_user_unknown();
 			return;
 		}
 
@@ -210,7 +210,7 @@
 			const data = (await response.json()) as { user?: UserProfileData };
 
 			if (!response.ok) {
-				const apiError = readApiError(data, 'Failed to update profile');
+				const apiError = readApiError(data, m.profile_update_failed());
 				if (apiError.fields && Object.keys(apiError.fields).length > 0) {
 					fieldErrors = apiError.fields;
 				} else {
@@ -228,12 +228,12 @@
 				window.dispatchEvent(new CustomEvent('kizuna:profile-updated', { detail: data.user }));
 			}
 
-			toast.show('Profile updated successfully', 3500);
+			toast.show(m.profile_updated(), 3500);
 			if (data.user) {
 				onSuccess?.(data.user);
 			}
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Network error updating profile';
+			const message = err instanceof Error ? err.message : m.profile_update_network_error();
 			formError = message;
 			saveSuccess = false;
 			toast.show(message);
@@ -246,7 +246,7 @@
 <form
 	class="w-full max-w-2xl mx-auto flex flex-col gap-6 {className}"
 	onsubmit={handleSubmit}
-	aria-label="Profile settings form"
+	aria-label={m.profile_form_label()}
 >
 	<!-- Card Container -->
 	<div
@@ -257,10 +257,10 @@
 			<h2
 				class="text-xl sm:text-2xl font-bold tracking-tight text-slate-950 dark:text-dark-text m-0"
 			>
-				Edit Profile
+				{m.profile_edit_title()}
 			</h2>
 			<p class="text-xs sm:text-sm text-slate-500 dark:text-dark-muted mt-1 m-0">
-				Update your public profile, avatar, and personal details.
+				{m.profile_edit_subtitle()}
 			</p>
 		</div>
 
@@ -285,7 +285,7 @@
 					name="check"
 					class="text-base text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5"
 				/>
-				<div class="flex-1 font-medium">Profile updated successfully! All changes are saved.</div>
+				<div class="flex-1 font-medium">{m.profile_saved_banner()}</div>
 			</div>
 		{/if}
 
@@ -299,14 +299,14 @@
 					for="profile-name"
 					class="text-xs font-semibold text-slate-900 dark:text-dark-text tracking-wide"
 				>
-					Display Name <span class="text-red-500">*</span>
+					{m.profile_display_name()} <span class="text-red-500">*</span>
 				</label>
 				<input
 					id="profile-name"
 					type="text"
 					bind:value={name}
 					required
-					placeholder="e.g. Elena Rostova"
+					placeholder={m.profile_name_placeholder()}
 					maxlength="100"
 					class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-dark-elevated text-slate-950 dark:text-dark-text rounded-xl border {fieldErrors.name
 						? 'border-red-500 focus:ring-red-500'
@@ -325,7 +325,7 @@
 					for="profile-handle"
 					class="text-xs font-semibold text-slate-900 dark:text-dark-text tracking-wide"
 				>
-					Username / Handle
+					{m.profile_handle_label()}
 				</label>
 				<div class="relative flex items-center">
 					<span
@@ -337,7 +337,7 @@
 						id="profile-handle"
 						type="text"
 						bind:value={handle}
-						placeholder="elena.rostova"
+						placeholder={m.profile_handle_placeholder()}
 						maxlength="30"
 						class="w-full h-11 pl-8 pr-3.5 text-sm bg-slate-50 dark:bg-dark-elevated text-slate-950 dark:text-dark-text rounded-xl border {fieldErrors.handle
 							? 'border-red-500 focus:ring-red-500'
@@ -350,7 +350,7 @@
 					</span>
 				{:else}
 					<span class="text-[11px] text-slate-500 dark:text-dark-muted">
-						Your unique handle for mentions and profile links.
+						{m.profile_handle_hint()}
 					</span>
 				{/if}
 			</div>
@@ -361,13 +361,13 @@
 					for="profile-title"
 					class="text-xs font-semibold text-slate-900 dark:text-dark-text tracking-wide"
 				>
-					Title / Profession
+					{m.profile_title_label()}
 				</label>
 				<input
 					id="profile-title"
 					type="text"
 					bind:value={title}
-					placeholder="e.g. Architectural & Film Photographer"
+					placeholder={m.profile_title_placeholder()}
 					maxlength="100"
 					class="w-full h-11 px-3.5 text-sm bg-slate-50 dark:bg-dark-elevated text-slate-950 dark:text-dark-text rounded-xl border {fieldErrors.title
 						? 'border-red-500 focus:ring-red-500'
@@ -387,7 +387,7 @@
 						for="profile-bio"
 						class="text-xs font-semibold text-slate-900 dark:text-dark-text tracking-wide"
 					>
-						Bio
+						{m.profile_bio()}
 					</label>
 					<span class="text-[11px] text-slate-400 dark:text-dark-muted font-mono">
 						{bio.length} / 500
@@ -397,7 +397,7 @@
 					id="profile-bio"
 					bind:value={bio}
 					rows="3"
-					placeholder="Capturing silence, light, and brutalist geometries across Scandinavia & Japan..."
+					placeholder={m.profile_bio_placeholder()}
 					maxlength="500"
 					class="w-full p-3.5 text-sm bg-slate-50 dark:bg-dark-elevated text-slate-950 dark:text-dark-text rounded-xl border {fieldErrors.bio
 						? 'border-red-500 focus:ring-red-500'
@@ -418,7 +418,7 @@
 						for="profile-website"
 						class="text-xs font-semibold text-slate-900 dark:text-dark-text tracking-wide"
 					>
-						Website
+						{m.profile_website()}
 					</label>
 					<div class="relative flex items-center">
 						<Icon
@@ -429,7 +429,7 @@
 							id="profile-website"
 							type="text"
 							bind:value={website}
-							placeholder="elenarostova.com"
+							placeholder={m.profile_website_placeholder()}
 							maxlength="255"
 							class="w-full h-11 pl-9 pr-3.5 text-sm bg-slate-50 dark:bg-dark-elevated text-slate-950 dark:text-dark-text rounded-xl border {fieldErrors.website
 								? 'border-red-500 focus:ring-red-500'
@@ -449,7 +449,7 @@
 						for="profile-location"
 						class="text-xs font-semibold text-slate-900 dark:text-dark-text tracking-wide"
 					>
-						Location
+						{m.profile_location()}
 					</label>
 					<div class="relative flex items-center">
 						<Icon
@@ -460,7 +460,7 @@
 							id="profile-location"
 							type="text"
 							bind:value={location}
-							placeholder="Stockholm & Kyoto"
+							placeholder={m.profile_location_placeholder()}
 							maxlength="100"
 							class="w-full h-11 pl-9 pr-3.5 text-sm bg-slate-50 dark:bg-dark-elevated text-slate-950 dark:text-dark-text rounded-xl border {fieldErrors.location
 								? 'border-red-500 focus:ring-red-500'
@@ -481,7 +481,7 @@
 					for="profile-camera-gear"
 					class="text-xs font-semibold text-slate-900 dark:text-dark-text tracking-wide"
 				>
-					Camera Gear / Setup
+					{m.profile_camera()}
 				</label>
 				<div class="relative flex items-center">
 					<Icon
@@ -492,7 +492,7 @@
 						id="profile-camera-gear"
 						type="text"
 						bind:value={cameraGear}
-						placeholder="Hasselblad 500C/M • Leica M11"
+						placeholder={m.profile_camera_placeholder()}
 						maxlength="200"
 						class="w-full h-11 pl-9 pr-3.5 text-sm bg-slate-50 dark:bg-dark-elevated text-slate-950 dark:text-dark-text rounded-xl border {fieldErrors.cameraGear
 							? 'border-red-500 focus:ring-red-500'
@@ -519,7 +519,7 @@
 					disabled={isSubmitting || isUploading}
 					onclick={onCancel}
 				>
-					Cancel
+					{m.common_cancel()}
 				</Button>
 			{/if}
 
@@ -530,7 +530,7 @@
 				disabled={!isDirty || isSubmitting || isUploading}
 				loading={isSubmitting}
 			>
-				Save Changes
+				{m.profile_save()}
 			</Button>
 		</div>
 	</div>

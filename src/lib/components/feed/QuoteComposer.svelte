@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
+	import { m } from '$lib/i18n';
 	import PostComposerFields from './PostComposerFields.svelte';
 	import QuotedPostCard from './QuotedPostCard.svelte';
 	import { PostDraft } from './post-draft.svelte';
@@ -31,20 +32,20 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not publish your quote').message);
+				toast.show(readApiError(body, m.post_quote_error()).message);
 				return;
 			}
 			open = false;
-			toast.show('Quote published');
+			toast.show(m.post_quote_published());
 		} catch {
-			toast.show('Could not publish your quote');
+			toast.show(m.post_quote_error());
 		} finally {
 			publishing = false;
 		}
 	}
 </script>
 
-<BottomSheet bind:open title="Quote post" showTitle>
+<BottomSheet bind:open title={m.post_quote()} showTitle>
 	<PostComposerFields {draft} id="quote-post-{post.id}" onsubmit={publish}>
 		{#snippet attachment()}
 			<QuotedPostCard quoted={post} />
@@ -58,7 +59,7 @@
 				onclick={() => (open = false)}
 				class="px-5 h-12 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-text font-semibold text-xs border-0 cursor-pointer"
 			>
-				Cancel
+				{m.common_cancel()}
 			</button>
 			<button
 				type="submit"
@@ -66,7 +67,7 @@
 				disabled={publishDisabled}
 				class="flex-1 h-12 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-sm border-0 cursor-pointer active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2"
 			>
-				<span>{publishing ? 'Publishing…' : 'Publish'}</span>
+				<span>{publishing ? m.composer_publishing() : m.composer_publish()}</span>
 				<Icon name="arrow-right" class="text-xs" />
 			</button>
 		</div>
