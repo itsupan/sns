@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import type { IconName } from '$lib/components/shared/icons';
 
 	export type TabId = 'grid' | 'saved';
 	export type ViewMode = 'grid' | 'feed' | 'compact';
@@ -26,7 +27,7 @@
 	interface TabDef {
 		id: TabId;
 		label: string;
-		icon: string;
+		icon: IconName;
 	}
 
 	const allTabs: TabDef[] = [
@@ -35,7 +36,7 @@
 	];
 	let tabs = $derived(allTabs.filter((t) => showSaved || t.id !== 'saved'));
 
-	const viewModes: { id: ViewMode; label: string; icon: string }[] = [
+	const viewModes: { id: ViewMode; label: string; icon: IconName }[] = [
 		{ id: 'grid', label: 'Grid layout', icon: 'apps' },
 		{ id: 'feed', label: 'Feed layout', icon: 'border-all' },
 		{ id: 'compact', label: 'Compact layout', icon: 'menu-burger' }

@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postLike, postSave, user } from './schema';
 import { loadFollowedIds } from './follows';
+import { loadMutedIds } from './mutes';
 import { loadCommentPreviews, loadPostMedia, loadPostTags, loadRecentLikers } from './posts';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import { isTextBackground } from '$lib/post-backgrounds';
@@ -57,8 +58,8 @@ export function backgroundOf(row: { postType: string; background: string | null 
 }
 
 /**
- * Turns post rows into the `PostCard` shape: media, tags, follow state, the viewer's likes and
- * saves, and the latest comment as a preview. Media URLs are not refreshed here.
+ * Turns post rows into the `PostCard` shape: media, tags, follow and mute state, the viewer's
+ * likes and saves, and the latest comment as a preview. Media URLs are not refreshed here.
  */
 export async function toPostCards(
 	db: Database,
@@ -67,16 +68,14 @@ export async function toPostCards(
 ): Promise<PostData[]> {
 	if (rows.length === 0) return [];
 	const postIds = rows.map((r) => r.post.id);
+	const authorIds = rows.map((r) => r.user.id);
 
-	const [mediaByPost, tagsByPost, followedAuthors, viewer, likers, commentPreview] =
+	const [mediaByPost, tagsByPost, followedAuthors, mutedAuthors, viewer, likers, commentPreview] =
 		await Promise.all([
 			loadPostMedia(db, postIds),
 			loadPostTags(db, postIds),
-			loadFollowedIds(
-				db,
-				viewerId,
-				rows.map((r) => r.user.id)
-			),
+			loadFollowedIds(db, viewerId, authorIds),
+			loadMutedIds(db, viewerId, authorIds),
 			loadViewerPostState(db, viewerId, postIds),
 			loadRecentLikers(db, viewerId, postIds),
 			loadCommentPreviews(db, viewerId, postIds)
@@ -94,7 +93,8 @@ export async function toPostCards(
 				avatar: r.user.image || '',
 				location,
 				timeAgo: formatTimeAgo(r.post.createdAt),
-				isFollowing: followedAuthors.has(r.user.id)
+				isFollowing: followedAuthors.has(r.user.id),
+				isMuted: mutedAuthors.has(r.user.id)
 			},
 			title: r.post.title || '',
 			description: r.post.content,
@@ -110,10 +110,11 @@ export async function toPostCards(
 			tags: tagsByPost.get(r.post.id) ?? [],
 			likes: r.post.likesCount,
 			commentsCount: r.post.commentsCount,
-			repostsCount: r.post.sharesCount,
+			sharesCount: r.post.sharesCount,
 			likedBy: likers.get(r.post.id),
 			liked: viewer.liked.has(r.post.id),
 			saved: viewer.saved.has(r.post.id),
+			pinned: r.post.pinnedAt !== null,
 			commentPreview: commentPreview.get(r.post.id)
 		};
 	});

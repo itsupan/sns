@@ -16,7 +16,9 @@ describe('loadConfig', () => {
 			UPLOAD_ALLOWED_MIME_TYPES: ' image/png , IMAGE/JPEG ',
 			FEED_PAGE_SIZE: '10',
 			FEED_MAX_PAGE_SIZE: '25',
-			MEDIA_URL_TTL_SECONDS: '3600'
+			PROFILE_PAGE_SIZE: '9',
+			MEDIA_URL_TTL_SECONDS: '3600',
+			IMAGE_TRANSFORMS: ' on '
 		});
 		expect(config.rateLimits.like).toEqual({ limit: 5, windowSec: 30 });
 		expect(loadConfig({ RATE_LIMIT_REACTION: '3/10' }).rateLimits.reaction).toEqual({
@@ -27,7 +29,10 @@ describe('loadConfig', () => {
 		expect(config.upload.maxBytes).toBe(1048576);
 		expect([...config.upload.allowedMimeTypes]).toEqual(['image/png', 'image/jpeg']);
 		expect(config.feed).toEqual({ defaultPageSize: 10, maxPageSize: 25 });
+		expect(config.profile).toEqual({ defaultPageSize: 9, maxPageSize: 36 });
 		expect(config.mediaUrlTtlSec).toBe(3600);
+		expect(config.imageTransforms).toBe(true);
+		expect(loadConfig({ IMAGE_TRANSFORMS: 'off' }).imageTransforms).toBe(false);
 	});
 
 	it('warns and falls back on invalid values', () => {
@@ -36,12 +41,14 @@ describe('loadConfig', () => {
 			RATE_LIMIT_LIKE: 'lots',
 			RATE_LIMIT_COMMENT: '0/60',
 			UPLOAD_MAX_BYTES: '-5',
-			UPLOAD_ALLOWED_MIME_TYPES: ' , '
+			UPLOAD_ALLOWED_MIME_TYPES: ' , ',
+			IMAGE_TRANSFORMS: 'yes'
 		});
 		expect(config.rateLimits.like).toEqual(DEFAULT_CONFIG.rateLimits.like);
 		expect(config.rateLimits.comment).toEqual(DEFAULT_CONFIG.rateLimits.comment);
 		expect(config.upload).toEqual(DEFAULT_CONFIG.upload);
-		expect(warn).toHaveBeenCalledTimes(4);
+		expect(config.imageTransforms).toBe(false);
+		expect(warn).toHaveBeenCalledTimes(5);
 	});
 
 	it('clamps page size and media TTL to their maximums', () => {

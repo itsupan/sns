@@ -4,6 +4,7 @@ import { user } from '$lib/server/db/schema';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { PageServerLoad } from './$types';
 import { refreshMediaUrl, refreshPostMediaUrls } from '$lib/server/services/storage';
+import { getConfig } from '$lib/server/config';
 import {
 	EMPTY_PROFILE_STATS,
 	loadProfilePosts,
@@ -12,6 +13,7 @@ import {
 } from '$lib/server/db/profiles';
 import { loadSavedPreview } from '$lib/server/db/saves';
 import { blockStatus } from '$lib/server/db/blocks';
+import { loadMutedIds } from '$lib/server/db/mutes';
 
 export const load: PageServerLoad = async ({ params, locals, url, platform }) => {
 	const rawId = params.id;
@@ -31,6 +33,7 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 			website: user.website,
 			location: user.location,
 			cameraGear: user.cameraGear,
+			isPrivate: user.isPrivate,
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt
 		})
@@ -42,21 +45,25 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	}
 
 	const viewerId = locals.user?.id ?? null;
-	// Either way round, a block shows a limited profile: no posts, no follow or message.
-	const block =
+	// Either way round, a block shows a limited profile: no posts (`loadProfilePosts` leaves them
+	// out), no follow or message. A private account's posts are left out the same way until the
+	// viewer follows it.
+	const [block, mutedIds, firstPage, stats] = await Promise.all([
 		viewerId && viewerId !== targetUser.id
-			? await blockStatus(locals.db, viewerId, targetUser.id)
-			: { blocked: false, blockedBy: false };
-	const hidden = block.blocked || block.blockedBy;
-	const [posts, stats] = await Promise.all([
-		hidden ? [] : loadProfilePosts(locals.db, targetUser, viewerId),
+			? blockStatus(locals.db, viewerId, targetUser.id)
+			: { blocked: false, blockedBy: false },
+		loadMutedIds(locals.db, viewerId, [targetUser.id]),
+		loadProfilePosts(locals.db, targetUser.id, viewerId, {
+			limit: getConfig(platform?.env).profile.defaultPageSize
+		}),
 		loadProfileStats(locals.db, targetUser.id, viewerId).catch(() => EMPTY_PROFILE_STATS)
 	]);
 	const gridPosts = await Promise.all(
-		posts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
+		firstPage.posts.map(async (p) => toGridItem(await refreshPostMediaUrls(p, platform?.env)))
 	);
 
 	const isOwnProfile = viewerId === targetUser.id;
+	const isLocked = targetUser.isPrivate && !isOwnProfile && stats.followStatus !== 'following';
 	let saved: GridItem[] = [];
 	if (isOwnProfile) {
 		try {
@@ -92,8 +99,11 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 			cameraGear: targetUser.cameraGear
 		},
 		isOwnProfile,
+		isLocked,
 		block,
+		muted: mutedIds.has(targetUser.id),
 		posts: gridPosts,
+		nextCursor: firstPage.nextCursor,
 		saved,
 		stats,
 		canonicalUrl,

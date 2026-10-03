@@ -2,7 +2,7 @@
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import TileGrid from '$lib/components/explore/TileGrid.svelte';
-	import LoadMore from '$lib/components/explore/LoadMore.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import type { ExploreTile } from '$lib/explore/types';
 	import type { PageProps } from './$types';

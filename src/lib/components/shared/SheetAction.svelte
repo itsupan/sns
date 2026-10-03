@@ -1,8 +1,9 @@
 <script lang="ts">
 	import Icon from './Icon.svelte';
+	import type { IconName } from './icons';
 
 	interface Props {
-		icon: string;
+		icon: IconName;
 		label: string;
 		danger?: boolean;
 		onclick?: () => void;
