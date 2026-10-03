@@ -466,6 +466,19 @@
 								</div>
 
 								<a
+									href={resolve('/drafts')}
+									class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 dark:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated no-underline transition-colors"
+									role="menuitem"
+									onclick={() => (desktopDropdownOpen = false)}
+								>
+									<Icon
+										name="document"
+										class="text-sm text-slate-500 dark:text-dark-muted shrink-0"
+									/>
+									<span>Drafts</span>
+								</a>
+
+								<a
 									href={resolve('/settings')}
 									class="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 dark:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated no-underline transition-colors"
 									role="menuitem"
@@ -589,6 +602,14 @@
 			onclick={() => {
 				settingsOpen = false;
 				handleShare();
+			}}
+		/>
+		<SheetAction
+			icon="document"
+			label="Drafts"
+			onclick={() => {
+				settingsOpen = false;
+				goto(resolve('/drafts'));
 			}}
 		/>
 		<SheetAction

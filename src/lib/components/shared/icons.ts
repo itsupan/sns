@@ -15,6 +15,7 @@ import Circle from '@lucide/svelte/icons/circle';
 import CircleAlert from '@lucide/svelte/icons/circle-alert';
 import CircleCheck from '@lucide/svelte/icons/circle-check';
 import CircleX from '@lucide/svelte/icons/circle-x';
+import Clock from '@lucide/svelte/icons/clock';
 import Compass from '@lucide/svelte/icons/compass';
 import Copy from '@lucide/svelte/icons/copy';
 import Crop from '@lucide/svelte/icons/crop';
@@ -86,6 +87,7 @@ export const ICONS = {
 	check: Check,
 	'check-circle': CircleCheck,
 	circle: Circle,
+	clock: Clock,
 	comment: MessageCircle,
 	'comment-alt': MessageSquareText,
 	'compass-alt': Compass,

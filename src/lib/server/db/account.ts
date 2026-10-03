@@ -3,6 +3,7 @@ import type { BatchItem } from 'drizzle-orm/batch';
 import type { Database } from './index';
 import { account, session, user } from './auth-schema';
 import { deleteR2Objects, extractR2Key } from '$lib/server/services/storage';
+import { draftMediaUrls, toDraftData } from '$lib/server/posts/drafts';
 import {
 	closeFriend,
 	commentReaction,
@@ -16,6 +17,7 @@ import {
 	notificationOptOut,
 	post,
 	postComment,
+	postDraft,
 	postLike,
 	postMedia,
 	postSave,
@@ -29,7 +31,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 12;
+export const EXPORT_FORMAT_VERSION = 13;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -45,6 +47,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		sessions,
 		posts,
 		reposts,
+		drafts,
 		comments,
 		likes,
 		saves,
@@ -87,6 +90,11 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.from(post)
 			.where(and(eq(post.userId, userId), isNotNull(post.repostOfId)))
 			.orderBy(asc(post.createdAt)),
+		db
+			.select()
+			.from(postDraft)
+			.where(eq(postDraft.userId, userId))
+			.orderBy(asc(postDraft.createdAt)),
 		db
 			.select()
 			.from(postComment)
@@ -298,6 +306,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			tags: byPost(tags, p.id).map((t) => t.name)
 		})),
 		reposts,
+		drafts: drafts.map(toDraftData),
 		comments,
 		likes,
 		saves,
@@ -351,7 +360,7 @@ function chunks<T>(items: T[], size = ID_CHUNK): T[][] {
 const unique = (ids: (string | null)[]) => [...new Set(ids.filter((id): id is string => !!id))];
 
 export interface DeleteAccountResult {
-	/** R2 keys the user owned (post media, stories, avatar). */
+	/** R2 keys the user owned (post and draft media, stories, avatar). */
 	mediaKeys: string[];
 	/** Keys that could not be deleted; logged, never blocks the deletion. */
 	failedKeys: string[];
@@ -374,6 +383,7 @@ export async function deleteAccount(
 
 	const [
 		media,
+		drafts,
 		stories,
 		following,
 		followers,
@@ -390,6 +400,7 @@ export async function deleteAccount(
 			.from(postMedia)
 			.innerJoin(post, eq(post.id, postMedia.postId))
 			.where(eq(post.userId, userId)),
+		db.select({ payload: postDraft.payload }).from(postDraft).where(eq(postDraft.userId, userId)),
 		db.select({ url: story.mediaUrl }).from(story).where(eq(story.userId, userId)),
 		db
 			.select({ id: userFollow.followingId })
@@ -430,7 +441,12 @@ export async function deleteAccount(
 	]);
 
 	const mediaKeys = unique(
-		[...media.map((m) => m.url), ...stories.map((s) => s.url), profile.image].map(extractR2Key)
+		[
+			...media.map((m) => m.url),
+			...drafts.flatMap((d) => draftMediaUrls(d.payload)),
+			...stories.map((s) => s.url),
+			profile.image
+		].map(extractR2Key)
 	);
 
 	const statements: BatchItem<'sqlite'>[] = [

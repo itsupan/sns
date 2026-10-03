@@ -8,10 +8,14 @@
 	import { asset } from '$app/paths';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
-	import { goto } from '$app/navigation';
+	import { goto, replaceState } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { page } from '$app/state';
+	import { onMount } from 'svelte';
+	import type { DraftData } from '$lib/drafts';
 	import type { PostData } from './PostCard.svelte';
 	import PostComposerFields from './PostComposerFields.svelte';
+	import DraftControls from './DraftControls.svelte';
 	import MediaAltFields from './MediaAltFields.svelte';
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
@@ -91,17 +95,32 @@
 		target.value = '';
 	}
 
+	function clearComposer() {
+		draft.reset();
+		showLocationInput = false;
+		showTagInput = false;
+		sheetOpen = false;
+		studioModalOpen = false;
+	}
+
 	async function publish() {
 		if (isPublishDisabled) return;
 		if (!requireLogin('Please log in to publish a post')) return;
 
 		isSubmitting = true;
 		try {
-			const res = await fetch('/api/posts', {
-				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
-				body: JSON.stringify({ ...draft.toPayload(), cameraMeta: null })
-			});
+			let res: Response;
+			if (draft.draftId) {
+				// A saved draft is published as stored, so store the edits first.
+				const saved = await draft.saveDraft();
+				res = await fetch(`/api/drafts/${saved.id}/publish`, { method: 'POST' });
+			} else {
+				res = await fetch('/api/posts', {
+					method: 'POST',
+					headers: { 'Content-Type': 'application/json' },
+					body: JSON.stringify({ ...draft.toPayload(), cameraMeta: null })
+				});
+			}
 
 			if (!res.ok) {
 				const data = await res.json().catch(() => null);
@@ -111,12 +130,7 @@
 			const data = (await res.json()) as { post: PostData };
 			onPublish?.(data.post);
 			toast.show('Post published successfully');
-
-			draft.reset();
-			showLocationInput = false;
-			showTagInput = false;
-			sheetOpen = false;
-			studioModalOpen = false;
+			clearComposer();
 		} catch (err) {
 			const message = err instanceof Error ? err.message : 'Could not publish post';
 			toast.show(message);
@@ -142,6 +156,23 @@
 	$effect(() => {
 		window.addEventListener(OPEN_COMPOSER_EVENT, openComposer);
 		return () => window.removeEventListener(OPEN_COMPOSER_EVENT, openComposer);
+	});
+
+	/** "Edit" on /drafts links to `/?draft=<id>`: load that draft into the composer and open it. */
+	onMount(async () => {
+		const draftId = page.url.searchParams.get('draft');
+		if (!draftId) return;
+		// Drop the query, so reloading the page does not reopen the draft.
+		replaceState(resolve('/'), {});
+		try {
+			const res = await fetch(`/api/drafts/${encodeURIComponent(draftId)}`);
+			const data = await res.json().catch(() => null);
+			if (!res.ok) throw new Error(readApiError(data, 'Could not open the draft').message);
+			draft.loadDraft((data as { draft: DraftData }).draft);
+			openComposer();
+		} catch (err) {
+			toast.show(err instanceof Error ? err.message : 'Could not open the draft');
+		}
 	});
 
 	function autogrow(node: HTMLTextAreaElement) {
@@ -225,6 +256,15 @@
 		onsubmit={publish}
 		beforeAddMedia={() => requireLogin('Please log in to upload media')}
 	/>
+	<div class="px-3 pb-3">
+		<DraftControls
+			{draft}
+			id="mobile-composer"
+			disabled={isPublishDisabled}
+			beforeSave={() => requireLogin('Please log in to save a draft')}
+			onsaved={clearComposer}
+		/>
+	</div>
 
 	{#snippet footer()}
 		<div class="flex items-center gap-3 w-full">
@@ -621,6 +661,14 @@
 				</button>
 			</div>
 		</div>
+
+		<DraftControls
+			{draft}
+			id="inline-composer"
+			disabled={isPublishDisabled}
+			beforeSave={() => requireLogin('Please log in to save a draft')}
+			onsaved={clearComposer}
+		/>
 	</form>
 </div>
 
