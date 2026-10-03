@@ -3,6 +3,7 @@
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
 	import TextPostPicker from './TextPostPicker.svelte';
+	import MediaAltFields from './MediaAltFields.svelte';
 	import { formatShortcuts } from '$lib/formatting-editor';
 	import { ASPECT_RATIOS, POST_TYPES, type PostDraft } from './post-draft.svelte';
 
@@ -149,6 +150,10 @@
 				<span class="text-[11px] font-medium">Add Plate</span>
 			</button>
 		</div>
+	{/if}
+
+	{#if !draft.isText}
+		<MediaAltFields {draft} />
 	{/if}
 
 	<!-- Canvas Ratio Selector (Only when media attached) -->

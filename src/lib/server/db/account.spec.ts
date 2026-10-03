@@ -108,7 +108,7 @@ describe('account export on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		expect(data).not.toBeNull();
 		expect(data!.profile).toMatchObject({ id: 'alice', email: 'a@test.dev', handle: 'alice' });
 		expect(data!.posts.map((p) => p.id)).toEqual(['p-a']);
-		expect(data!.posts[0].media).toEqual([{ url: 'uploads/a.jpg', type: 'image' }]);
+		expect(data!.posts[0].media).toEqual([{ url: 'uploads/a.jpg', type: 'image', alt: null }]);
 		expect(data!.comments.map((c) => c.id)).toEqual(['c-1']);
 		expect(data!.likes.map((l) => l.postId)).toEqual(['p-b']);
 		expect(data!.saves.map((s) => s.postId)).toEqual(['p-b']);

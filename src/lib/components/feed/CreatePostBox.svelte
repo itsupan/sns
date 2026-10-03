@@ -12,6 +12,7 @@
 	import { resolve } from '$app/paths';
 	import type { PostData } from './PostCard.svelte';
 	import PostComposerFields from './PostComposerFields.svelte';
+	import MediaAltFields from './MediaAltFields.svelte';
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
 	import TextPostPicker from './TextPostPicker.svelte';
@@ -439,6 +440,8 @@
 								<span class="text-[10px] font-medium">Add</span>
 							</button>
 						</div>
+
+						<MediaAltFields {draft} />
 					</div>
 				{/if}
 
@@ -809,6 +812,8 @@
 							<span class="text-[10px] font-medium">Add Plate</span>
 						</button>
 					</div>
+
+					<MediaAltFields {draft} />
 				</div>
 			</div>
 

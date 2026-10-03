@@ -60,6 +60,8 @@ export const postMedia = sqliteTable(
 		type: text('type', { enum: ['image', 'video'] }).notNull(),
 		width: integer('width'),
 		height: integer('height'),
+		// Author-written description for screen readers.
+		alt: text('alt'),
 		// 0-based order within the post's carousel.
 		position: integer('position').notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })

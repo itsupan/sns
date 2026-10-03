@@ -46,6 +46,8 @@
 	export interface MediaItem {
 		url: string;
 		type: 'image' | 'video';
+		/** Author-written description for screen readers. */
+		alt?: string;
 	}
 
 	export interface PostData {
@@ -68,14 +70,14 @@
 		/** Most recent liker other than the viewer, for the "Liked by" line. */
 		likedBy?: string;
 		commentsCount: number;
-		repostsCount: number;
+		sharesCount: number;
 		commentPreview?: PostComment;
 		liked?: boolean;
 		saved?: boolean;
 	}
 
 	interface Props {
-		post?: PostData;
+		post: PostData;
 		class?: string;
 		/** Load the image eagerly (first post in the feed, for LCP). */
 		priority?: boolean;
@@ -90,53 +92,9 @@
 		fullText?: boolean;
 	}
 
-	const defaultPost: PostData = {
-		id: 'post-1',
-		author: {
-			name: 'Elena Rostova',
-			handle: '@elena.rostova',
-			avatar:
-				'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-			location: 'Copenhagen, Denmark',
-			timeAgo: '3h ago'
-		},
-		title: 'Quiet Brutalism: Concrete Light & Shadows',
-		description:
-			'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.',
-		image:
-			'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-		mediaItems: [
-			{
-				url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			}
-		],
-		aspectRatio: '4:5',
-		location: 'Fondazione Prada, Milano',
-		tags: ['#MinimalArchitecture', '#LightAndSpace', '#DesignArchive'],
-		likes: 842,
-		commentsCount: 46,
-		repostsCount: 12,
-		commentPreview: {
-			author: 'marcus_k',
-			content: 'The texture gradation is immaculate. Concrete takes light like velvet here.'
-		}
-	};
-
+	// eslint-disable-next-line svelte/no-unused-props -- `post` is spread into the edited copy below, so its fields are read through it.
 	let {
-		post: postProp = defaultPost,
+		post: postProp,
 		class: className = '',
 		priority = false,
 		onLike,
@@ -155,7 +113,7 @@
 	let post = $derived<PostData>(edits ? { ...postProp, ...edits } : postProp);
 	let isOwner = $derived(Boolean(post.author.id && $session.data?.user?.id === post.author.id));
 
-	// Author's profile: your own posts go to /profile, demo posts without an id use the handle.
+	// Author's profile: your own posts go to /profile, authors without an id fall back to the handle.
 	let profileHref = $derived(
 		isOwner
 			? resolve('/profile')
@@ -303,7 +261,7 @@
 	let isLiked = $derived(likedOverride !== null ? likedOverride : (post.liked ?? false));
 	let isSaved = $derived(savedOverride !== null ? savedOverride : (post.saved ?? false));
 	let likesCount = $derived(post.likes + likesDelta);
-	let sharesCount = $derived(post.repostsCount + sharesDelta);
+	let sharesCount = $derived(post.sharesCount + sharesDelta);
 	let displayCommentsCount = $derived(post.commentsCount + commentsDelta);
 	let activeCommentPreview = $derived(latestCommentPreview || post.commentPreview);
 
@@ -451,7 +409,7 @@
 			const res = await fetch(`/api/posts/${post.id}/share`, { method: 'POST' });
 			const body = (await res.json().catch(() => null)) as { sharesCount?: number } | null;
 			if (res.ok && typeof body?.sharesCount === 'number') {
-				sharesDelta = body.sharesCount - post.repostsCount;
+				sharesDelta = body.sharesCount - post.sharesCount;
 			}
 		} catch {
 			// The share itself already happened; only the counter is left unchanged.
@@ -687,7 +645,9 @@
 				{:else}
 					<img
 						src={activeMediaUrl}
-						alt={post.title || `Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+						alt={currentMedia.alt ||
+							post.title ||
+							`Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
 						srcset={imageSrcset(activeMediaUrl, FEED_IMAGE_WIDTHS)}
 						sizes="(min-width: 672px) 672px, 100vw"
 						class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"

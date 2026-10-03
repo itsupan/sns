@@ -106,6 +106,7 @@ export function toGridItem(p: PostData): GridItem {
 		id: p.id,
 		title: p.title || stripFormatting(p.description).slice(0, 40),
 		image: first?.url || p.image,
+		alt: first?.alt,
 		mediaType: first?.type ?? 'none',
 		likes: p.likes,
 		comments: p.commentsCount,

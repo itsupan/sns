@@ -133,7 +133,7 @@
 						{#if target.media.type === 'image'}
 							<img
 								src={target.media.url}
-								alt="First media item of the reported post"
+								alt={target.media.alt || 'First media item of the reported post'}
 								loading="lazy"
 								class="max-h-64 w-fit rounded-xl object-contain bg-slate-50 dark:bg-dark-elevated"
 							/>

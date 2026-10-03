@@ -26,7 +26,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 6;
+export const EXPORT_FORMAT_VERSION = 7;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -189,6 +189,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 						postId: postMedia.postId,
 						url: postMedia.url,
 						type: postMedia.type,
+						alt: postMedia.alt,
 						position: postMedia.position
 					})
 					.from(postMedia)
@@ -260,7 +261,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		sessions,
 		posts: posts.map((p) => ({
 			...p,
-			media: byPost(media, p.id).map(({ url, type }) => ({ url, type })),
+			media: byPost(media, p.id).map(({ url, type, alt }) => ({ url, type, alt })),
 			tags: byPost(tags, p.id).map((t) => t.name)
 		})),
 		comments,

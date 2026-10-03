@@ -17,7 +17,7 @@ const gridItem = (id: string, extra: Partial<GridItem> = {}): GridItem => {
 		tags: [],
 		likes: 0,
 		commentsCount: 0,
-		repostsCount: 0
+		sharesCount: 0
 	};
 	return { id, title: `Saved ${id}`, image: '', likes: 0, comments: 0, post, ...extra };
 };
