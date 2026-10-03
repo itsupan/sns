@@ -1,23 +1,16 @@
 import { json } from '@sveltejs/kit';
-import { and, eq } from 'drizzle-orm';
 import type { RequestHandler, RequestEvent } from './$types';
-import { post } from '$lib/server/db/schema';
-import { notDeleted } from '$lib/server/db/posts';
+import { requireVisiblePost } from '$lib/server/db/posts';
 import { setSaved } from '$lib/server/db/saves';
 import { requireNotBlocked } from '$lib/server/db/blocks';
-import { ApiError, enforceRateLimit, requireUser, withApi } from '$lib/server/api';
+import { enforceRateLimit, requireUser, withApi } from '$lib/server/api';
 
-/** Shared by save and unsave: auth, rate limit, post must exist and not be deleted. */
+/** Shared by save and unsave: auth, rate limit, post must exist and be visible to the viewer. */
 async function prepare({ params, locals, platform }: RequestEvent) {
 	const currentUser = requireUser(locals);
 	await enforceRateLimit(platform, 'save', currentUser.id);
-	const [found] = await locals.db
-		.select({ authorId: post.userId })
-		.from(post)
-		.where(and(eq(post.id, params.id), notDeleted))
-		.limit(1);
-	if (!found) throw new ApiError(404, 'not_found', 'Post not found');
-	return { userId: currentUser.id, postId: params.id, authorId: found.authorId };
+	const { authorId } = await requireVisiblePost(locals.db, currentUser.id, params.id);
+	return { userId: currentUser.id, postId: params.id, authorId };
 }
 
 /** Save `:id` to the viewer's private collection. Idempotent. */

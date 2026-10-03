@@ -61,6 +61,11 @@ html {
 	-webkit-tap-highlight-color: transparent;
 }
 
+/* The page stays still behind any open modal, including while one modal hands off to the next. */
+html:has(dialog:modal) {
+	overflow: hidden;
+}
+
 body {
 	overscroll-behavior-y: none;
 	-webkit-font-smoothing: antialiased;

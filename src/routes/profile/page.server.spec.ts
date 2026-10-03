@@ -1,25 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { PostData } from '$lib/components/feed/PostCard.svelte';
+import { loadProfilePosts } from '$lib/server/db/profiles';
 import { load } from './+page.server';
 
-// Media and tags come from post_media / post_tag via loaders; stub them.
-vi.mock('$lib/server/db/posts', async (importOriginal) => {
-	const actual = await importOriginal<typeof import('$lib/server/db/posts')>();
-	const media: Record<string, Array<{ url: string; type: 'image' | 'video' }>> = {
-		'p-1': [
-			{ url: 'https://example.com/bowl.jpg', type: 'image' },
-			{ url: 'https://example.com/bowl2.jpg', type: 'image' }
-		]
-	};
-	return {
-		...actual,
-		loadRecentLikers: vi.fn(async () => new Map()),
-		loadPostMedia: vi.fn(
-			async (_db: unknown, ids: string[]) =>
-				new Map(ids.filter((id) => media[id]).map((id) => [id, media[id]]))
-		),
-		loadPostTags: vi.fn(async () => new Map<string, string[]>())
-	};
+// Posts, stats and saves have their own real-D1 specs; this one covers what the page does with them.
+vi.mock('$lib/server/db/profiles', async (importOriginal) => {
+	const actual = await importOriginal<typeof import('$lib/server/db/profiles')>();
+	return { ...actual, loadProfilePosts: vi.fn(async () => ({ posts: [], nextCursor: null })) };
 });
+vi.mock('$lib/server/db/saves', () => ({ loadSavedPreview: vi.fn(async () => []) }));
 
 type LoadEvent = Parameters<typeof load>[0];
 
@@ -80,31 +69,34 @@ describe('Profile +page.server.ts', () => {
 		expect(result.user.bio).toBe('Capturing moments.');
 	});
 
-	it('returns user posts list from database', async () => {
+	it('returns the first page of posts as grid items, with the cursor for the next', async () => {
 		const mockUser = {
 			id: 'user-auth-1',
 			name: 'Taro Yamada',
 			email: 'taro@example.com'
 		};
-
-		const mockPost = {
+		const card = {
 			id: 'p-1',
-			userId: 'user-auth-1',
+			author: { id: 'user-auth-1', name: 'Taro Yamada', handle: '@taroyamada', avatar: '' },
 			title: 'Tea Bowl',
-			content: 'A study on clay',
-			likesCount: 15,
-			commentsCount: 3,
-			createdAt: new Date()
-		};
+			description: 'A study on clay',
+			image: 'https://example.com/bowl.jpg',
+			mediaItems: [
+				{ url: 'https://example.com/bowl.jpg', type: 'image' },
+				{ url: 'https://example.com/bowl2.jpg', type: 'image' }
+			],
+			likes: 15,
+			commentsCount: 3
+		} as PostData;
+		vi.mocked(loadProfilePosts).mockResolvedValueOnce({ posts: [card], nextCursor: '1700_p-1' });
 
-		// user lookup → .limit(); posts → .orderBy(); viewer likes / stats → awaited directly.
+		// user lookup → .limit(); stats → awaited directly.
 		const mockDb = {
 			select: vi.fn(() => ({
 				from: vi.fn(() => ({
 					where: vi.fn(() =>
 						Object.assign(Promise.resolve([{ postsCount: 1, impressionsCount: 7 }]), {
-							limit: vi.fn(async () => [mockUser]),
-							orderBy: vi.fn(async () => [mockPost])
+							limit: vi.fn(async () => [mockUser])
 						})
 					)
 				}))
@@ -116,19 +108,21 @@ describe('Profile +page.server.ts', () => {
 				user: { id: 'user-auth-1', name: 'Taro Yamada', email: 'taro@example.com' },
 				db: mockDb
 			},
-			url: new URL('http://localhost:5173/profile')
+			url: new URL('http://localhost:5173/profile'),
+			platform: { env: { PROFILE_PAGE_SIZE: '9' } }
 		} as unknown as LoadEvent;
 
 		const result = await load(mockEvent);
 		expect(result).toBeDefined();
 		if (!result) throw new Error('Expected result from load');
+		expect(loadProfilePosts).toHaveBeenCalledWith(mockDb, 'user-auth-1', 'user-auth-1', {
+			limit: 9
+		});
 		expect(result.posts).toHaveLength(1);
-		expect(result.posts[0].id).toBe('p-1');
-		expect(result.posts[0].isCarousel).toBe(true);
-		expect(result.posts[0].likes).toBe(15);
+		expect(result.posts[0]).toMatchObject({ id: 'p-1', isCarousel: true, likes: 15 });
 		// Full post for list view, same shape the feed uses.
 		expect(result.posts[0].post?.description).toBe('A study on clay');
-		expect(result.posts[0].post?.author.handle).toBe('@taroyamada');
+		expect(result.nextCursor).toBe('1700_p-1');
 		expect(result.stats.postsCount).toBe(1);
 		expect(result.stats.impressionsCount).toBe(7);
 	});
