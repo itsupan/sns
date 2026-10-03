@@ -7,7 +7,9 @@ export type ActivityType =
 	| 'mention'
 	| 'story_reaction'
 	| 'follow_request'
-	| 'follow_accepted';
+	| 'follow_accepted'
+	| 'repost'
+	| 'quote';
 
 /** One notification as the Activity API returns it. */
 export interface ActivityItem {

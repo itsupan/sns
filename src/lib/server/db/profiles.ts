@@ -4,7 +4,7 @@ import type { Database } from '.';
 import { post, user } from './schema';
 import { followStatus } from './follows';
 import { visibleTo } from './visibility';
-import { encodeCursor, notDeleted, type FeedCursor } from './posts';
+import { encodeCursor, notDeleted, notRepost, type FeedCursor } from './posts';
 import { postRowAuthor, toPostCards } from './post-cards';
 import { MAX_PINNED_POSTS } from '$lib/constants/post-limits';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
@@ -29,7 +29,10 @@ export const EMPTY_PROFILE_STATS: ProfileStats = {
 	followStatus: 'none'
 };
 
-/** Header stats for a profile: live posts and their views, stored follow counters, viewer state. */
+/**
+ * Header stats for a profile: live posts (reposts excluded) and their views, stored follow
+ * counters, viewer state.
+ */
 export async function loadProfileStats(
 	db: Database,
 	userId: string,
@@ -42,7 +45,7 @@ export async function loadProfileStats(
 				impressionsCount: sql<number>`coalesce(sum(${post.viewsCount}), 0)`
 			})
 			.from(post)
-			.where(and(eq(post.userId, userId), notDeleted)),
+			.where(and(eq(post.userId, userId), notDeleted, notRepost)),
 		db
 			.select({ followersCount: user.followersCount, followingCount: user.followingCount })
 			.from(user)
@@ -63,7 +66,7 @@ export async function loadProfileStats(
 }
 
 /**
- * One page of a profile's live posts in the `PostCard` shape, newest first, keyset-paginated on
+ * One page of a profile's live posts (reposts excluded) in the `PostCard` shape, newest first, keyset-paginated on
  * (created_at, id) via `post_userId_createdAt_idx`. The first page (no cursor) leads with the
  * pinned posts, most recently pinned first; the pages never repeat them. Empty when the author
  * and `viewerId` are blocked in either direction, or the author is private and not followed by
@@ -75,7 +78,7 @@ export async function loadProfilePosts(
 	viewerId: string | null | undefined,
 	{ limit, cursor }: { limit: number; cursor?: FeedCursor | null }
 ): Promise<{ posts: PostData[]; nextCursor: string | null }> {
-	const shown = and(eq(post.userId, userId), notDeleted, visibleTo(viewerId, post.userId));
+	const shown = and(eq(post.userId, userId), notDeleted, notRepost, visibleTo(viewerId, post.userId));
 	const [pinned, rows] = await Promise.all([
 		cursor
 			? []

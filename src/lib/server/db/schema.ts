@@ -25,7 +25,7 @@ export const post = sqliteTable(
 		aspectRatio: text('aspect_ratio').default('1:1'), // '1:1' | '4:5' | '16:9'
 		location: text('location'), // e.g. "Fondazione Prada, Milano"
 		cameraMeta: text('camera_meta'),
-		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article' | 'text'
+		postType: text('post_type').default('photo').notNull(), // 'photo' | 'story' | 'article' | 'text' | 'repost'
 		// Text posts only: a key of TEXT_BACKGROUNDS ($lib/post-backgrounds).
 		background: text('background'),
 		likesCount: integer('likes_count').default(0).notNull(),
@@ -33,6 +33,16 @@ export const post = sqliteTable(
 		sharesCount: integer('shares_count').default(0).notNull(),
 		// Times the post page was opened by someone other than the author; summed into profile impressions.
 		viewsCount: integer('views_count').default(0).notNull(),
+		// A repost (post type 'repost', empty content) of this post; it goes with the original.
+		repostOfId: text('repost_of_id').references((): AnySQLiteColumn => post.id, {
+			onDelete: 'cascade'
+		}),
+		// A quote post embeds this one; the quote outlives it and then shows it as unavailable.
+		quoteOfId: text('quote_of_id').references((): AnySQLiteColumn => post.id, {
+			onDelete: 'set null'
+		}),
+		// Live reposts of this post; grows and shrinks by one with each repost and undo.
+		repostsCount: integer('reposts_count').default(0).notNull(),
 		createdAt: integer('created_at', { mode: 'timestamp_ms' })
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
@@ -50,7 +60,14 @@ export const post = sqliteTable(
 		// Profile grid: WHERE user_id = ? ORDER BY created_at DESC (also serves user_id lookups).
 		index('post_userId_createdAt_idx').on(table.userId, table.createdAt),
 		// Pinned posts: WHERE user_id = ? AND pinned_at IS NOT NULL ORDER BY pinned_at DESC.
-		index('post_userId_pinnedAt_idx').on(table.userId, table.pinnedAt)
+		index('post_userId_pinnedAt_idx').on(table.userId, table.pinnedAt),
+		// One live repost per user and post; also serves the viewer's "reposted" lookup.
+		uniqueIndex('post_userId_repostOfId_unique')
+			.on(table.userId, table.repostOfId)
+			.where(sql`repost_of_id is not null and deleted_at is null`),
+		// The foreign keys' cascade and set null when an original is removed.
+		index('post_repostOfId_idx').on(table.repostOfId),
+		index('post_quoteOfId_idx').on(table.quoteOfId)
 	]
 );
 
@@ -571,7 +588,9 @@ export const NOTIFICATION_TYPES = [
 	'mention',
 	'story_reaction',
 	'follow_request',
-	'follow_accepted'
+	'follow_accepted',
+	'repost',
+	'quote'
 ] as const;
 export type NotificationType = (typeof NOTIFICATION_TYPES)[number];
 

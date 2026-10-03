@@ -1,4 +1,4 @@
-import { and, asc, eq, inArray, isNotNull, ne, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, ne, sql } from 'drizzle-orm';
 import type { BatchItem } from 'drizzle-orm/batch';
 import type { Database } from './index';
 import { account, session, user } from './auth-schema';
@@ -29,7 +29,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 11;
+export const EXPORT_FORMAT_VERSION = 12;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -44,6 +44,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		logins,
 		sessions,
 		posts,
+		reposts,
 		comments,
 		likes,
 		saves,
@@ -76,7 +77,16 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			})
 			.from(session)
 			.where(eq(session.userId, userId)),
-		db.select().from(post).where(eq(post.userId, userId)).orderBy(asc(post.createdAt)),
+		db
+			.select()
+			.from(post)
+			.where(and(eq(post.userId, userId), isNull(post.repostOfId)))
+			.orderBy(asc(post.createdAt)),
+		db
+			.select({ postId: post.repostOfId, createdAt: post.createdAt, deletedAt: post.deletedAt })
+			.from(post)
+			.where(and(eq(post.userId, userId), isNotNull(post.repostOfId)))
+			.orderBy(asc(post.createdAt)),
 		db
 			.select()
 			.from(postComment)
@@ -287,6 +297,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			media: byPost(media, p.id).map(({ url, type, alt }) => ({ url, type, alt })),
 			tags: byPost(tags, p.id).map((t) => t.name)
 		})),
+		reposts,
 		comments,
 		likes,
 		saves,
@@ -350,8 +361,8 @@ export interface DeleteAccountResult {
  * Deletes a user and everything they own (GDPR art. 17). Foreign keys cascade the rows (sessions,
  * accounts, posts, comments, likes, follows, messages...); one D1 batch (one transaction) deletes
  * the user, their DMs, and recomputes the denormalized counters of other users' rows that lose
- * likes, comments, replies, reactions, follows or story views. Media on our R2 bucket is removed
- * afterwards; R2 failures are logged and do not undo the deletion.
+ * likes, reposts, comments, replies, reactions, follows or story views. Media on our R2 bucket is
+ * removed afterwards; R2 failures are logged and do not undo the deletion.
  */
 export async function deleteAccount(
 	db: Database,
@@ -367,6 +378,7 @@ export async function deleteAccount(
 		following,
 		followers,
 		liked,
+		reposted,
 		commented,
 		replyParents,
 		reacted,
@@ -392,6 +404,10 @@ export async function deleteAccount(
 			.from(postLike)
 			.innerJoin(post, eq(post.id, postLike.postId))
 			.where(and(eq(postLike.userId, userId), ne(post.userId, userId))),
+		db
+			.select({ id: post.repostOfId })
+			.from(post)
+			.where(and(eq(post.userId, userId), isNotNull(post.repostOfId))),
 		// Replies by others to the user's comments are on the same posts, so this covers them.
 		db
 			.selectDistinct({ id: postComment.postId })
@@ -444,6 +460,14 @@ export async function deleteAccount(
 				.update(post)
 				.set({
 					likesCount: sql`(select count(*) from ${postLike} where ${postLike.postId} = ${post.id})`
+				})
+				.where(inArray(post.id, ids))
+		),
+		...chunks(unique(reposted.map((r) => r.id))).map((ids) =>
+			db
+				.update(post)
+				.set({
+					repostsCount: sql`(select count(*) from ${post} as r where r.repost_of_id = ${post.id} and r.deleted_at is null)`
 				})
 				.where(inArray(post.id, ids))
 		),

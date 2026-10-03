@@ -1,4 +1,5 @@
 <script lang="ts">
+	import type { Snippet } from 'svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
@@ -16,9 +17,18 @@
 		alwaysShowTitle?: boolean;
 		/** Called before opening the file picker; return false to block (e.g. signed out). */
 		beforeAddMedia?: () => boolean;
+		/** Shown under the text, e.g. the post being quoted. */
+		attachment?: Snippet;
 	}
 
-	let { draft, id, onsubmit, alwaysShowTitle = false, beforeAddMedia }: Props = $props();
+	let {
+		draft,
+		id,
+		onsubmit,
+		alwaysShowTitle = false,
+		beforeAddMedia,
+		attachment
+	}: Props = $props();
 
 	let fileInput = $state<HTMLInputElement | null>(null);
 	let contentInput = $state<HTMLTextAreaElement | null>(null);
@@ -212,6 +222,8 @@
 		></textarea>
 		<MentionSuggest target={contentInput} />
 	</div>
+
+	{@render attachment?.()}
 
 	<!-- Interactive Tags List -->
 	{#if draft.tags.length > 0}

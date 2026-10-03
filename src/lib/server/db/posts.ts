@@ -10,9 +10,13 @@ import { ApiError } from '$lib/server/api/errors';
 /** Every read or write of a post must exclude soft-deleted rows (see `post.deletedAt`). */
 export const notDeleted = isNull(post.deletedAt);
 
+/** Keeps out repost rows, which only stand for their original in the home feed. */
+export const notRepost = isNull(post.repostOfId);
+
 /**
- * The live post `postId` with its author, or a 404 when it is missing, deleted, or by a private
- * account the viewer does not follow. Blocks are left to `requireNotBlocked`, which answers 403.
+ * The live post `postId` with its author, or a 404 when it is missing, deleted, a repost (likes,
+ * saves, shares, comments and reposts act on the original), or by a private account the viewer
+ * does not follow. Blocks are left to `requireNotBlocked`, which answers 403.
  */
 export async function requireVisiblePost(
 	db: Database,
@@ -20,9 +24,14 @@ export async function requireVisiblePost(
 	postId: string
 ) {
 	const [row] = await db
-		.select({ id: post.id, authorId: post.userId, sharesCount: post.sharesCount })
+		.select({
+			id: post.id,
+			authorId: post.userId,
+			sharesCount: post.sharesCount,
+			repostsCount: post.repostsCount
+		})
 		.from(post)
-		.where(and(eq(post.id, postId), notDeleted, notPrivateTo(viewerId, post.userId)))
+		.where(and(eq(post.id, postId), notDeleted, notRepost, notPrivateTo(viewerId, post.userId)))
 		.limit(1);
 	if (!row) throw new ApiError(404, 'not_found', 'Post not found');
 	return row;

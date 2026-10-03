@@ -72,7 +72,9 @@
 		mention: 'at',
 		story_reaction: 'smile',
 		follow_request: 'user-add',
-		follow_accepted: 'check'
+		follow_accepted: 'check',
+		repost: 'arrows-repeat',
+		quote: 'comment-alt'
 	};
 </script>
 

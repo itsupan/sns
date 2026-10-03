@@ -14,11 +14,13 @@ export interface ActivityGroup {
 	comment: ActivityItem['comment'];
 }
 
-/** What a notification groups by; comments and replies are never grouped. */
+/** What a notification groups by; comments, replies and quotes are never grouped. */
 function groupKey(item: ActivityItem): string | null {
 	switch (item.type) {
 		case 'like':
 			return `like:${item.post?.id}`;
+		case 'repost':
+			return `repost:${item.post?.id}`;
 		case 'reaction':
 			return `reaction:${item.comment?.id}`;
 		case 'follow':
@@ -29,8 +31,9 @@ function groupKey(item: ActivityItem): string | null {
 }
 
 /**
- * Groups likes on the same post, reactions on the same comment, and follows. Input and output are
- * newest first; a group sits where its newest item was and is unread if any of its items is.
+ * Groups likes and reposts of the same post, reactions on the same comment, and follows. Input
+ * and output are newest first; a group sits where its newest item was and is unread if any of its
+ * items is.
  */
 export function groupActivity(items: ActivityItem[]): ActivityGroup[] {
 	const groups: ActivityGroup[] = [];
@@ -87,6 +90,10 @@ export function activityVerb(group: ActivityGroup): string {
 			return 'asked to follow you';
 		case 'follow_accepted':
 			return 'accepted your follow request';
+		case 'repost':
+			return 'reposted your post';
+		case 'quote':
+			return 'quoted your post';
 	}
 }
 
@@ -100,5 +107,7 @@ export const activityTypeLabels: Record<ActivityType, string> = {
 	mention: 'Tags in posts',
 	story_reaction: 'Reactions to your stories',
 	follow_request: 'Follow requests',
-	follow_accepted: 'Accepted follow requests'
+	follow_accepted: 'Accepted follow requests',
+	repost: 'Reposts of your posts',
+	quote: 'Quotes of your posts'
 };
