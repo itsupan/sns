@@ -5,6 +5,7 @@ import { commentsCountOf, reactionsCountOf, repliesCountOf } from './counters';
 import { encodeCursor, notDeleted, requireVisiblePost, type FeedCursor } from './posts';
 import { notifyStatement, unnotifyReactionStatement } from './notifications';
 import { notBlockedWith, requireNotBlocked } from './blocks';
+import { notMutedBy } from './mutes';
 import { visibleTo } from './visibility';
 import { ApiError } from '$lib/server/api/errors';
 import { displayHandle, formatTimeAgo } from '$lib/utils/format';
@@ -93,9 +94,9 @@ export async function loadReactionSummaries(
 
 /**
  * One page of a post's top-level comments (`parentCommentId` null) or of one comment's
- * replies, oldest first, minus comments by users blocked in either direction with the viewer, and
- * none at all when the post itself is hidden from them (see `visibleTo`). Keyset pagination on
- * (created_at, id), served by `post_comment_postId_parent_createdAt_idx`.
+ * replies, oldest first, minus comments by users blocked in either direction with the viewer or
+ * muted by them, and none at all when the post itself is hidden from them (see `visibleTo`).
+ * Keyset pagination on (created_at, id), served by `post_comment_postId_parent_createdAt_idx`.
  */
 export async function listComments(
 	db: Database,
@@ -136,6 +137,7 @@ export async function listComments(
 					? isNull(postComment.parentCommentId)
 					: eq(postComment.parentCommentId, parentCommentId),
 				notBlockedWith(viewerId, postComment.userId),
+				notMutedBy(viewerId, postComment.userId),
 				visibleTo(viewerId, post.userId),
 				cursor
 					? sql`(${postComment.createdAt}, ${postComment.id}) > (${cursor.createdAt}, ${cursor.id})`

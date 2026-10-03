@@ -1,8 +1,9 @@
 import { and, eq, sql, type SQL } from 'drizzle-orm';
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core';
 import type { Database } from '.';
-import { user } from './schema';
+import { post, user } from './schema';
 import { notBlockedWith } from './blocks';
+import { noMutedKeywordFor, notMutedBy } from './mutes';
 
 /**
  * Condition keeping only rows whose `authorColumn` (a user id) is not a private account hidden
@@ -26,6 +27,19 @@ export function notPrivateTo(
  */
 export function visibleTo(viewerId: string | null | undefined, authorColumn: SQLiteColumn | SQL) {
 	return and(notBlockedWith(viewerId, authorColumn), notPrivateTo(viewerId, authorColumn)) as SQL;
+}
+
+/**
+ * Condition for posts in the viewer's feeds (home, Explore, tag pages): visible to them (see
+ * `visibleTo`), not by someone they muted and free of their muted keywords. Profiles opened
+ * directly filter with `visibleTo` alone, so a mute never hides them.
+ */
+export function shownInFeedsTo(viewerId: string | null | undefined) {
+	return and(
+		visibleTo(viewerId, post.userId),
+		notMutedBy(viewerId, post.userId),
+		noMutedKeywordFor(viewerId)
+	) as SQL;
 }
 
 /** Whether the viewer may see `profileId`'s posts and follow lists (blocks are checked apart). */

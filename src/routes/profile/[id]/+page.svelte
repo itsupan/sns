@@ -108,6 +108,7 @@
 				isOwnProfile: data.isOwnProfile
 			}}
 			block={data.block}
+			muted={data.muted}
 		/>
 
 		{#if data.block.blocked || data.block.blockedBy}

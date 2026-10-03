@@ -5,6 +5,7 @@
 		LegalSection,
 		LogOutButton,
 		NotificationsSection,
+		MutedSection,
 		PrivacyDataSection,
 		PrivateAccountSection,
 		SecuritySection
@@ -31,6 +32,7 @@
 	<NotificationsSection />
 	<PrivacyDataSection hasPassword={data.hasPassword} />
 	<BlockedUsersSection users={data.blockedUsers} />
+	<MutedSection users={data.mutedUsers} keywords={data.mutedKeywords} />
 	<LegalSection />
 	<LogOutButton />
 </main>

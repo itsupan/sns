@@ -2,6 +2,7 @@ import { and, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import type { Database } from '$lib/server/db';
 import { notification, story, storyView, user, userFollow } from '$lib/server/db/schema';
 import { notBlockedWith } from '$lib/server/db/blocks';
+import { notMutedBy } from '$lib/server/db/mutes';
 import { encodeCursor, type FeedCursor } from '$lib/server/db/posts';
 import { STORY_TTL_SEC } from '$lib/stories';
 import type { StoryReaction } from '$lib/reactions';
@@ -98,8 +99,8 @@ export interface TrayStory extends StoredStory {
 }
 
 /**
- * Live stories by `viewerId` and the people they follow, minus anyone blocked either way, with
- * whether the viewer watched each and the reaction they sent. Own stories first, then newest.
+ * Live stories by `viewerId` and the people they follow, minus anyone blocked either way or muted,
+ * with whether the viewer watched each and the reaction they sent. Own stories first, then newest.
  */
 export async function loadTrayStories(
 	db: Database,
@@ -120,7 +121,8 @@ export async function loadTrayStories(
 			and(
 				sql`${story.userId} in (select ${userFollow.followingId} from ${userFollow} where ${userFollow.followerId} = ${viewerId} union all select ${viewerId})`,
 				live(now),
-				notBlockedWith(viewerId, story.userId)
+				notBlockedWith(viewerId, story.userId),
+				notMutedBy(viewerId, story.userId)
 			)
 		)
 		.orderBy(desc(sql`${story.userId} = ${viewerId}`), desc(story.createdAt))

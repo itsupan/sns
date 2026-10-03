@@ -10,6 +10,7 @@ import {
 	followRequest,
 	message,
 	moderationAction,
+	mutedKeyword,
 	notification,
 	notificationOptOut,
 	post,
@@ -22,11 +23,12 @@ import {
 	story,
 	storyView,
 	tag,
-	userFollow
+	userFollow,
+	userMute
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 7;
+export const EXPORT_FORMAT_VERSION = 8;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -49,6 +51,8 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		followers,
 		followRequestsSent,
 		followRequestsReceived,
+		muted,
+		mutedKeywords,
 		memberships,
 		notifications,
 		notificationOptOuts,
@@ -123,6 +127,15 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.from(followRequest)
 			.innerJoin(user, eq(user.id, followRequest.requesterId))
 			.where(eq(followRequest.targetId, userId)),
+		db
+			.select({ userId: userMute.mutedId, handle: user.handle, since: userMute.createdAt })
+			.from(userMute)
+			.innerJoin(user, eq(user.id, userMute.mutedId))
+			.where(eq(userMute.muterId, userId)),
+		db
+			.select({ keyword: mutedKeyword.keyword, since: mutedKeyword.createdAt })
+			.from(mutedKeyword)
+			.where(eq(mutedKeyword.userId, userId)),
 		db
 			.select({ conversationId: conversationMember.conversationId })
 			.from(conversationMember)
@@ -273,6 +286,8 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		followers,
 		followRequestsSent,
 		followRequestsReceived,
+		muted,
+		mutedKeywords,
 		// Deleted messages keep only their metadata, as in the app.
 		conversations: conversationIds.map((id) => ({
 			id,
