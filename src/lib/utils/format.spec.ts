@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatCount, formatTimeAgo, likesSummary } from './format';
+import { displayHandle, formatCount, formatTimeAgo, likesSummary } from './format';
 
 describe('formatCount', () => {
 	it('keeps small numbers as-is', () => {
@@ -52,5 +52,13 @@ describe('likesSummary', () => {
 		expect(likesSummary(2, true, 'Ana')).toBe('Liked by you and 1 other');
 		expect(likesSummary(1, false, 'Ana')).toBe('Liked by Ana');
 		expect(likesSummary(1201, false, 'Ana')).toBe('Liked by Ana and 1.2K others');
+	});
+});
+
+describe('displayHandle', () => {
+	it('shows the handle with one @, or one made from the name when there is none', () => {
+		expect(displayHandle('aoi', 'Aoi Tanaka')).toBe('@aoi');
+		expect(displayHandle('@aoi', 'Aoi Tanaka')).toBe('@aoi');
+		expect(displayHandle(null, 'Aoi Tanaka')).toBe('@aoitanaka');
 	});
 });

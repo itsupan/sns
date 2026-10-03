@@ -1,6 +1,9 @@
 import { render } from 'vitest-browser-svelte';
+import { page, userEvent } from 'vitest/browser';
 import { describe, expect, it } from 'vitest';
 import ProfileHeader from './ProfileHeader.svelte';
+// The scroll lock is a rule in the global stylesheet.
+import '../../../app.css';
 
 describe('ProfileHeader', () => {
 	it('renders owner actions when viewing current user profile', async () => {
@@ -94,5 +97,25 @@ describe('ProfileHeader', () => {
 		await expect.element(screen.getByText('Share Profile')).toBeInTheDocument();
 		await expect.element(screen.getByText('Telegram')).toBeInTheDocument();
 		await expect.element(screen.getByText('Facebook')).toBeInTheDocument();
+	});
+
+	it('hands off from the settings sheet to the share dialog with the page locked throughout', async () => {
+		await page.viewport(390, 800);
+		const screen = render(ProfileHeader, {
+			props: { profile: { name: 'Current User', handle: null, isOwnProfile: true } }
+		});
+		const settings = screen.getByRole('button', { name: 'Settings' });
+		await settings.click();
+		await screen.getByRole('button', { name: 'Share profile' }).click();
+
+		const share = screen.getByRole('dialog', { name: 'Share Profile' });
+		await expect.element(share).toBeVisible();
+		expect(screen.getByRole('dialog', { name: 'Settings' }).query()).toBeNull();
+		expect(getComputedStyle(document.documentElement).overflow).toBe('hidden');
+
+		await userEvent.keyboard('{Escape}');
+		await expect.element(share).not.toBeInTheDocument();
+		await expect.element(settings).toHaveFocus();
+		expect(getComputedStyle(document.documentElement).overflow).toBe('visible');
 	});
 });
