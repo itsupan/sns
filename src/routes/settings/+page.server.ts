@@ -7,6 +7,7 @@ import { listBlockedUsers } from '$lib/server/db/blocks';
 import { refreshMediaUrl } from '$lib/server/services/storage';
 import { displayHandle } from '$lib/utils/format';
 import { describeUserAgent } from '$lib/utils/user-agent';
+import { isModerator } from '$lib/server/roles';
 
 export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	if (!locals.user || !locals.session) {
@@ -61,6 +62,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 			lastActiveAt: s.updatedAt,
 			current: s.id === currentSessionId
 		})),
-		blockedUsers
+		blockedUsers,
+		isModerator: isModerator(me)
 	};
 };
