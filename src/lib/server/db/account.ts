@@ -15,6 +15,8 @@ import {
 	mutedKeyword,
 	notification,
 	notificationOptOut,
+	pollOption,
+	pollVote,
 	post,
 	postComment,
 	postDraft,
@@ -31,7 +33,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 13;
+export const EXPORT_FORMAT_VERSION = 14;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -52,6 +54,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		likes,
 		saves,
 		shares,
+		pollVotes,
 		reactions,
 		following,
 		followers,
@@ -112,6 +115,16 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.select({ postId: postShare.postId, createdAt: postShare.createdAt })
 			.from(postShare)
 			.where(eq(postShare.userId, userId)),
+		db
+			.select({
+				postId: pollVote.postId,
+				option: pollOption.label,
+				createdAt: pollVote.createdAt
+			})
+			.from(pollVote)
+			.innerJoin(pollOption, eq(pollOption.id, pollVote.optionId))
+			.where(eq(pollVote.userId, userId))
+			.orderBy(asc(pollVote.createdAt)),
 		db
 			.select({
 				commentId: commentReaction.commentId,
@@ -311,6 +324,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		likes,
 		saves,
 		shares,
+		pollVotes,
 		commentReactions: reactions,
 		following,
 		followers,
@@ -370,8 +384,8 @@ export interface DeleteAccountResult {
  * Deletes a user and everything they own (GDPR art. 17). Foreign keys cascade the rows (sessions,
  * accounts, posts, comments, likes, follows, messages...); one D1 batch (one transaction) deletes
  * the user, their DMs, and recomputes the denormalized counters of other users' rows that lose
- * likes, reposts, comments, replies, reactions, follows or story views. Media on our R2 bucket is
- * removed afterwards; R2 failures are logged and do not undo the deletion.
+ * likes, reposts, poll votes, comments, replies, reactions, follows or story views. Media on our R2
+ * bucket is removed afterwards; R2 failures are logged and do not undo the deletion.
  */
 export async function deleteAccount(
 	db: Database,
@@ -389,6 +403,7 @@ export async function deleteAccount(
 		followers,
 		liked,
 		reposted,
+		voted,
 		commented,
 		replyParents,
 		reacted,
@@ -419,6 +434,7 @@ export async function deleteAccount(
 			.select({ id: post.repostOfId })
 			.from(post)
 			.where(and(eq(post.userId, userId), isNotNull(post.repostOfId))),
+		db.select({ id: pollVote.optionId }).from(pollVote).where(eq(pollVote.userId, userId)),
 		// Replies by others to the user's comments are on the same posts, so this covers them.
 		db
 			.selectDistinct({ id: postComment.postId })
@@ -486,6 +502,14 @@ export async function deleteAccount(
 					repostsCount: sql`(select count(*) from ${post} as r where r.repost_of_id = ${post.id} and r.deleted_at is null)`
 				})
 				.where(inArray(post.id, ids))
+		),
+		...chunks(unique(voted.map((v) => v.id))).map((ids) =>
+			db
+				.update(pollOption)
+				.set({
+					votesCount: sql`(select count(*) from ${pollVote} where ${pollVote.optionId} = ${pollOption.id})`
+				})
+				.where(inArray(pollOption.id, ids))
 		),
 		...chunks(unique(commented.map((c) => c.id))).map((ids) =>
 			db

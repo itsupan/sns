@@ -20,6 +20,7 @@
 	import FormatToolbar from '$lib/components/shared/FormatToolbar.svelte';
 	import MentionSuggest from '$lib/components/shared/MentionSuggest.svelte';
 	import TextPostPicker from './TextPostPicker.svelte';
+	import PollEditor from './PollEditor.svelte';
 	import { formatShortcuts } from '$lib/formatting-editor';
 	import { ASPECT_RATIOS as ratios, POST_TYPES as types, PostDraft } from './post-draft.svelte';
 
@@ -254,6 +255,7 @@
 		{draft}
 		id="mobile-composer"
 		onsubmit={publish}
+		allowPoll
 		beforeAddMedia={() => requireLogin('Please log in to upload media')}
 	/>
 	<div class="px-3 pb-3">
@@ -329,6 +331,7 @@
 
 				{#if draft.isText}
 					<TextPostPicker {draft} />
+					<PollEditor {draft} />
 				{/if}
 
 				<!-- Multiple Media Preview / Sequence Tray (Desktop) -->
