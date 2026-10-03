@@ -10,3 +10,10 @@ export function isStoryExpired(id: string, now = Date.now()): boolean {
 	const createdAt = Number(id.slice(id.lastIndexOf(':') + 1));
 	return !(createdAt + STORY_TTL_SEC * 1000 > now);
 }
+
+const storyDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+
+/** The day a story was shared, in the viewer's locale and time zone: "Oct 3, 2026". */
+export function formatStoryDate(createdAt: number): string {
+	return storyDateFormat.format(createdAt);
+}

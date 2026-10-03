@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ProfileHeader from '$lib/components/profile/ProfileHeader.svelte';
+	import HighlightsRow from '$lib/components/profile/HighlightsRow.svelte';
 	import ProfileTabs from '$lib/components/profile/ProfileTabs.svelte';
 	import ProfileGrid from '$lib/components/profile/ProfileGrid.svelte';
 	import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
@@ -76,6 +77,18 @@
 	<div class="w-full max-w-6xl mx-auto px-0 sm:px-6 lg:px-8 py-0 sm:py-6 flex flex-col">
 		<!-- Profile Header (Responsive: Mobile Profile Bar / Desktop Master Curator Card) -->
 		<ProfileHeader user={data?.user} profile={data?.stats} />
+
+		{#if data}
+			<HighlightsRow
+				owner={{
+					id: data.user.id,
+					name: currentProfile.name,
+					handle: currentProfile.handle,
+					image: currentProfile.avatar || null
+				}}
+				isOwner
+			/>
+		{/if}
 
 		<!-- Tabs Bar (Responsive: Mobile Icon Tabs / Desktop Filter Pills) -->
 		<ProfileTabs bind:activeTab bind:viewMode showSaved />

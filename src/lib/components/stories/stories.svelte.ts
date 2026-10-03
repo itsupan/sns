@@ -24,6 +24,8 @@ export interface Story {
 export interface StoryGroup {
 	user: { id: string; name: string; handle: string | null; image: string | null };
 	isSelf: boolean;
+	/** Shown in place of the author's name, e.g. a highlight's title. */
+	title?: string;
 	/** Oldest first: the order they are watched in. */
 	stories: Story[];
 }

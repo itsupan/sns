@@ -151,6 +151,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | `comment`        | `RATE_LIMIT_COMMENT`         | `POST /api/posts/:id/comments`                                       | 20 / min  |
 | `reaction`       | `RATE_LIMIT_REACTION`        | `POST /api/comments/:id/reactions`                                   | 60 / min  |
 | `storyReaction`  | `RATE_LIMIT_STORY_REACTION`  | `POST /api/stories/:id/react`                                        | 60 / min  |
+| `highlight`      | `RATE_LIMIT_HIGHLIGHT`       | create, edit or delete a highlight (`/api/highlights`)               | 30 / min  |
 | `search`         | `RATE_LIMIT_SEARCH`          | `GET /api/search` (per user, or per IP when signed out)              | 60 / min  |
 | `chatStart`      | `RATE_LIMIT_CHAT_START`      | `POST /api/conversations`                                            | 10 / min  |
 | `chatMessage`    | `RATE_LIMIT_CHAT_MESSAGE`    | `POST /api/conversations/:id/messages`                               | 30 / min  |
@@ -262,6 +263,8 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `PROFILE_MAX_PAGE_SIZE`       | integer                       | `36`                                        |
 | `STORY_VIEWERS_PAGE_SIZE`     | integer (≤ max)               | `20` (story viewers list page)              |
 | `STORY_VIEWERS_MAX_PAGE_SIZE` | integer                       | `50`                                        |
+| `STORY_ARCHIVE_PAGE_SIZE`     | integer (≤ max)               | `24` (story archive page)                   |
+| `STORY_ARCHIVE_MAX_PAGE_SIZE` | integer                       | `48`                                        |
 | `MEDIA_URL_TTL_SECONDS`       | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                           |
 | `IMAGE_TRANSFORMS`            | `on` or `off`                 | `off`                                       |
 | `SIGNUP_BLOCKED_EMAILS`       | comma-separated emails        | empty (nobody blocked)                      |

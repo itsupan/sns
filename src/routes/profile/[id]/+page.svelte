@@ -1,5 +1,6 @@
 <script lang="ts">
 	import ProfileHeader from '$lib/components/profile/ProfileHeader.svelte';
+	import HighlightsRow from '$lib/components/profile/HighlightsRow.svelte';
 	import ProfileTabs from '$lib/components/profile/ProfileTabs.svelte';
 	import ProfileGrid from '$lib/components/profile/ProfileGrid.svelte';
 	import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
@@ -132,6 +133,8 @@
 				</p>
 			</div>
 		{:else}
+			<HighlightsRow owner={data.targetUser} isOwner={data.isOwnProfile} />
+
 			<!-- Tabs Bar -->
 			<ProfileTabs bind:activeTab bind:viewMode showSaved={data.isOwnProfile} />
 
