@@ -77,6 +77,8 @@
 		commentPreview?: PostComment;
 		liked?: boolean;
 		saved?: boolean;
+		/** Pinned to the top of the author's profile. */
+		pinned?: boolean;
 	}
 
 	interface Props {
@@ -93,6 +95,8 @@
 		showFollow?: boolean;
 		/** Show the whole description instead of clamping it behind "See more" (the post page). */
 		fullText?: boolean;
+		/** Mark the post when it is pinned (profile pages, where pinned posts lead). */
+		showPinned?: boolean;
 	}
 
 	// eslint-disable-next-line svelte/no-unused-props -- `post` is spread into the edited copy below, so its fields are read through it.
@@ -105,7 +109,8 @@
 		onDelete,
 		onUpdate,
 		showFollow = true,
-		fullText = false
+		fullText = false,
+		showPinned = false
 	}: Props = $props();
 
 	const session = authClient.useSession();
@@ -151,9 +156,11 @@
 	let editOpen = $state(false);
 	let confirmDeleteOpen = $state(false);
 	let deleting = $state(false);
+	let pinning = $state(false);
 
 	let likedOverride = $state<boolean | null>(null);
 	let savedOverride = $state<boolean | null>(null);
+	let pinnedOverride = $state<boolean | null>(null);
 	let likesDelta = $state(0);
 	let likePop = $state(0);
 	let burst = $state(0);
@@ -263,6 +270,7 @@
 
 	let isLiked = $derived(likedOverride !== null ? likedOverride : (post.liked ?? false));
 	let isSaved = $derived(savedOverride !== null ? savedOverride : (post.saved ?? false));
+	let isPinned = $derived(pinnedOverride ?? post.pinned ?? false);
 	let likesCount = $derived(post.likes + likesDelta);
 	let sharesCount = $derived(post.sharesCount + sharesDelta);
 	let displayCommentsCount = $derived(post.commentsCount + commentsDelta);
@@ -503,6 +511,28 @@
 		}
 	}
 
+	async function togglePin() {
+		optionsOpen = false;
+		if (pinning) return;
+		pinning = true;
+		const pin = !isPinned;
+		try {
+			const res = await fetch(`/api/posts/${post.id}/pin`, { method: pin ? 'PUT' : 'DELETE' });
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				toast.show(readApiError(body, 'Could not update pinned posts').message);
+				return;
+			}
+			pinnedOverride = pin;
+			toast.show(pin ? 'Pinned to your profile' : 'Unpinned from your profile');
+			onUpdate?.({ ...post, pinned: pin });
+		} catch {
+			toast.show('Could not update pinned posts');
+		} finally {
+			pinning = false;
+		}
+	}
+
 	const actionButton =
 		'min-w-11 h-11 -my-1 flex items-center justify-center gap-1.5 rounded-full transition cursor-pointer border-0 bg-transparent active:scale-90';
 </script>
@@ -514,6 +544,15 @@
 		aria-labelledby={post.title ? `post-title-${post.id}` : undefined}
 		aria-label={post.title ? undefined : `Post by ${post.author.name}`}
 	>
+		{#if showPinned && isPinned}
+			<p
+				class="flex items-center gap-1.5 px-4 lg:px-0 mb-2 text-xs font-semibold text-slate-500 dark:text-dark-muted"
+			>
+				<Icon name="pin" class="text-xs" />
+				Pinned
+			</p>
+		{/if}
+
 		<!-- Post Header: Author info & options -->
 		<header class="flex items-center justify-between px-4 lg:px-0">
 			<div class="flex items-center gap-3 min-w-0">
@@ -907,6 +946,11 @@
 	<BottomSheet bind:open={optionsOpen} title="Post options">
 		{#if isOwner}
 			<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+			<SheetAction
+				icon={isPinned ? 'pin-off' : 'pin'}
+				label={isPinned ? 'Unpin' : 'Pin to profile'}
+				onclick={togglePin}
+			/>
 			<SheetAction
 				icon="trash"
 				label="Delete post"

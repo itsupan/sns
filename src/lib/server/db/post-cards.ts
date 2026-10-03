@@ -114,6 +114,7 @@ export async function toPostCards(
 			likedBy: likers.get(r.post.id),
 			liked: viewer.liked.has(r.post.id),
 			saved: viewer.saved.has(r.post.id),
+			pinned: r.post.pinnedAt !== null,
 			commentPreview: commentPreview.get(r.post.id)
 		};
 	});
