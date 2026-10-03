@@ -32,9 +32,13 @@ export type RateLimitName =
 	| 'mediaRefresh'
 	| 'accountExport'
 	| 'report'
+	| 'moderation'
 	| 'accountDelete'
 	| 'signIn'
 	| 'signUp'
+	| 'authEmail'
+	| 'passwordChange'
+	| 'sessionRevoke'
 	| 'profileUpdate'
 	| 'contentEdit'
 	| 'markRead'
@@ -59,11 +63,19 @@ export interface AppConfig {
 	activity: PageSize;
 	/** Explore and tag-page grids. */
 	explore: PageSize;
+	/** A profile's posts grid. */
+	profile: PageSize;
+	/** Who watched one of your stories. */
+	storyViewers: PageSize;
+	/** The moderation queue and the moderator list. */
+	moderation: PageSize;
 	/** Chat history pages and the conversations inbox. */
 	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
 	mediaUrlTtlSec: number;
-	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
+	/** Serve resized copies of our images through Cloudflare Image Transformations. */
+	imageTransforms: boolean;
+	/** Normalized emails (see `normalizeEmail`) that may not sign up or be moved to. */
 	auth: { blockedSignupEmails: ReadonlySet<string> };
 }
 
@@ -89,9 +101,13 @@ export const DEFAULT_CONFIG: AppConfig = {
 		mediaRefresh: { limit: 60, windowSec: 60 },
 		accountExport: { limit: 5, windowSec: 3600 },
 		report: { limit: 10, windowSec: 3600 },
+		moderation: { limit: 120, windowSec: 60 },
 		accountDelete: { limit: 5, windowSec: 3600 },
 		signIn: { limit: 10, windowSec: 60 },
 		signUp: { limit: 5, windowSec: 3600 },
+		authEmail: { limit: 5, windowSec: 3600 },
+		passwordChange: { limit: 10, windowSec: 3600 },
+		sessionRevoke: { limit: 30, windowSec: 60 },
 		profileUpdate: { limit: 10, windowSec: 60 },
 		contentEdit: { limit: 30, windowSec: 60 },
 		markRead: { limit: 120, windowSec: 60 },
@@ -116,11 +132,15 @@ export const DEFAULT_CONFIG: AppConfig = {
 	saved: { defaultPageSize: 12, maxPageSize: 50 },
 	activity: { defaultPageSize: 20, maxPageSize: 50 },
 	explore: { defaultPageSize: 18, maxPageSize: 36 },
+	profile: { defaultPageSize: 18, maxPageSize: 36 },
+	storyViewers: { defaultPageSize: 20, maxPageSize: 50 },
+	moderation: { defaultPageSize: 20, maxPageSize: 50 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
 		inbox: { defaultPageSize: 20, maxPageSize: 50 }
 	},
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
+	imageTransforms: false,
 	auth: { blockedSignupEmails: new Set() }
 };
 
@@ -144,9 +164,13 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	mediaRefresh: 'RATE_LIMIT_MEDIA_REFRESH',
 	accountExport: 'RATE_LIMIT_ACCOUNT_EXPORT',
 	report: 'RATE_LIMIT_REPORT',
+	moderation: 'RATE_LIMIT_MODERATION',
 	accountDelete: 'RATE_LIMIT_ACCOUNT_DELETE',
 	signIn: 'RATE_LIMIT_SIGN_IN',
 	signUp: 'RATE_LIMIT_SIGN_UP',
+	authEmail: 'RATE_LIMIT_AUTH_EMAIL',
+	passwordChange: 'RATE_LIMIT_PASSWORD_CHANGE',
+	sessionRevoke: 'RATE_LIMIT_SESSION_REVOKE',
 	profileUpdate: 'RATE_LIMIT_PROFILE_UPDATE',
 	contentEdit: 'RATE_LIMIT_CONTENT_EDIT',
 	markRead: 'RATE_LIMIT_MARK_READ',
@@ -154,6 +178,13 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 };
 
 const PositiveInt = v.pipe(v.string(), v.trim(), v.regex(/^\d+$/), v.toNumber(), v.minValue(1));
+
+const OnOff = v.pipe(
+	v.string(),
+	v.trim(),
+	v.regex(/^(on|off)$/),
+	v.transform((value) => value === 'on')
+);
 
 const RateLimitVar = v.pipe(
 	v.string(),
@@ -257,6 +288,9 @@ export function loadConfig(env: object | undefined): AppConfig {
 		saved: pageSize('SAVED', d.saved),
 		activity: pageSize('ACTIVITY', d.activity),
 		explore: pageSize('EXPLORE', d.explore),
+		profile: pageSize('PROFILE', d.profile),
+		storyViewers: pageSize('STORY_VIEWERS', d.storyViewers),
+		moderation: pageSize('MODERATION', d.moderation),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),
 			inbox: pageSize('INBOX', d.chat.inbox)
@@ -265,6 +299,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 			read(vars, 'MEDIA_URL_TTL_SECONDS', PositiveInt, d.mediaUrlTtlSec),
 			MAX_SIGV4_TTL_SEC
 		),
+		imageTransforms: read(vars, 'IMAGE_TRANSFORMS', OnOff, d.imageTransforms),
 		auth: {
 			blockedSignupEmails: read(
 				vars,

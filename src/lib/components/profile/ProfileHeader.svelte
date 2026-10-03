@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import Avatar from '$lib/components/shared/Avatar.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import SheetAction from '$lib/components/shared/SheetAction.svelte';
@@ -11,15 +12,20 @@
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { readApiError } from '$lib/utils/api-error';
-	import { formatCount } from '$lib/utils/format';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import { displayHandle, formatCount } from '$lib/utils/format';
+	import {
+		FOLLOW_LABELS,
+		followStore,
+		followToast,
+		type FollowStatus
+	} from '$lib/utils/follow.svelte';
 
 	import { profileStore, resolveProfile, type ProfileData } from '$lib/utils/profile.svelte';
 
 	interface Props {
 		profile?: Partial<ProfileData>;
 		class?: string;
-		onFollowChange?: (following: boolean) => void;
+		onFollowChange?: (status: FollowStatus) => void;
 		user?: Record<string, unknown> | null;
 		/** Block state between the viewer and this (other) user, for the Block / Unblock action. */
 		block?: { blocked: boolean; blockedBy: boolean };
@@ -76,12 +82,14 @@
 	});
 
 	// Shared with post cards, so following from the feed shows here too (and the other way round).
-	let loadedFollowing = $derived(customProfile?.isFollowing ?? false);
-	let isFollowing = $derived(
-		profile.id ? followStore.isFollowing(profile.id, loadedFollowing) : loadedFollowing
+	let loadedStatus = $derived(customProfile?.followStatus ?? 'none');
+	let followStatus = $derived(
+		profile.id ? followStore.status(profile.id, loadedStatus) : loadedStatus
 	);
 	let followersCount = $derived(
-		profile.followersCount + (isFollowing === loadedFollowing ? 0 : isFollowing ? 1 : -1)
+		profile.followersCount +
+			Number(followStatus === 'following') -
+			Number(loadedStatus === 'following')
 	);
 
 	async function toggleFollow() {
@@ -101,11 +109,10 @@
 		}
 
 		if (!profile.id || followStore.isPending(profile.id)) return;
-		const next = !isFollowing;
 		try {
-			await followStore.set(profile.id, next);
-			onFollowChange?.(next);
-			toast.show(next ? `Following ${profile.name}` : `Unfollowed ${profile.name}`);
+			const { status } = await followStore.set(profile.id, followStatus === 'none');
+			onFollowChange?.(status);
+			toast.show(followToast(status, profile.name));
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -218,24 +225,15 @@
 	>
 		<div class="profile-grid gap-x-4 sm:gap-x-6 gap-y-4 sm:gap-y-6 items-center sm:items-start">
 			<!-- 1. AVATAR -->
-			<div class="area-avatar relative shrink-0">
-				<div
-					class="size-20 sm:size-24 lg:size-28 rounded-full overflow-hidden ring-2 sm:ring-4 ring-slate-100 dark:ring-dark-border sm:dark:ring-dark-elevated shadow-xs sm:shadow-sm bg-slate-100 dark:bg-dark-elevated flex items-center justify-center shrink-0"
-				>
-					{#if profile.avatar}
-						<img
-							src={profile.avatar}
-							alt={profile.name || 'Profile photo'}
-							class="w-full h-full object-cover"
-						/>
-					{:else}
-						<span
-							class="font-bold text-2xl sm:text-3xl text-slate-600 dark:text-dark-text select-none"
-						>
-							{profile.name ? profile.name.slice(0, 1).toUpperCase() : 'U'}
-						</span>
-					{/if}
-				</div>
+			<div class="area-avatar relative flex shrink-0">
+				<Avatar
+					src={profile.avatar}
+					name={profile.name}
+					alt={profile.name || 'Profile photo'}
+					size="3xl"
+					loading="eager"
+					class="rounded-full ring-2 sm:ring-4 ring-slate-100 dark:ring-dark-border sm:dark:ring-dark-elevated shadow-xs sm:shadow-sm"
+				/>
 
 				<!-- Mobile Camera overlay button -->
 				{#if profile.isOwnProfile}
@@ -247,16 +245,6 @@
 					>
 						<Icon name="camera" class="text-xs" />
 					</button>
-				{/if}
-
-				<!-- Desktop Verified Badge -->
-				{#if profile.isVerified}
-					<div
-						class="hidden sm:flex absolute bottom-1 right-1 size-6 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 items-center justify-center shadow-md ring-2 ring-white dark:ring-dark-card"
-						title="Verified Curator"
-					>
-						<Icon name="check" class="text-xs" />
-					</div>
 				{/if}
 			</div>
 
@@ -340,7 +328,7 @@
 
 				<!-- Desktop Handle & Subtitle -->
 				<div class="hidden sm:flex items-center gap-2 text-sm text-slate-500 dark:text-dark-muted">
-					<span>@{profile.handle}</span>
+					<span>{displayHandle(profile.handle, profile.name)}</span>
 					{#if profile.title}
 						<span>•</span>
 						<span class="font-medium text-slate-700 dark:text-dark-text">{profile.title}</span>
@@ -383,7 +371,7 @@
 
 						{#if profile.location}
 							<div class="hidden sm:inline-flex items-center gap-1.5">
-								<Icon name="marker" class="text-xs shrink-0" />
+								<Icon name="map-marker" class="text-xs shrink-0" />
 								<span>{profile.location}</span>
 							</div>
 						{/if}
@@ -440,6 +428,8 @@
 									role="menuitem"
 									onclick={() => {
 										desktopDropdownOpen = false;
+										// The menu unmounts; the share dialog hands focus back to its button.
+										settingsButtonRef?.focus();
 										handleShare();
 									}}
 								>
@@ -492,17 +482,19 @@
 					<!-- Follow / Following Button -->
 					<button
 						type="button"
-						class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full flex items-center justify-center gap-1.5 font-semibold text-xs transition-all duration-150 cursor-pointer border {isFollowing
+						class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full flex items-center justify-center gap-1.5 font-semibold text-xs transition-all duration-150 cursor-pointer border {followStatus !==
+						'none'
 							? 'bg-black text-white dark:bg-white dark:text-black border-transparent sm:border-slate-200 sm:dark:border-dark-border sm:bg-slate-100 sm:dark:bg-dark-elevated sm:text-slate-900 sm:dark:text-white sm:hover:bg-dark-hover'
 							: 'bg-blue-600 text-white sm:bg-slate-950 sm:dark:bg-white sm:text-white sm:dark:text-slate-950 border-transparent hover:opacity-90'}"
+						aria-pressed={followStatus !== 'none'}
 						onclick={toggleFollow}
 					>
-						{#if isFollowing}
+						{#if followStatus === 'following'}
 							<Icon name="check" class="text-xs" />
-							<span>Following</span>
-							<Icon name="angle-small-down" class="hidden sm:inline-block text-xs ml-0.5" />
-						{:else}
-							<span>Follow</span>
+						{/if}
+						<span>{FOLLOW_LABELS[followStatus]}</span>
+						{#if followStatus === 'following'}
+							<Icon name="angle-down" class="hidden sm:inline-block text-xs ml-0.5" />
 						{/if}
 					</button>
 

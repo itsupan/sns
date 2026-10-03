@@ -110,7 +110,7 @@ export async function toPostCards(
 			tags: tagsByPost.get(r.post.id) ?? [],
 			likes: r.post.likesCount,
 			commentsCount: r.post.commentsCount,
-			repostsCount: r.post.sharesCount,
+			sharesCount: r.post.sharesCount,
 			likedBy: likers.get(r.post.id),
 			liked: viewer.liked.has(r.post.id),
 			saved: viewer.saved.has(r.post.id),

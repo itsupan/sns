@@ -3,9 +3,29 @@ import type { Database } from '.';
 import { post, postComment, postLike, postMedia, postTag, tag, user } from './schema';
 import { MAX_TAGS_PER_POST } from '$lib/constants/post-limits';
 import { notBlockedWith } from './blocks';
+import { notPrivateTo, visibleTo } from './visibility';
+import { ApiError } from '$lib/server/api/errors';
 
 /** Every read or write of a post must exclude soft-deleted rows (see `post.deletedAt`). */
 export const notDeleted = isNull(post.deletedAt);
+
+/**
+ * The live post `postId` with its author, or a 404 when it is missing, deleted, or by a private
+ * account the viewer does not follow. Blocks are left to `requireNotBlocked`, which answers 403.
+ */
+export async function requireVisiblePost(
+	db: Database,
+	viewerId: string | null | undefined,
+	postId: string
+) {
+	const [row] = await db
+		.select({ id: post.id, authorId: post.userId, sharesCount: post.sharesCount })
+		.from(post)
+		.where(and(eq(post.id, postId), notDeleted, notPrivateTo(viewerId, post.userId)))
+		.limit(1);
+	if (!row) throw new ApiError(404, 'not_found', 'Post not found');
+	return row;
+}
 
 /** Position in the feed: the last post seen, ordered by (created_at, id) descending. */
 export interface FeedCursor {
@@ -55,7 +75,7 @@ export async function loadFeedPage(
 		.where(
 			and(
 				notDeleted,
-				notBlockedWith(viewerId, post.userId),
+				visibleTo(viewerId, post.userId),
 				cursor
 					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined
@@ -77,6 +97,8 @@ export async function loadFeedPage(
 export interface MediaItem {
 	url: string;
 	type: 'image' | 'video';
+	/** Author-written description for screen readers. */
+	alt?: string;
 }
 
 /** Media for many posts in one query, keyed by post id and ordered by position. */
@@ -88,15 +110,21 @@ export async function loadPostMedia(
 	if (postIds.length === 0) return byPost;
 
 	const rows = await db
-		.select({ postId: postMedia.postId, url: postMedia.url, type: postMedia.type })
+		.select({
+			postId: postMedia.postId,
+			url: postMedia.url,
+			type: postMedia.type,
+			alt: postMedia.alt
+		})
 		.from(postMedia)
 		.where(inArray(postMedia.postId, postIds))
 		.orderBy(asc(postMedia.postId), asc(postMedia.position));
 
-	for (const { postId, url, type } of rows) {
+	for (const { postId, url, type, alt } of rows) {
+		const item: MediaItem = { url, type, alt: alt ?? undefined };
 		const items = byPost.get(postId);
-		if (items) items.push({ url, type });
-		else byPost.set(postId, [{ url, type }]);
+		if (items) items.push(item);
+		else byPost.set(postId, [item]);
 	}
 	return byPost;
 }
@@ -104,19 +132,21 @@ export async function loadPostMedia(
 const VIDEO_URL = /\.(mp4|webm|mov)(\?.*)?$/i;
 
 /**
- * Cleans a `mediaUrls` payload (`[{ url, type? }]`) from the composer: drops blank entries and
- * infers video from the declared type or the file extension. Order is kept (first = cover).
+ * Cleans a `mediaUrls` payload (`[{ url, type?, alt? }]`) from the composer: drops blank entries,
+ * infers video from the declared type or the file extension and trims alt text, dropping it when
+ * blank. Order is kept (first = cover).
  */
 export function normalizeMedia(input: unknown): MediaItem[] {
 	if (!Array.isArray(input)) return [];
 	return input
 		.filter(
-			(m): m is { url: string; type?: string } =>
+			(m): m is { url: string; type?: string; alt?: unknown } =>
 				typeof m === 'object' && m !== null && typeof m.url === 'string' && m.url.trim().length > 0
 		)
 		.map((m) => ({
 			url: m.url.trim(),
-			type: m.type === 'video' || VIDEO_URL.test(m.url) ? 'video' : 'image'
+			type: m.type === 'video' || VIDEO_URL.test(m.url) ? 'video' : 'image',
+			alt: (typeof m.alt === 'string' && m.alt.trim()) || undefined
 		}));
 }
 

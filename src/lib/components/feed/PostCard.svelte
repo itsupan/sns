@@ -13,8 +13,14 @@
 	import PostCommentsModal from './PostCommentsModal.svelte';
 	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
+	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { readApiError } from '$lib/utils/api-error';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import {
+		FOLLOW_LABELS,
+		followStore,
+		followToast,
+		type FollowStatus
+	} from '$lib/utils/follow.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
@@ -40,6 +46,8 @@
 	export interface MediaItem {
 		url: string;
 		type: 'image' | 'video';
+		/** Author-written description for screen readers. */
+		alt?: string;
 	}
 
 	export interface PostData {
@@ -62,14 +70,14 @@
 		/** Most recent liker other than the viewer, for the "Liked by" line. */
 		likedBy?: string;
 		commentsCount: number;
-		repostsCount: number;
+		sharesCount: number;
 		commentPreview?: PostComment;
 		liked?: boolean;
 		saved?: boolean;
 	}
 
 	interface Props {
-		post?: PostData;
+		post: PostData;
 		class?: string;
 		/** Load the image eagerly (first post in the feed, for LCP). */
 		priority?: boolean;
@@ -84,53 +92,8 @@
 		fullText?: boolean;
 	}
 
-	const defaultPost: PostData = {
-		id: 'post-1',
-		author: {
-			name: 'Elena Rostova',
-			handle: '@elena.rostova',
-			avatar:
-				'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-			location: 'Copenhagen, Denmark',
-			timeAgo: '3h ago'
-		},
-		title: 'Quiet Brutalism: Concrete Light & Shadows',
-		description:
-			'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.',
-		image:
-			'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-		mediaItems: [
-			{
-				url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			}
-		],
-		aspectRatio: '4:5',
-		location: 'Fondazione Prada, Milano',
-		tags: ['#MinimalArchitecture', '#LightAndSpace', '#DesignArchive'],
-		likes: 842,
-		commentsCount: 46,
-		repostsCount: 12,
-		commentPreview: {
-			author: 'marcus_k',
-			content: 'The texture gradation is immaculate. Concrete takes light like velvet here.'
-		}
-	};
-
 	let {
-		post: postProp = defaultPost,
+		post: postProp,
 		class: className = '',
 		priority = false,
 		onLike,
@@ -149,7 +112,7 @@
 	let post = $derived<PostData>(edits ? { ...postProp, ...edits } : postProp);
 	let isOwner = $derived(Boolean(post.author.id && $session.data?.user?.id === post.author.id));
 
-	// Author's profile: your own posts go to /profile, demo posts without an id use the handle.
+	// Author's profile: your own posts go to /profile, authors without an id fall back to the handle.
 	let profileHref = $derived(
 		isOwner
 			? resolve('/profile')
@@ -157,8 +120,10 @@
 					id: post.author.id ?? post.author.handle.replace(/^@/, '')
 				})
 	);
-	let followingAuthor = $derived(
-		post.author.id ? followStore.isFollowing(post.author.id, post.author.isFollowing) : false
+	let followStatus = $derived<FollowStatus>(
+		post.author.id
+			? followStore.status(post.author.id, post.author.isFollowing ? 'following' : 'none')
+			: 'none'
 	);
 	let canFollow = $derived(showFollow && Boolean(post.author.id) && !isOwner);
 
@@ -172,10 +137,9 @@
 			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
 			return;
 		}
-		const next = !followingAuthor;
 		try {
-			await followStore.set(authorId, next);
-			toast.show(next ? `Following ${post.author.name}` : `Unfollowed ${post.author.name}`);
+			const { status } = await followStore.set(authorId, followStatus === 'none');
+			toast.show(followToast(status, post.author.name));
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -296,7 +260,7 @@
 	let isLiked = $derived(likedOverride !== null ? likedOverride : (post.liked ?? false));
 	let isSaved = $derived(savedOverride !== null ? savedOverride : (post.saved ?? false));
 	let likesCount = $derived(post.likes + likesDelta);
-	let sharesCount = $derived(post.repostsCount + sharesDelta);
+	let sharesCount = $derived(post.sharesCount + sharesDelta);
 	let displayCommentsCount = $derived(post.commentsCount + commentsDelta);
 	let activeCommentPreview = $derived(latestCommentPreview || post.commentPreview);
 
@@ -444,7 +408,7 @@
 			const res = await fetch(`/api/posts/${post.id}/share`, { method: 'POST' });
 			const body = (await res.json().catch(() => null)) as { sharesCount?: number } | null;
 			if (res.ok && typeof body?.sharesCount === 'number') {
-				sharesDelta = body.sharesCount - post.repostsCount;
+				sharesDelta = body.sharesCount - post.sharesCount;
 			}
 		} catch {
 			// The share itself already happened; only the counter is left unchanged.
@@ -547,13 +511,14 @@
 							<span class="text-xs text-slate-400 dark:text-dark-subtle" aria-hidden="true">•</span>
 							<button
 								type="button"
-								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followingAuthor
+								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followStatus !==
+								'none'
 									? 'text-slate-500 dark:text-dark-muted hover:text-slate-800 dark:hover:text-dark-text'
 									: 'text-blue-600 dark:text-kizuna-blue hover:text-blue-700'}"
-								aria-pressed={followingAuthor}
+								aria-pressed={followStatus !== 'none'}
 								onclick={toggleFollowAuthor}
 							>
-								{followingAuthor ? 'Following' : 'Follow'}
+								{FOLLOW_LABELS[followStatus]}
 							</button>
 						{/if}
 					</div>
@@ -679,7 +644,10 @@
 				{:else}
 					<img
 						src={activeMediaUrl}
-						alt={post.title || `Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+						alt={currentMedia.alt ||
+							post.title ||
+							`Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+						srcset={imageSrcset(activeMediaUrl, FEED_IMAGE_WIDTHS)}
 						sizes="(min-width: 672px) 672px, 100vw"
 						class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
 						loading={priority && activeSlide === 0 ? 'eager' : 'lazy'}
@@ -906,37 +874,42 @@
 	</article>
 {/if}
 
-<BottomSheet bind:open={optionsOpen} title="Post options">
-	{#if isOwner}
-		<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+<!-- Mounted only while open: a feed of idle cards carries no dialogs. -->
+{#if optionsOpen}
+	<BottomSheet bind:open={optionsOpen} title="Post options">
+		{#if isOwner}
+			<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+			<SheetAction
+				icon="trash"
+				label="Delete post"
+				danger
+				onclick={() => {
+					optionsOpen = false;
+					confirmDeleteOpen = true;
+				}}
+			/>
+		{/if}
 		<SheetAction
-			icon="trash"
-			label="Delete post"
-			danger
+			icon="bookmark"
+			label={isSaved ? 'Remove from saved' : 'Save'}
 			onclick={() => {
 				optionsOpen = false;
-				confirmDeleteOpen = true;
+				toggleSave();
 			}}
 		/>
-	{/if}
-	<SheetAction
-		icon="bookmark"
-		label={isSaved ? 'Remove from saved' : 'Save'}
-		onclick={() => {
-			optionsOpen = false;
-			toggleSave();
-		}}
-	/>
-	<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
-	<SheetAction icon="link" label="Copy link" onclick={copyLink} />
-	{#if !isOwner}
-		<SheetAction icon="flag" label="Report" danger onclick={openReport} />
-	{/if}
-</BottomSheet>
+		<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
+		<SheetAction icon="link" label="Copy link" onclick={copyLink} />
+		{#if !isOwner}
+			<SheetAction icon="flag" label="Report" danger onclick={openReport} />
+		{/if}
+	</BottomSheet>
+{/if}
 
-{#if isOwner}
+{#if editOpen}
 	<EditPostModal bind:open={editOpen} {post} onSaved={handleEdited} />
+{/if}
 
+{#if confirmDeleteOpen}
 	<BottomSheet bind:open={confirmDeleteOpen} title="Delete post?" showTitle>
 		<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
 			This removes the post from your profile and everyone's feed. You can't undo this.
@@ -963,14 +936,19 @@
 	</BottomSheet>
 {/if}
 
-{#if !isOwner}
+{#if reportOpen}
 	<ReportSheet bind:open={reportOpen} targetType="post" targetId={post.id} />
 {/if}
 
-<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
-<PostCommentsModal
-	bind:open={commentsOpen}
-	{post}
-	onCommentAdded={handleCommentAdded}
-	onCommentDeleted={handleCommentDeleted}
-/>
+{#if shareOpen}
+	<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
+{/if}
+
+{#if commentsOpen}
+	<PostCommentsModal
+		bind:open={commentsOpen}
+		{post}
+		onCommentAdded={handleCommentAdded}
+		onCommentDeleted={handleCommentDeleted}
+	/>
+{/if}

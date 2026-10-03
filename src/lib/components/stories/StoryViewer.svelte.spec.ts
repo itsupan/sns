@@ -115,6 +115,35 @@ describe('StoryViewer', () => {
 		);
 	});
 
+	it('opens the viewers list and the delete confirmation as dialogs of their own', async () => {
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => Response.json({ count: 0, viewers: [] }))
+		);
+		const screen = render(StoryViewer, { props: { open: true, groups } });
+		const viewer = screen.getByRole('dialog', { name: 'Stories from Me' });
+
+		const views = screen.getByRole('button', { name: '0 views, see who viewed' });
+		await views.click();
+		const panel = screen.getByRole('dialog', { name: 'Story viewers' });
+		await expect.element(panel.getByText('No one has viewed this story yet.')).toBeVisible();
+		// Arrows in the list don't move the story on.
+		await userEvent.keyboard('{ArrowRight}');
+		await userEvent.keyboard('{Escape}');
+		await expect.element(panel).not.toBeInTheDocument();
+		await expect.element(screen.getByText('My first')).toBeVisible();
+		await expect.element(views).toHaveFocus();
+
+		const remove = screen.getByRole('button', { name: 'Delete story' });
+		await remove.click();
+		const confirm = screen.getByRole('dialog', { name: 'Delete this story?' });
+		await expect.element(confirm).toBeVisible();
+		await userEvent.keyboard('{Escape}');
+		await expect.element(confirm).not.toBeInTheDocument();
+		await expect.element(viewer).toBeVisible();
+		await expect.element(remove).toHaveFocus();
+	});
+
 	it('shows the view count on your own story and lists who viewed it', async () => {
 		const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
 			if (url.endsWith('/views')) {
@@ -133,7 +162,10 @@ describe('StoryViewer', () => {
 					]
 				});
 			}
-			return Response.json({ following: init?.method === 'POST', followersCount: 1 });
+			return Response.json({
+				status: init?.method === 'POST' ? 'following' : 'none',
+				followersCount: 1
+			});
 		});
 		vi.stubGlobal('fetch', fetchMock);
 		const own: StoryGroup[] = [
@@ -159,6 +191,37 @@ describe('StoryViewer', () => {
 
 		// The story stays put while the list is open.
 		await expect.element(screen.getByText('My first')).toBeVisible();
+	});
+
+	it('shows the server view count and loads more viewers page by page', async () => {
+		const person = (id: string) => ({
+			id,
+			name: `Viewer ${id}`,
+			handle: null,
+			image: null,
+			viewedAt: now - 60_000,
+			reaction: null,
+			isFollowing: false
+		});
+		const fetchMock = vi.fn(async (url: string) =>
+			url.endsWith('?cursor=next')
+				? Response.json({ count: 3, viewers: [person('c')], nextCursor: null })
+				: Response.json({ count: 3, viewers: [person('a'), person('b')], nextCursor: 'next' })
+		);
+		vi.stubGlobal('fetch', fetchMock);
+		const own: StoryGroup[] = [
+			{ ...groups[0], stories: [{ ...groups[0].stories[0], viewCount: 1 }] }
+		];
+		const screen = render(StoryViewer, { props: { open: true, groups: own } });
+
+		await screen.getByRole('button', { name: '1 view, see who viewed' }).click();
+		const panel = screen.getByRole('dialog', { name: 'Story viewers' });
+		await expect.element(panel.getByText('3 viewers', { exact: true })).toBeVisible();
+		await expect.element(panel.getByText('Viewer c')).toBeVisible();
+		expect(fetchMock).toHaveBeenCalledWith(
+			`/api/stories/${encodeURIComponent(own[0].stories[0].id)}/views?cursor=next`
+		);
+		expect(panel.getByRole('listitem').elements()).toHaveLength(3);
 	});
 
 	it('sends a reaction and toggles it off with a second tap', async () => {

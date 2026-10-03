@@ -6,6 +6,7 @@ import { notDeleted } from './posts';
 import { displayHandle } from '$lib/utils/format';
 import { searchTermsOf } from '$lib/search';
 import { notBlockedWith } from './blocks';
+import { visibleTo } from './visibility';
 
 /**
  * Turns user input into a safe FTS5 MATCH expression, or `null` when nothing is searchable.
@@ -46,7 +47,7 @@ export interface PostResult {
 	id: string;
 	snippet: string;
 	location: string | null;
-	thumbnail: { url: string; type: 'image' | 'video' } | null;
+	thumbnail: { url: string; type: 'image' | 'video'; alt?: string } | null;
 	createdAt: Date;
 	author: { id: string; name: string; handle: string; image: string | null };
 }
@@ -107,14 +108,19 @@ export async function searchPosts(
 		.from(sql`post_fts`)
 		.innerJoin(post, sql`${post}.rowid = post_fts.rowid`)
 		.innerJoin(user, eq(user.id, post.userId))
-		.where(and(sql`post_fts MATCH ${match}`, notDeleted, notBlockedWith(viewerId, post.userId)))
+		.where(and(sql`post_fts MATCH ${match}`, notDeleted, visibleTo(viewerId, post.userId)))
 		.orderBy(rank, asc(post.id))
 		.limit(limit);
 
 	const thumbs = new Map<string, PostResult['thumbnail']>();
 	if (rows.length > 0) {
 		const media = await db
-			.select({ postId: postMedia.postId, url: postMedia.url, type: postMedia.type })
+			.select({
+				postId: postMedia.postId,
+				url: postMedia.url,
+				type: postMedia.type,
+				alt: postMedia.alt
+			})
 			.from(postMedia)
 			.where(
 				and(
@@ -125,7 +131,9 @@ export async function searchPosts(
 					eq(postMedia.position, 0)
 				)
 			);
-		for (const m of media) thumbs.set(m.postId, { url: m.url, type: m.type });
+		for (const m of media) {
+			thumbs.set(m.postId, { url: m.url, type: m.type, alt: m.alt ?? undefined });
+		}
 	}
 
 	return rows.map((r) => ({

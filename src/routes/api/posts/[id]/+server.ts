@@ -18,6 +18,7 @@ import {
 	refreshPostMediaUrls
 } from '$lib/server/services/storage';
 import {
+	MAX_ALT_LENGTH,
 	MAX_MEDIA_PER_POST,
 	MAX_POST_CONTENT_LENGTH,
 	MAX_POST_LOCATION_LENGTH,
@@ -130,6 +131,10 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 		const message = `A post can have at most ${MAX_MEDIA_PER_POST} media items`;
 		throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
 	}
+	if (media?.some((m) => (m.alt?.length ?? 0) > MAX_ALT_LENGTH)) {
+		const message = `Alt text can be at most ${MAX_ALT_LENGTH} characters`;
+		throw new ApiError(400, 'validation_failed', message, { mediaUrls: message });
+	}
 	if (media) {
 		// Kept media comes back as refreshed (presigned) URLs; store the original URL for the same object.
 		const stored = (await loadPostMedia(locals.db, [postId])).get(postId) ?? [];
@@ -210,6 +215,7 @@ export const PATCH: RequestHandler = withApi(async ({ params, locals, request, p
 										postId,
 										url: m.url,
 										type: m.type,
+										alt: m.alt ?? null,
 										position
 									}))
 								)
