@@ -4,6 +4,7 @@ import * as v from 'valibot';
 import { user } from '$lib/server/db/schema';
 import { decodeCursor } from '$lib/server/db/posts';
 import { FOLLOW_MAX_PAGE_SIZE, FOLLOW_PAGE_SIZE, listFollows } from '$lib/server/db/follows';
+import { canViewProfile } from '$lib/server/db/visibility';
 import { refreshMediaUrl } from '$lib/server/services/storage';
 import { ApiError, withApi } from './errors';
 import { parseQuery } from './validation';
@@ -22,7 +23,10 @@ const ListQuery = v.object({
 	cursor: v.optional(v.string())
 });
 
-/** GET handler for `/api/users/:id/followers` and `/following`: cursor-paginated user list. */
+/**
+ * GET handler for `/api/users/:id/followers` and `/following`: cursor-paginated user list. 403
+ * for a private account the viewer does not follow.
+ */
 export function followListHandler(direction: 'followers' | 'following') {
 	return withApi(async ({ params, url, locals, platform }: RequestEvent) => {
 		const userId = params.id;
@@ -43,11 +47,15 @@ export function followListHandler(direction: 'followers' | 'following') {
 		if (exists.length === 0) {
 			throw new ApiError(404, 'not_found', 'User not found');
 		}
+		const viewerId = locals.user?.id ?? null;
+		if (!(await canViewProfile(locals.db, viewerId, userId))) {
+			throw new ApiError(403, 'private_account', 'This account is private');
+		}
 
 		const page = await listFollows(locals.db, {
 			userId,
 			direction,
-			viewerId: locals.user?.id ?? null,
+			viewerId,
 			limit: query.limit,
 			cursor
 		});

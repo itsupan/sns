@@ -44,7 +44,9 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 const renderPage = (items: ActivityItem[], nextCursor: string | null = null) =>
-	render(Page, { props: { data: { items, nextCursor } } as never });
+	render(Page, {
+		props: { data: { items, nextCursor, requests: { users: [], nextCursor: null } } } as never
+	});
 
 describe('/activity', () => {
 	it('groups likes on the same post and shows comment text', async () => {

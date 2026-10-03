@@ -64,16 +64,16 @@ describe('profiles on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 			followingCount: 0,
 			// Deleted posts' views do not count.
 			impressionsCount: 15,
-			isFollowing: true
+			followStatus: 'following'
 		});
 		expect((await loadProfileStats(db, 'bob', null)).followingCount).toBe(1);
 		// Your own profile never shows "following yourself".
-		expect((await loadProfileStats(db, 'alice', 'alice')).isFollowing).toBe(false);
+		expect((await loadProfileStats(db, 'alice', 'alice')).followStatus).toBe('none');
 
 		await setFollowing(db, 'bob', 'alice', false);
 		expect(await loadProfileStats(db, 'alice', 'bob')).toMatchObject({
 			followersCount: 1,
-			isFollowing: false
+			followStatus: 'none'
 		});
 	});
 

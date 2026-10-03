@@ -32,7 +32,7 @@ beforeEach(() => {
 			calls.push({ url, method: init?.method ?? 'GET' });
 			if (url.startsWith('/api/explore'))
 				return Response.json({ tiles: [tile('t3')], hasMore: false });
-			return Response.json({ following: true, followersCount: 13 });
+			return Response.json({ status: 'following', followersCount: 13 });
 		})
 	);
 });

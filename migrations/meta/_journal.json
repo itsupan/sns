@@ -162,6 +162,13 @@
       "when": 1791010504773,
       "tag": "0023_moderation",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1791010550279,
+      "tag": "0024_private_accounts",
+      "breakpoints": true
     }
   ]
 }

@@ -17,7 +17,7 @@ const testProfile = {
 	followersCount: 150,
 	followingCount: 50,
 	impressionsCount: 1200,
-	isFollowing: false,
+	followStatus: 'none' as const,
 	isOwnProfile: true
 };
 

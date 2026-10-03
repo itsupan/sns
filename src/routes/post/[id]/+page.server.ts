@@ -10,6 +10,8 @@ import { refreshPostMediaUrls } from '$lib/server/services/storage';
 import { loadPostMedia, loadPostTags, loadRecentLikers, notDeleted } from '$lib/server/db/posts';
 
 import { backgroundOf, loadViewerPostState } from '$lib/server/db/post-cards';
+import { notBlockedWith } from '$lib/server/db/blocks';
+import { notPrivateTo } from '$lib/server/db/visibility';
 const FALLBACK_POSTS: PostData[] = [
 	{
 		id: 'post-1',
@@ -100,6 +102,8 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 	}
 
 	let postData: PostData | null = null;
+	// The post exists, but its author is a private account the viewer does not follow.
+	let isPrivate = false;
 
 	if (locals.db) {
 		try {
@@ -112,14 +116,16 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 						handle: user.handle,
 						image: user.image,
 						location: user.location
-					}
+					},
+					visible: notPrivateTo(locals.user?.id, post.userId).mapWith(Boolean)
 				})
 				.from(post)
 				.innerJoin(user, eq(post.userId, user.id))
-				.where(and(eq(post.id, postId), notDeleted))
+				.where(and(eq(post.id, postId), notDeleted, notBlockedWith(locals.user?.id, post.userId)))
 				.limit(1);
 
-			if (rows.length > 0) {
+			isPrivate = rows[0]?.visible === false;
+			if (rows[0]?.visible) {
 				const r = rows[0];
 
 				// Count an impression when someone other than the author opens the post.
@@ -210,6 +216,10 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		} catch (err) {
 			console.error('Failed to load post by id from database:', err);
 		}
+	}
+
+	if (isPrivate) {
+		throw error(403, 'This account is private');
 	}
 
 	if (!postData) {
