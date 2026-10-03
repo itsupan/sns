@@ -7,14 +7,25 @@
 	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
 	import { formatCount, likesSummary } from '$lib/utils/format';
 	import { TEXT_BACKGROUNDS, type TextBackground } from '$lib/post-backgrounds';
+	import type { PollData } from '$lib/polls';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { authClient } from '$lib/auth-client';
 	import SharePostModal from './SharePostModal.svelte';
 	import PostCommentsModal from './PostCommentsModal.svelte';
 	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
+	import QuoteComposer from './QuoteComposer.svelte';
+	import QuotedPostCard from './QuotedPostCard.svelte';
+	import PostPoll from './PostPoll.svelte';
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
+	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { readApiError } from '$lib/utils/api-error';
-	import { followStore } from '$lib/utils/follow.svelte';
+	import {
+		FOLLOW_LABELS,
+		followStore,
+		followToast,
+		type FollowStatus
+	} from '$lib/utils/follow.svelte';
+	import { muteStore } from '$lib/utils/mute.svelte';
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 
@@ -27,6 +38,8 @@
 		timeAgo?: string;
 		/** Whether the viewer follows this author (false when signed out or for your own posts). */
 		isFollowing?: boolean;
+		/** Whether the viewer muted this author. */
+		isMuted?: boolean;
 	}
 
 	export interface PostComment {
@@ -40,6 +53,8 @@
 	export interface MediaItem {
 		url: string;
 		type: 'image' | 'video';
+		/** Author-written description for screen readers. */
+		alt?: string;
 	}
 
 	export interface PostData {
@@ -55,6 +70,8 @@
 		postType?: PostType;
 		/** Text posts: the background preset the text sits on. */
 		background?: TextBackground;
+		/** Text posts: a poll, with the viewer's vote. */
+		poll?: PollData;
 		location?: string;
 		cameraMeta?: string;
 		tags: string[];
@@ -62,14 +79,29 @@
 		/** Most recent liker other than the viewer, for the "Liked by" line. */
 		likedBy?: string;
 		commentsCount: number;
-		repostsCount: number;
+		sharesCount: number;
+		repostsCount?: number;
 		commentPreview?: PostComment;
 		liked?: boolean;
 		saved?: boolean;
+		/** Pinned to the top of the author's profile. */
+		pinned?: boolean;
+		/** Whether the viewer reposted this post. */
+		reposted?: boolean;
+		/** Set when the card stands for someone's repost of this post. */
+		repostedBy?: { id: string; name: string; handle: string };
+		/** Quote posts: the quoted post, or null once it is deleted or hidden from the viewer. */
+		quoted?: QuotedPost | null;
 	}
 
+	/** What a quote post shows of the post it quotes. */
+	export type QuotedPost = Pick<
+		PostData,
+		'id' | 'author' | 'title' | 'description' | 'mediaItems' | 'postType' | 'background'
+	>;
+
 	interface Props {
-		post?: PostData;
+		post: PostData;
 		class?: string;
 		/** Load the image eagerly (first post in the feed, for LCP). */
 		priority?: boolean;
@@ -82,55 +114,12 @@
 		showFollow?: boolean;
 		/** Show the whole description instead of clamping it behind "See more" (the post page). */
 		fullText?: boolean;
+		/** Mark the post when it is pinned (profile pages, where pinned posts lead). */
+		showPinned?: boolean;
 	}
 
-	const defaultPost: PostData = {
-		id: 'post-1',
-		author: {
-			name: 'Elena Rostova',
-			handle: '@elena.rostova',
-			avatar:
-				'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-			location: 'Copenhagen, Denmark',
-			timeAgo: '3h ago'
-		},
-		title: 'Quiet Brutalism: Concrete Light & Shadows',
-		description:
-			'A study on natural dawn illumination casting geometric shadows across raw exposed concrete in the central atrium. Shot on 35mm f/1.4. The spatial tension transforms throughout the winter solstice.',
-		image:
-			'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-		mediaItems: [
-			{
-				url: 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			},
-			{
-				url: 'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=1200&auto=format&fit=crop&q=80',
-				type: 'image'
-			}
-		],
-		aspectRatio: '4:5',
-		location: 'Fondazione Prada, Milano',
-		tags: ['#MinimalArchitecture', '#LightAndSpace', '#DesignArchive'],
-		likes: 842,
-		commentsCount: 46,
-		repostsCount: 12,
-		commentPreview: {
-			author: 'marcus_k',
-			content: 'The texture gradation is immaculate. Concrete takes light like velvet here.'
-		}
-	};
-
 	let {
-		post: postProp = defaultPost,
+		post: postProp,
 		class: className = '',
 		priority = false,
 		onLike,
@@ -138,7 +127,8 @@
 		onDelete,
 		onUpdate,
 		showFollow = true,
-		fullText = false
+		fullText = false,
+		showPinned = false
 	}: Props = $props();
 
 	const session = authClient.useSession();
@@ -149,7 +139,7 @@
 	let post = $derived<PostData>(edits ? { ...postProp, ...edits } : postProp);
 	let isOwner = $derived(Boolean(post.author.id && $session.data?.user?.id === post.author.id));
 
-	// Author's profile: your own posts go to /profile, demo posts without an id use the handle.
+	// Author's profile: your own posts go to /profile, authors without an id fall back to the handle.
 	let profileHref = $derived(
 		isOwner
 			? resolve('/profile')
@@ -157,25 +147,30 @@
 					id: post.author.id ?? post.author.handle.replace(/^@/, '')
 				})
 	);
-	let followingAuthor = $derived(
-		post.author.id ? followStore.isFollowing(post.author.id, post.author.isFollowing) : false
+	let followStatus = $derived<FollowStatus>(
+		post.author.id
+			? followStore.status(post.author.id, post.author.isFollowing ? 'following' : 'none')
+			: 'none'
 	);
 	let canFollow = $derived(showFollow && Boolean(post.author.id) && !isOwner);
+
+	/** Signed out: shows `message` and sends the user to log in. Resolves to whether signed in. */
+	async function requireSignIn(message: string): Promise<boolean> {
+		if ($session.data?.user) return true;
+		toast.show(message);
+		const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
+		return false;
+	}
 
 	async function toggleFollowAuthor() {
 		const authorId = post.author.id;
 		if (!authorId || followStore.isPending(authorId)) return;
-		if (!$session.data?.user) {
-			toast.show('Please log in to follow curators');
-			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
-			return;
-		}
-		const next = !followingAuthor;
+		if (!(await requireSignIn('Please log in to follow curators'))) return;
 		try {
-			await followStore.set(authorId, next);
-			toast.show(next ? `Following ${post.author.name}` : `Unfollowed ${post.author.name}`);
+			const { status } = await followStore.set(authorId, followStatus === 'none');
+			toast.show(followToast(status, post.author.name));
 		} catch (err) {
 			toast.show(err instanceof Error ? err.message : 'Could not update follow');
 		}
@@ -183,9 +178,11 @@
 	let editOpen = $state(false);
 	let confirmDeleteOpen = $state(false);
 	let deleting = $state(false);
+	let pinning = $state(false);
 
 	let likedOverride = $state<boolean | null>(null);
 	let savedOverride = $state<boolean | null>(null);
+	let pinnedOverride = $state<boolean | null>(null);
 	let likesDelta = $state(0);
 	let likePop = $state(0);
 	let burst = $state(0);
@@ -193,6 +190,10 @@
 	let commentsOpen = $state(false);
 	let shareOpen = $state(false);
 	let sharesDelta = $state(0);
+	let repostOpen = $state(false);
+	let quoteOpen = $state(false);
+	let repostedOverride = $state<boolean | null>(null);
+	let repostsDelta = $state(0);
 	let commentsDelta = $state(0);
 	let latestCommentPreview = $state<PostComment | undefined>(undefined);
 
@@ -295,8 +296,11 @@
 
 	let isLiked = $derived(likedOverride !== null ? likedOverride : (post.liked ?? false));
 	let isSaved = $derived(savedOverride !== null ? savedOverride : (post.saved ?? false));
+	let isPinned = $derived(pinnedOverride ?? post.pinned ?? false);
 	let likesCount = $derived(post.likes + likesDelta);
-	let sharesCount = $derived(post.repostsCount + sharesDelta);
+	let sharesCount = $derived(post.sharesCount + sharesDelta);
+	let isReposted = $derived(repostedOverride ?? post.reposted ?? false);
+	let repostsCount = $derived((post.repostsCount ?? 0) + repostsDelta);
 	let displayCommentsCount = $derived(post.commentsCount + commentsDelta);
 	let activeCommentPreview = $derived(latestCommentPreview || post.commentPreview);
 
@@ -387,28 +391,34 @@
 		}
 	}
 
+	let authorMuted = $derived(
+		post.author.id ? muteStore.muted(post.author.id, post.author.isMuted) : false
+	);
+
+	async function toggleMuteAuthor() {
+		optionsOpen = false;
+		const authorId = post.author.id;
+		if (!authorId || muteStore.isPending(authorId)) return;
+		if (!(await requireSignIn('Please log in to mute accounts'))) return;
+		const mute = !authorMuted;
+		try {
+			await muteStore.set(authorId, mute);
+			toast.show(mute ? `Muted ${post.author.name}` : `Unmuted ${post.author.name}`);
+		} catch (err) {
+			toast.show(err instanceof Error ? err.message : 'Could not update mute');
+		}
+	}
+
 	let reportOpen = $state(false);
 
 	async function openReport() {
 		optionsOpen = false;
-		if (!$session.data?.user) {
-			toast.show('Please log in to report posts');
-			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
-			return;
-		}
+		if (!(await requireSignIn('Please log in to report posts'))) return;
 		reportOpen = true;
 	}
 
 	async function toggleSave() {
-		if (!$session.data?.user) {
-			toast.show('Please log in to save posts');
-			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
-			return;
-		}
+		if (!(await requireSignIn('Please log in to save posts'))) return;
 		const next = !isSaved;
 		savedOverride = next;
 		haptic();
@@ -444,11 +454,52 @@
 			const res = await fetch(`/api/posts/${post.id}/share`, { method: 'POST' });
 			const body = (await res.json().catch(() => null)) as { sharesCount?: number } | null;
 			if (res.ok && typeof body?.sharesCount === 'number') {
-				sharesDelta = body.sharesCount - post.repostsCount;
+				sharesDelta = body.sharesCount - post.sharesCount;
 			}
 		} catch {
 			// The share itself already happened; only the counter is left unchanged.
 		}
+	}
+
+	async function openRepost() {
+		if (await requireSignIn('Please log in to repost')) repostOpen = true;
+	}
+
+	let repostInFlight = false;
+
+	// Not optimistic: the sheet closes at once and the server's answer sets state and count.
+	async function toggleRepost() {
+		repostOpen = false;
+		if (repostInFlight) return;
+		repostInFlight = true;
+		try {
+			const res = await fetch(`/api/posts/${post.id}/repost`, {
+				method: isReposted ? 'DELETE' : 'POST'
+			});
+			const body = (await res.json().catch(() => null)) as {
+				reposted?: boolean;
+				repostsCount?: number;
+			} | null;
+			if (!res.ok || typeof body?.reposted !== 'boolean') {
+				toast.show(readApiError(body, 'Could not update your repost').message);
+				return;
+			}
+			repostedOverride = body.reposted;
+			if (typeof body.repostsCount === 'number') {
+				repostsDelta = body.repostsCount - (post.repostsCount ?? 0);
+			}
+			haptic();
+			toast.show(body.reposted ? 'Reposted' : 'Repost removed');
+		} catch {
+			toast.show('Could not update your repost');
+		} finally {
+			repostInFlight = false;
+		}
+	}
+
+	function openQuote() {
+		repostOpen = false;
+		quoteOpen = true;
 	}
 
 	function handleCommentAdded(comment: PostComment, newCount: number) {
@@ -511,6 +562,28 @@
 		}
 	}
 
+	async function togglePin() {
+		optionsOpen = false;
+		if (pinning) return;
+		pinning = true;
+		const pin = !isPinned;
+		try {
+			const res = await fetch(`/api/posts/${post.id}/pin`, { method: pin ? 'PUT' : 'DELETE' });
+			if (!res.ok) {
+				const body = await res.json().catch(() => null);
+				toast.show(readApiError(body, 'Could not update pinned posts').message);
+				return;
+			}
+			pinnedOverride = pin;
+			toast.show(pin ? 'Pinned to your profile' : 'Unpinned from your profile');
+			onUpdate?.({ ...post, pinned: pin });
+		} catch {
+			toast.show('Could not update pinned posts');
+		} finally {
+			pinning = false;
+		}
+	}
+
 	const actionButton =
 		'min-w-11 h-11 -my-1 flex items-center justify-center gap-1.5 rounded-full transition cursor-pointer border-0 bg-transparent active:scale-90';
 </script>
@@ -522,6 +595,33 @@
 		aria-labelledby={post.title ? `post-title-${post.id}` : undefined}
 		aria-label={post.title ? undefined : `Post by ${post.author.name}`}
 	>
+		{#if showPinned && isPinned}
+			<p
+				class="flex items-center gap-1.5 px-4 lg:px-0 mb-2 text-xs font-semibold text-slate-500 dark:text-dark-muted"
+			>
+				<Icon name="pin" class="text-xs" />
+				Pinned
+			</p>
+		{/if}
+		{#if post.repostedBy}
+			<p
+				class="flex items-center gap-1.5 px-4 lg:px-0 m-0 mb-2 text-xs font-medium text-slate-500 dark:text-dark-muted"
+			>
+				<Icon name="arrows-repeat" class="text-sm" />
+				{#if post.repostedBy.id === $session.data?.user?.id}
+					<span>You reposted</span>
+				{:else}
+					<a
+						href={resolve('/profile/[id]', { id: post.repostedBy.id })}
+						class="font-semibold text-slate-700 dark:text-dark-text no-underline hover:underline truncate"
+					>
+						{post.repostedBy.name}
+					</a>
+					<span class="shrink-0">reposted</span>
+				{/if}
+			</p>
+		{/if}
+
 		<!-- Post Header: Author info & options -->
 		<header class="flex items-center justify-between px-4 lg:px-0">
 			<div class="flex items-center gap-3 min-w-0">
@@ -547,13 +647,14 @@
 							<span class="text-xs text-slate-400 dark:text-dark-subtle" aria-hidden="true">•</span>
 							<button
 								type="button"
-								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followingAuthor
+								class="shrink-0 text-xs font-semibold border-0 bg-transparent p-0 cursor-pointer transition-colors {followStatus !==
+								'none'
 									? 'text-slate-500 dark:text-dark-muted hover:text-slate-800 dark:hover:text-dark-text'
 									: 'text-blue-600 dark:text-kizuna-blue hover:text-blue-700'}"
-								aria-pressed={followingAuthor}
+								aria-pressed={followStatus !== 'none'}
 								onclick={toggleFollowAuthor}
 							>
-								{followingAuthor ? 'Following' : 'Follow'}
+								{FOLLOW_LABELS[followStatus]}
 							</button>
 						{/if}
 					</div>
@@ -679,7 +780,10 @@
 				{:else}
 					<img
 						src={activeMediaUrl}
-						alt={post.title || `Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+						alt={currentMedia.alt ||
+							post.title ||
+							`Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+						srcset={imageSrcset(activeMediaUrl, FEED_IMAGE_WIDTHS)}
 						sizes="(min-width: 672px) 672px, 100vw"
 						class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
 						loading={priority && activeSlide === 0 ? 'eager' : 'lazy'}
@@ -762,6 +866,10 @@
 			</div>
 		{/if}
 
+		{#if post.poll}
+			<PostPoll postId={post.id} poll={post.poll} {isOwner} {requireSignIn} />
+		{/if}
+
 		<!-- Action Bar: sits right under the media on phones and vertical tablets, like native feeds -->
 		<div
 			class="action-bar flex items-center justify-between px-2 lg:px-0 lg:py-2 lg:order-1 lg:border-t border-slate-100 dark:border-dark-border text-slate-700 dark:text-dark-muted text-sm lg:text-xs font-medium"
@@ -798,12 +906,16 @@
 
 				<button
 					type="button"
-					class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
+					class="{actionButton} px-2 {isReposted
+						? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+						: 'hover:text-slate-900 dark:hover:text-dark-text'}"
 					aria-label="Repost"
-					onclick={openShare}
+					aria-haspopup="dialog"
+					aria-pressed={isReposted}
+					onclick={openRepost}
 				>
 					<Icon name="arrows-repeat" class="text-xl lg:text-base" />
-					<span>{formatCount(sharesCount)}</span>
+					<span>{formatCount(repostsCount)}</span>
 				</button>
 			</div>
 
@@ -822,11 +934,12 @@
 
 				<button
 					type="button"
-					class="{actionButton} hover:text-slate-900 dark:hover:text-dark-text"
+					class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
 					aria-label="Share post"
 					onclick={openShare}
 				>
 					<Icon name="paper-plane" class="text-xl lg:text-base" />
+					<span>{formatCount(sharesCount)}</span>
 				</button>
 			</div>
 		</div>
@@ -861,6 +974,12 @@
 							{expanded ? 'See less' : 'See more'}
 						</button>
 					{/if}
+				</div>
+			{/if}
+
+			{#if post.quoted !== undefined}
+				<div class="mb-3">
+					<QuotedPostCard quoted={post.quoted} />
 				</div>
 			{/if}
 
@@ -906,37 +1025,54 @@
 	</article>
 {/if}
 
-<BottomSheet bind:open={optionsOpen} title="Post options">
-	{#if isOwner}
-		<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+<!-- Mounted only while open: a feed of idle cards carries no dialogs. -->
+{#if optionsOpen}
+	<BottomSheet bind:open={optionsOpen} title="Post options">
+		{#if isOwner}
+			<SheetAction icon="pencil" label="Edit post" onclick={openEdit} />
+			<SheetAction
+				icon={isPinned ? 'pin-off' : 'pin'}
+				label={isPinned ? 'Unpin' : 'Pin to profile'}
+				onclick={togglePin}
+			/>
+			<SheetAction
+				icon="trash"
+				label="Delete post"
+				danger
+				onclick={() => {
+					optionsOpen = false;
+					confirmDeleteOpen = true;
+				}}
+			/>
+		{/if}
 		<SheetAction
-			icon="trash"
-			label="Delete post"
-			danger
+			icon="bookmark"
+			label={isSaved ? 'Remove from saved' : 'Save'}
 			onclick={() => {
 				optionsOpen = false;
-				confirmDeleteOpen = true;
+				toggleSave();
 			}}
 		/>
-	{/if}
-	<SheetAction
-		icon="bookmark"
-		label={isSaved ? 'Remove from saved' : 'Save'}
-		onclick={() => {
-			optionsOpen = false;
-			toggleSave();
-		}}
-	/>
-	<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
-	<SheetAction icon="link" label="Copy link" onclick={copyLink} />
-	{#if !isOwner}
-		<SheetAction icon="flag" label="Report" danger onclick={openReport} />
-	{/if}
-</BottomSheet>
+		<SheetAction icon="paper-plane" label="Share" onclick={openShare} />
+		<SheetAction icon="link" label="Copy link" onclick={copyLink} />
+		{#if !isOwner}
+			{#if post.author.id}
+				<SheetAction
+					icon={authorMuted ? 'volume' : 'volume-mute'}
+					label={authorMuted ? `Unmute ${post.author.name}` : `Mute ${post.author.name}`}
+					onclick={toggleMuteAuthor}
+				/>
+			{/if}
+			<SheetAction icon="flag" label="Report" danger onclick={openReport} />
+		{/if}
+	</BottomSheet>
+{/if}
 
-{#if isOwner}
+{#if editOpen}
 	<EditPostModal bind:open={editOpen} {post} onSaved={handleEdited} />
+{/if}
 
+{#if confirmDeleteOpen}
 	<BottomSheet bind:open={confirmDeleteOpen} title="Delete post?" showTitle>
 		<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
 			This removes the post from your profile and everyone's feed. You can't undo this.
@@ -963,14 +1099,34 @@
 	</BottomSheet>
 {/if}
 
-{#if !isOwner}
+{#if reportOpen}
 	<ReportSheet bind:open={reportOpen} targetType="post" targetId={post.id} />
 {/if}
 
-<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
-<PostCommentsModal
-	bind:open={commentsOpen}
-	{post}
-	onCommentAdded={handleCommentAdded}
-	onCommentDeleted={handleCommentDeleted}
-/>
+{#if shareOpen}
+	<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
+{/if}
+
+{#if repostOpen}
+	<BottomSheet bind:open={repostOpen} title="Repost">
+		<SheetAction
+			icon="arrows-repeat"
+			label={isReposted ? 'Undo repost' : 'Repost'}
+			onclick={toggleRepost}
+		/>
+		<SheetAction icon="pencil" label="Quote" onclick={openQuote} />
+	</BottomSheet>
+{/if}
+
+{#if quoteOpen}
+	<QuoteComposer bind:open={quoteOpen} {post} />
+{/if}
+
+{#if commentsOpen}
+	<PostCommentsModal
+		bind:open={commentsOpen}
+		{post}
+		onCommentAdded={handleCommentAdded}
+		onCommentDeleted={handleCommentDeleted}
+	/>
+{/if}

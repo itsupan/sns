@@ -31,7 +31,7 @@
 			href={resolve('/profile')}
 			class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text no-underline self-start transition-colors"
 		>
-			<Icon name="angle-small-left" class="text-base" />
+			<Icon name="angle-left" class="text-base" />
 			<span>Back to Profile</span>
 		</a>
 

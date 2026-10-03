@@ -78,10 +78,14 @@
 			.filter((g) => g.stories.length > 0);
 	}
 
+	const hasCloseFriends = (group: StoryGroup) =>
+		group.stories.some((s) => s.audience === 'close_friends');
+
 	function ringClass(group: StoryGroup) {
-		return storiesStore.hasUnseen(group)
-			? 'bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600'
-			: 'bg-slate-200 dark:bg-dark-hover';
+		if (!storiesStore.hasUnseen(group)) return 'bg-slate-200 dark:bg-dark-hover';
+		return hasCloseFriends(group)
+			? 'bg-green-500'
+			: 'bg-gradient-to-tr from-amber-400 via-rose-500 to-fuchsia-600';
 	}
 
 	const itemButton =
@@ -146,7 +150,7 @@
 				</li>
 			{/each}
 		{:else}
-			<!-- People you follow: gradient ring = new, grey ring = watched -->
+			<!-- People you follow: gradient ring = new, green = new incl. close friends, grey = watched -->
 			{#each others as group (group.user.id)}
 				{@const unseen = storiesStore.hasUnseen(group)}
 				<li class="snap-start">
@@ -154,7 +158,7 @@
 						type="button"
 						class={itemButton}
 						onclick={() => openViewer(group)}
-						aria-label={`View story from ${group.user.name}${unseen ? ', new' : ''}`}
+						aria-label={`View story from ${group.user.name}${unseen ? ', new' : ''}${hasCloseFriends(group) ? ', close friends' : ''}`}
 					>
 						<div class="size-16 rounded-full p-[2.5px] {ringClass(group)}">
 							<div class="size-full rounded-full p-[2px] bg-white dark:bg-dark-card">

@@ -2,9 +2,10 @@ import { stripFormatting } from '$lib/formatting';
 import { and, desc, eq, inArray, ne, notExists, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postTag, tag, user, userFollow } from './schema';
-import { encodeCursor, loadPostMedia, notDeleted, type FeedCursor } from './posts';
+import { encodeCursor, loadPostMedia, notDeleted, notRepost, type FeedCursor } from './posts';
 import type { ExploreTile } from '$lib/explore/types';
 import { notBlockedWith } from './blocks';
+import { shownInFeedsTo } from './visibility';
 import { backgroundOf } from './post-cards';
 
 /** Explore ranks only this many of the newest live posts, so each request reads a bounded set. */
@@ -33,14 +34,14 @@ const scoreSql = (now: number) =>
 	sql<number>`(1.0 + ${post.likesCount} + 2.0 * ${post.commentsCount} + ${post.viewsCount} / 50.0) / ((${now} - ${post.createdAt}) / ${sql.raw(`${HOUR_MS}.0`)} + 2.0)`;
 
 /**
- * Posts not by the viewer, anyone they follow or anyone blocked in either direction (nothing is
- * excluded when signed out).
+ * Posts shown in the viewer's feeds that are not by them or anyone they follow (signed out, every
+ * visible post).
  */
 function outsideNetwork(db: Database, viewerId: string | null | undefined) {
-	if (!viewerId) return undefined;
+	if (!viewerId) return shownInFeedsTo(viewerId);
 	return and(
 		ne(post.userId, viewerId),
-		notBlockedWith(viewerId, post.userId),
+		shownInFeedsTo(viewerId),
 		notExists(
 			db
 				.select({ one: sql`1` })
@@ -64,7 +65,7 @@ export async function loadExplorePage(
 	const candidates = db
 		.select({ id: post.id })
 		.from(post)
-		.where(and(notDeleted, outsideNetwork(db, viewerId)))
+		.where(and(notDeleted, notRepost, outsideNetwork(db, viewerId)))
 		.orderBy(desc(post.createdAt), desc(post.id))
 		.limit(EXPLORE_CANDIDATES);
 
@@ -80,7 +81,10 @@ export async function loadExplorePage(
 	return { ids: rows.slice(0, pageSize).map((r) => r.id), hasMore };
 }
 
-/** Live posts tagged `slug` (minus those by users blocked with the viewer), newest first, keyset-paginated on (created_at, id). */
+/**
+ * Live posts tagged `slug` shown in the viewer's feeds (see `shownInFeedsTo`), newest first,
+ * keyset-paginated on (created_at, id).
+ */
 export async function loadTagPage(
 	db: Database,
 	slug: string,
@@ -109,7 +113,7 @@ export async function loadTagPage(
 			and(
 				eq(postTag.tagId, found.id),
 				notDeleted,
-				notBlockedWith(viewerId, post.userId),
+				shownInFeedsTo(viewerId),
 				cursor
 					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined

@@ -8,7 +8,7 @@ export const GET: RequestHandler = withApi(async ({ locals, platform }) => {
 	await enforceRateLimit(platform, 'accountExport', me.id);
 
 	const data = await buildAccountExport(locals.db, me.id);
-	if (!data) throw new ApiError(404, 'NOT_FOUND', 'Account not found');
+	if (!data) throw new ApiError(404, 'not_found', 'Account not found');
 
 	const day = data.exportedAt.slice(0, 10);
 	return new Response(JSON.stringify(data, null, 2), {

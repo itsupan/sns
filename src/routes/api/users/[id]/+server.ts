@@ -1,10 +1,12 @@
 import { json } from '@sveltejs/kit';
-import { eq, and, ne } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import type { RequestHandler } from './$types';
 import * as v from 'valibot';
 import { user } from '$lib/server/db/schema';
-import { isFollowing } from '$lib/server/db/follows';
+import { approvalStatements, isFollowing } from '$lib/server/db/follows';
+import { isHandleTaken } from '$lib/server/db/handles';
 import { isOwnUpload } from '$lib/server/services/storage';
+import { HANDLE_PATTERN, HANDLE_RULES, normalizeHandle } from '$lib/utils/handle';
 import {
 	ApiError,
 	apiError,
@@ -41,11 +43,8 @@ const UpdateProfile = v.object(
 		handle: v.optional(
 			v.pipe(
 				v.nullable(v.string('Handle must be a string or null')),
-				v.transform((value) => value?.trim().replace(/^@/, '').toLowerCase() || null),
-				v.check(
-					(value) => value === null || /^[a-z0-9_.-]{1,30}$/.test(value),
-					'Handle must be 1-30 characters and can only contain letters, numbers, dots, and underscores'
-				)
+				v.transform((value) => (value === null ? null : normalizeHandle(value) || null)),
+				v.check((value) => value === null || HANDLE_PATTERN.test(value), HANDLE_RULES)
 			)
 		),
 		image: clearableText('Image', 2048, 'Image URL is too long'),
@@ -59,7 +58,8 @@ const UpdateProfile = v.object(
 			)
 		),
 		location: clearableText('Location', 100),
-		cameraGear: clearableText('Camera gear', 200)
+		cameraGear: clearableText('Camera gear', 200),
+		isPrivate: v.optional(v.boolean('Private account must be true or false'))
 	},
 	'Request body must be an object'
 );
@@ -142,25 +142,25 @@ export const PATCH: RequestHandler = withApi(async ({ params, request, locals, p
 		throw new ApiError(400, 'validation_failed', message, { image: message });
 	}
 
-	if (updates.handle) {
-		const existing = await locals.db
-			.select({ id: user.id })
-			.from(user)
-			.where(and(eq(user.handle, updates.handle), ne(user.id, targetUserId)))
-			.limit(1);
-
-		if (existing.length > 0) throw handleTaken();
+	if (updates.handle && (await isHandleTaken(locals.db, updates.handle, targetUserId))) {
+		throw handleTaken();
 	}
 
 	// 4. Update the user row in database
+	const write = locals.db
+		.update(user)
+		.set({
+			...updates,
+			updatedAt: new Date()
+		})
+		.where(eq(user.id, targetUserId));
 	try {
-		await locals.db
-			.update(user)
-			.set({
-				...updates,
-				updatedAt: new Date()
-			})
-			.where(eq(user.id, targetUserId));
+		// Anyone may follow a public account, so going public approves every pending request with it.
+		if (updates.isPrivate === false) {
+			await locals.db.batch([write, ...approvalStatements(locals.db, targetUserId)]);
+		} else {
+			await write;
+		}
 	} catch (err) {
 		// The unique index is the real guard: two requests can both pass the check above.
 		const detail = `${err} ${(err as { cause?: unknown })?.cause ?? ''}`;
@@ -181,6 +181,7 @@ export const PATCH: RequestHandler = withApi(async ({ params, request, locals, p
 			website: user.website,
 			location: user.location,
 			cameraGear: user.cameraGear,
+			isPrivate: user.isPrivate,
 			createdAt: user.createdAt,
 			updatedAt: user.updatedAt
 		})

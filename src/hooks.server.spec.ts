@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RequestEvent } from '@sveltejs/kit';
+import { RATE_LIMITS } from '$lib/server/api';
 import { fakeRateLimiter } from '$lib/server/testing/rate-limiter';
 
 vi.mock('$lib/server/db', () => ({ getDb: () => ({}) }));
@@ -71,6 +72,43 @@ describe('handle', () => {
 
 		// Other auth calls, like reading the session, are not limited.
 		expect((await run('/api/auth/get-session', { platform }).result).status).toBe(200);
+	});
+
+	it.each([
+		['/api/auth/request-password-reset', 'authEmail'],
+		['/api/auth/send-verification-email', 'authEmail'],
+		['/api/auth/change-email', 'authEmail'],
+		['/api/auth/reset-password', 'passwordChange'],
+		['/api/auth/change-password', 'passwordChange']
+	] as const)('limits POST %s per IP with %s', async (path, name) => {
+		const platform = { env: { RATE_LIMITER: fakeRateLimiter().namespace } };
+		for (let i = 0; i < RATE_LIMITS[name].limit; i++) {
+			expect((await run(path, { method: 'POST', platform }).result).status).toBe(200);
+		}
+		const res = await run(path, { method: 'POST', platform }).result;
+		expect(res.status).toBe(429);
+		expect(await res.json()).toEqual({ code: 'RATE_LIMITED', message: expect.any(String) });
+	});
+
+	it('refuses to send auth email while the limiter is down, but lets password changes through', async () => {
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		const failing = {
+			idFromName: (name: string) => name,
+			get: () => ({
+				hit: async () => {
+					throw new Error('Durable Object reset');
+				}
+			})
+		};
+		const platform = { env: { RATE_LIMITER: failing } };
+
+		const email = await run('/api/auth/request-password-reset', { method: 'POST', platform })
+			.result;
+		expect(email.status).toBe(503);
+		expect(await email.json()).toMatchObject({ code: 'RATE_LIMIT_UNAVAILABLE' });
+		const change = await run('/api/auth/change-password', { method: 'POST', platform }).result;
+		expect(change.status).toBe(200);
 	});
 });
 
