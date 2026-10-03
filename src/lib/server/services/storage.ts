@@ -295,6 +295,11 @@ export async function refreshPostMediaUrls<T extends object>(
 		updated.author = { ...authorObj, avatar: freshAvatar };
 	}
 
+	// A quote post's embedded post.
+	if (updated.quoted && typeof updated.quoted === 'object') {
+		updated.quoted = await refreshPostMediaUrls(updated.quoted, env);
+	}
+
 	return updated as T;
 }
 

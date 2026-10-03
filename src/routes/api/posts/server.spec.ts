@@ -4,12 +4,13 @@ import { GET, POST } from './+server';
 import type { RequestEvent } from './$types';
 
 // Media and tags come from post_media / post_tag via loaders; stub them with fixture rows.
-// attachTagsStatements records what the handler would store so loadPostTags can echo it.
+// attachTagsStatements and the mocked media insert record what the handler would store so
+// loadPostTags and loadPostMedia can echo it.
+const media = vi.hoisted<Record<string, Array<{ url: string; type: 'image' | 'video' }>>>(() => ({
+	'post-1': [{ url: 'https://example.com/photo.jpg', type: 'image' }]
+}));
 vi.mock('$lib/server/db/posts', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/db/posts')>();
-	const media: Record<string, Array<{ url: string; type: 'image' | 'video' }>> = {
-		'post-1': [{ url: 'https://example.com/photo.jpg', type: 'image' }]
-	};
 	const tags: Record<string, string[]> = { 'post-1': ['#MinimalArchitecture'] };
 	return {
 		...actual,
@@ -123,6 +124,41 @@ describe('GET /api/posts', () => {
 	});
 });
 
+/**
+ * A drizzle-shaped mock for creating a post: records the inserted post and media rows, reads the
+ * post back joined with `author`, and resolves the viewer's likes and saves empty.
+ */
+function createDb(author: Record<string, unknown>) {
+	let insertedRow: Record<string, unknown> | null = null;
+	const readBack: Record<string, unknown> = {
+		from: () => readBack,
+		innerJoin: () => readBack,
+		where: () => readBack,
+		limit: async () => [
+			{ post: { ...insertedRow, createdAt: new Date() }, user: { location: null, ...author } }
+		],
+		then: (resolve: (value: unknown[]) => void) => resolve([])
+	};
+	const db = {
+		insert: vi.fn(() => ({
+			values: vi.fn(async (val: Record<string, unknown> | Array<Record<string, unknown>>) => {
+				if (Array.isArray(val)) {
+					media[val[0].postId as string] = val.map((m) => ({
+						url: m.url as string,
+						type: m.type as 'image' | 'video'
+					}));
+				} else {
+					insertedRow ??= val;
+				}
+				return [{ success: true }];
+			})
+		})),
+		select: vi.fn(() => readBack),
+		batch: vi.fn(async (queries: unknown[]) => Promise.all(queries))
+	};
+	return { db, insertedRow: () => insertedRow };
+}
+
 describe('POST /api/posts', () => {
 	it('returns 401 when user is not authenticated', async () => {
 		const event = {
@@ -170,17 +206,13 @@ describe('POST /api/posts', () => {
 	});
 
 	it('creates a new post with text and media successfully', async () => {
-		let insertedRow: Record<string, unknown> | null = null;
-		const db = {
-			insert: vi.fn(() => ({
-				values: vi.fn(async (val: Record<string, unknown>) => {
-					// First insert is the post row; later ones are post_media rows.
-					insertedRow ??= val;
-					return [{ success: true }];
-				})
-			})),
-			batch: vi.fn(async (queries: unknown[]) => Promise.all(queries))
+		const user = {
+			id: 'u-1',
+			name: 'Kai Takahashi',
+			handle: 'kai.raw',
+			image: 'https://example.com/kai.jpg'
 		};
+		const { db, insertedRow } = createDb(user);
 
 		const event = {
 			request: {
@@ -193,15 +225,7 @@ describe('POST /api/posts', () => {
 					tags: ['ceramics', 'pottery']
 				})
 			},
-			locals: {
-				db,
-				user: {
-					id: 'u-1',
-					name: 'Kai Takahashi',
-					handle: 'kai.raw',
-					image: 'https://example.com/kai.jpg'
-				}
-			}
+			locals: { db, user }
 		} as unknown as RequestEvent;
 
 		const res = await POST(event);
@@ -218,21 +242,17 @@ describe('POST /api/posts', () => {
 		expect(data.post.description).toBe('New ceramic bowl finished.');
 		expect(data.post.mediaType).toBe('video');
 		expect(data.post.tags).toEqual(['#ceramics', '#pottery']);
-		expect(insertedRow).not.toBeNull();
+		expect(insertedRow()).not.toBeNull();
 	});
 
 	it('creates a post with multiple media plates, aspect ratio, and location', async () => {
-		let insertedRow: Record<string, unknown> | null = null;
-		const db = {
-			insert: vi.fn(() => ({
-				values: vi.fn(async (val: Record<string, unknown>) => {
-					// First insert is the post row; later ones are post_media rows.
-					insertedRow ??= val;
-					return [{ success: true }];
-				})
-			})),
-			batch: vi.fn(async (queries: unknown[]) => Promise.all(queries))
+		const user = {
+			id: 'u-elena',
+			name: 'Elena Rostova',
+			handle: 'elena.rostova',
+			image: 'https://example.com/elena.jpg'
 		};
+		const { db, insertedRow } = createDb(user);
 
 		const event = {
 			request: {
@@ -249,15 +269,7 @@ describe('POST /api/posts', () => {
 					tags: ['curated', 'architecture']
 				})
 			},
-			locals: {
-				db,
-				user: {
-					id: 'u-elena',
-					name: 'Elena Rostova',
-					handle: 'elena.rostova',
-					image: 'https://example.com/elena.jpg'
-				}
-			}
+			locals: { db, user }
 		} as unknown as RequestEvent;
 
 		const res = await POST(event);
@@ -274,7 +286,7 @@ describe('POST /api/posts', () => {
 		expect(data.post.mediaItems).toHaveLength(2);
 		expect(data.post.aspectRatio).toBe('4:5');
 		expect(data.post.location).toBe('Fondazione Prada, Milano');
-		expect(insertedRow).toMatchObject({
+		expect(insertedRow()).toMatchObject({
 			aspectRatio: '4:5',
 			location: 'Fondazione Prada, Milano'
 		});

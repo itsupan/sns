@@ -1,14 +1,30 @@
-import { json, redirect, type Handle, type HandleServerError } from '@sveltejs/kit';
+import {
+	json,
+	redirect,
+	type Handle,
+	type HandleServerError,
+	type RequestEvent
+} from '@sveltejs/kit';
 import { building } from '$app/environment';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 import { createAuth } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
 import { ApiError, enforceRateLimit, rateLimitSubject, type RateLimitName } from '$lib/server/api';
 
-/** better-auth endpoints limited per client IP, against password guessing and signup spam. */
+/**
+ * better-auth endpoints limited per client IP: password and two-factor code guessing, signup spam,
+ * email floods.
+ */
 const AUTH_RATE_LIMITS: Record<string, RateLimitName> = {
 	'/api/auth/sign-in/email': 'signIn',
-	'/api/auth/sign-up/email': 'signUp'
+	'/api/auth/sign-up/email': 'signUp',
+	'/api/auth/request-password-reset': 'authEmail',
+	'/api/auth/send-verification-email': 'authEmail',
+	'/api/auth/change-email': 'authEmail',
+	'/api/auth/reset-password': 'passwordChange',
+	'/api/auth/change-password': 'passwordChange',
+	'/api/auth/two-factor/verify-totp': 'twoFactor',
+	'/api/auth/two-factor/verify-backup-code': 'twoFactor'
 };
 
 /** Added to every response that does not set them itself (media routes send a stricter CSP). */
@@ -18,6 +34,29 @@ const SECURITY_HEADERS: Record<string, string> = {
 	'X-Frame-Options': 'DENY',
 	'Content-Security-Policy': "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
 };
+
+/** Pages a signed-in user can open before finishing the welcome flow (each with its subpages). */
+const ONBOARDING_EXEMPT = [
+	'/welcome',
+	'/login',
+	'/signup',
+	'/forgot-password',
+	'/reset-password',
+	'/offline',
+	'/legal',
+	'/admin'
+];
+
+/** Page visits (not API calls, assets or the exempt pages) that send a new user to /welcome. */
+function requiresOnboarding({ request, url }: RequestEvent): boolean {
+	const { pathname } = url;
+	if (request.method !== 'GET' || pathname.startsWith('/api/') || pathname.startsWith('/_app/')) {
+		return false;
+	}
+	// Files such as /robots.txt or /brand/logo-64.png.
+	if (/\.[a-z0-9]+$/i.test(pathname)) return false;
+	return !ONBOARDING_EXEMPT.some((page) => pathname === page || pathname.startsWith(`${page}/`));
+}
 
 function withSecurityHeaders(response: Response): Response {
 	// A WebSocket upgrade comes straight from the chat room, with immutable headers.
@@ -29,8 +68,12 @@ function withSecurityHeaders(response: Response): Response {
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
+	// Prerendered pages (the offline fallback) are built without bindings and are the same for
+	// everyone: no database, session or rate limit.
+	if (building) return withSecurityHeaders(await resolve(event));
+
 	const db = getDb(event.platform);
-	const auth = createAuth(event.platform!.env, db);
+	const auth = createAuth(event.platform!.env, db, event.platform!.ctx);
 
 	event.locals.db = db;
 	event.locals.auth = auth;
@@ -64,6 +107,13 @@ export const handle: Handle = async ({ event, resolve }) => {
 		throw redirect(
 			302,
 			`/login?redirectTo=${encodeURIComponent(event.url.pathname + event.url.search)}`
+		);
+	}
+
+	if (event.locals.user && !event.locals.user.onboardedAt && requiresOnboarding(event)) {
+		throw redirect(
+			302,
+			`/welcome?redirectTo=${encodeURIComponent(event.url.pathname + event.url.search)}`
 		);
 	}
 

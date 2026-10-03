@@ -13,8 +13,7 @@ const testUser = {
 	website: 'kenjisato.jp',
 	location: 'Tokyo, Japan',
 	cameraGear: 'Leica M6 · Summicron 35mm',
-	badgeText: 'CURATOR',
-	isVerified: true
+	badgeText: 'CURATOR'
 };
 
 const testStats = {
@@ -22,7 +21,7 @@ const testStats = {
 	followersCount: 120,
 	followingCount: 85,
 	impressionsCount: 1200,
-	isFollowing: false
+	followStatus: 'none' as const
 };
 
 const newRegisteredUser = {
@@ -43,7 +42,7 @@ const emptyStats = {
 	followersCount: 0,
 	followingCount: 0,
 	impressionsCount: 0,
-	isFollowing: false
+	followStatus: 'none' as const
 };
 
 describe('Profile Page', () => {
@@ -51,8 +50,10 @@ describe('Profile Page', () => {
 		const screen = render(ProfilePage, {
 			props: {
 				data: {
+					imageTransforms: false,
 					user: testUser,
 					posts: [],
+					nextCursor: null,
 					saved: [],
 					stats: testStats
 				}
@@ -92,8 +93,10 @@ describe('Profile Page', () => {
 		const screen = render(ProfilePage, {
 			props: {
 				data: {
+					imageTransforms: false,
 					user: newRegisteredUser,
 					posts: [],
+					nextCursor: null,
 					saved: [],
 					stats: emptyStats
 				}
@@ -121,8 +124,10 @@ describe('Profile Page', () => {
 		render(ProfilePage, {
 			props: {
 				data: {
+					imageTransforms: false,
 					user: testUser,
 					posts: [],
+					nextCursor: null,
 					saved: [],
 					stats: testStats
 				}
@@ -138,8 +143,10 @@ describe('Profile Page', () => {
 		const screen = render(ProfilePage, {
 			props: {
 				data: {
+					imageTransforms: false,
 					user: testUser,
 					posts: [],
+					nextCursor: null,
 					saved: [],
 					stats: testStats
 				}

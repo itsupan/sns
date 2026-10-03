@@ -9,16 +9,19 @@ import { schema } from './db';
 
 const MIN_SECRET_LENGTH = 32;
 
-export function createAuth(env: Env, db: Database) {
+export function createAuth(env: Env, db: Database, ctx: Pick<ExecutionContext, 'waitUntil'>) {
 	// authOptions falls back to a fixed dev secret; deployed sessions must never be signed with it,
 	// nor with a blank or short one (better-auth only warns about those).
 	if (!dev && (env.BETTER_AUTH_SECRET?.trim().length ?? 0) < MIN_SECRET_LENGTH) {
 		throw new Error(`BETTER_AUTH_SECRET must be at least ${MIN_SECRET_LENGTH} characters`);
 	}
+	const options = authOptions(env);
 	return betterAuth({
-		...authOptions(env),
+		...options,
 		database: drizzleAdapter(db, { provider: 'sqlite', schema }),
-		plugins: [sveltekitCookies(getRequestEvent)]
+		// Emails are sent after the response, so response times never reveal whether one went out.
+		advanced: { backgroundTasks: { handler: (task) => ctx.waitUntil(task) } },
+		plugins: [...options.plugins, sveltekitCookies(getRequestEvent)]
 	});
 }
 

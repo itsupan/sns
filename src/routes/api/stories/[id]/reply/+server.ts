@@ -4,6 +4,7 @@ import type { RequestHandler } from './$types';
 import { ApiError, enforceRateLimit, parseBody, requireUser, withApi } from '$lib/server/api';
 import { getOrCreateDm, sendMessage } from '$lib/server/db/chat';
 import { broadcastLater } from '$lib/server/chat/rooms';
+import { pushMessageLater } from '$lib/server/push/messages';
 import { requireVisibleStory } from '$lib/server/story-access';
 import { MAX_MESSAGE_LENGTH } from '$lib/chat/types';
 
@@ -27,7 +28,7 @@ export const POST: RequestHandler = withApi(async ({ params, request, locals, pl
 	const viewer = requireUser(locals);
 	await enforceRateLimit(platform, 'chatMessage', viewer.id);
 	const { content } = await parseBody(request, ReplyBody);
-	const { story } = await requireVisibleStory(locals, platform, params.id ?? '', viewer.id);
+	const story = await requireVisibleStory(locals, params.id ?? '', viewer.id);
 	if (story.userId === viewer.id) {
 		throw new ApiError(400, 'validation_failed', 'You cannot reply to your own story');
 	}
@@ -40,5 +41,6 @@ export const POST: RequestHandler = withApi(async ({ params, request, locals, pl
 		storyRef: story.id
 	});
 	broadcastLater(platform, dm.id, { type: 'message', message });
+	pushMessageLater(platform, locals.db, story.userId, viewer.name, message);
 	return json({ conversationId: dm.id, message }, { status: 201 });
 });

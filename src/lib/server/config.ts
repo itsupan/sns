@@ -16,6 +16,8 @@ export interface RateLimitRule {
 export type RateLimitName =
 	| 'createPost'
 	| 'createStory'
+	| 'highlight'
+	| 'draft'
 	| 'comment'
 	| 'reaction'
 	| 'storyReaction'
@@ -26,19 +28,28 @@ export type RateLimitName =
 	| 'like'
 	| 'save'
 	| 'share'
+	| 'repost'
+	| 'pollVote'
 	| 'follow'
+	| 'mute'
 	| 'uploadPresign'
 	| 'upload'
 	| 'mediaRefresh'
 	| 'accountExport'
 	| 'report'
+	| 'moderation'
 	| 'accountDelete'
 	| 'signIn'
 	| 'signUp'
+	| 'authEmail'
+	| 'passwordChange'
+	| 'twoFactor'
+	| 'sessionRevoke'
 	| 'profileUpdate'
 	| 'contentEdit'
 	| 'markRead'
-	| 'storyView';
+	| 'storyView'
+	| 'pushSubscribe';
 
 export interface PageSize {
 	defaultPageSize: number;
@@ -59,12 +70,32 @@ export interface AppConfig {
 	activity: PageSize;
 	/** Explore and tag-page grids. */
 	explore: PageSize;
+	/** A profile's posts grid. */
+	profile: PageSize;
+	/** Who watched one of your stories. */
+	storyViewers: PageSize;
+	/** Your story archive grid. */
+	storyArchive: PageSize;
+	/** The moderation queue and the moderator list. */
+	moderation: PageSize;
 	/** Chat history pages and the conversations inbox. */
 	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
 	mediaUrlTtlSec: number;
-	/** Normalized emails (see `normalizeEmail`) that may not create an account. */
+	/** Serve resized copies of our images through Cloudflare Image Transformations. */
+	imageTransforms: boolean;
+	/** Normalized emails (see `normalizeEmail`) that may not sign up or be moved to. */
 	auth: { blockedSignupEmails: ReadonlySet<string> };
+	/**
+	 * Public Cloudflare Turnstile key, null unless the `TURNSTILE_SECRET_KEY` secret is set too.
+	 * When set, signup and password reset requests need a solved challenge.
+	 */
+	turnstileSiteKey: string | null;
+	/**
+	 * Web Push: the VAPID public key the browser subscribes with and the contact sent to push
+	 * services. Null (push off) unless the `VAPID_PRIVATE_KEY` secret is set too.
+	 */
+	webPush: { publicKey: string; subject: string } | null;
 }
 
 const MAX_SIGV4_TTL_SEC = 7 * 24 * 3600;
@@ -73,6 +104,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 	rateLimits: {
 		createPost: { limit: 10, windowSec: 60 },
 		createStory: { limit: 10, windowSec: 60 },
+		highlight: { limit: 30, windowSec: 60 },
+		draft: { limit: 30, windowSec: 60 },
 		comment: { limit: 20, windowSec: 60 },
 		reaction: { limit: 60, windowSec: 60 },
 		storyReaction: { limit: 60, windowSec: 60 },
@@ -83,19 +116,28 @@ export const DEFAULT_CONFIG: AppConfig = {
 		like: { limit: 60, windowSec: 60 },
 		save: { limit: 60, windowSec: 60 },
 		share: { limit: 30, windowSec: 60 },
+		repost: { limit: 30, windowSec: 60 },
+		pollVote: { limit: 30, windowSec: 60 },
 		follow: { limit: 30, windowSec: 60 },
+		mute: { limit: 30, windowSec: 60 },
 		uploadPresign: { limit: 20, windowSec: 60 },
 		upload: { limit: 20, windowSec: 60 },
 		mediaRefresh: { limit: 60, windowSec: 60 },
 		accountExport: { limit: 5, windowSec: 3600 },
 		report: { limit: 10, windowSec: 3600 },
+		moderation: { limit: 120, windowSec: 60 },
 		accountDelete: { limit: 5, windowSec: 3600 },
 		signIn: { limit: 10, windowSec: 60 },
 		signUp: { limit: 5, windowSec: 3600 },
+		authEmail: { limit: 5, windowSec: 3600 },
+		passwordChange: { limit: 10, windowSec: 3600 },
+		twoFactor: { limit: 5, windowSec: 300 },
+		sessionRevoke: { limit: 30, windowSec: 60 },
 		profileUpdate: { limit: 10, windowSec: 60 },
 		contentEdit: { limit: 30, windowSec: 60 },
 		markRead: { limit: 120, windowSec: 60 },
-		storyView: { limit: 120, windowSec: 60 }
+		storyView: { limit: 120, windowSec: 60 },
+		pushSubscribe: { limit: 10, windowSec: 60 }
 	},
 	upload: {
 		maxBytes: 50 * 1024 * 1024,
@@ -116,18 +158,27 @@ export const DEFAULT_CONFIG: AppConfig = {
 	saved: { defaultPageSize: 12, maxPageSize: 50 },
 	activity: { defaultPageSize: 20, maxPageSize: 50 },
 	explore: { defaultPageSize: 18, maxPageSize: 36 },
+	profile: { defaultPageSize: 18, maxPageSize: 36 },
+	storyViewers: { defaultPageSize: 20, maxPageSize: 50 },
+	storyArchive: { defaultPageSize: 24, maxPageSize: 48 },
+	moderation: { defaultPageSize: 20, maxPageSize: 50 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
 		inbox: { defaultPageSize: 20, maxPageSize: 50 }
 	},
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
-	auth: { blockedSignupEmails: new Set() }
+	imageTransforms: false,
+	auth: { blockedSignupEmails: new Set() },
+	turnstileSiteKey: null,
+	webPush: null
 };
 
 /** Env var name for each rate limit. Value format: `<limit>/<windowSeconds>`, e.g. `10/60`. */
 export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	createPost: 'RATE_LIMIT_CREATE_POST',
 	createStory: 'RATE_LIMIT_CREATE_STORY',
+	highlight: 'RATE_LIMIT_HIGHLIGHT',
+	draft: 'RATE_LIMIT_DRAFT',
 	comment: 'RATE_LIMIT_COMMENT',
 	reaction: 'RATE_LIMIT_REACTION',
 	storyReaction: 'RATE_LIMIT_STORY_REACTION',
@@ -138,22 +189,46 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	like: 'RATE_LIMIT_LIKE',
 	save: 'RATE_LIMIT_SAVE',
 	share: 'RATE_LIMIT_SHARE',
+	repost: 'RATE_LIMIT_REPOST',
+	pollVote: 'RATE_LIMIT_POLL_VOTE',
 	follow: 'RATE_LIMIT_FOLLOW',
+	mute: 'RATE_LIMIT_MUTE',
 	uploadPresign: 'RATE_LIMIT_UPLOAD_PRESIGN',
 	upload: 'RATE_LIMIT_UPLOAD',
 	mediaRefresh: 'RATE_LIMIT_MEDIA_REFRESH',
 	accountExport: 'RATE_LIMIT_ACCOUNT_EXPORT',
 	report: 'RATE_LIMIT_REPORT',
+	moderation: 'RATE_LIMIT_MODERATION',
 	accountDelete: 'RATE_LIMIT_ACCOUNT_DELETE',
 	signIn: 'RATE_LIMIT_SIGN_IN',
 	signUp: 'RATE_LIMIT_SIGN_UP',
+	authEmail: 'RATE_LIMIT_AUTH_EMAIL',
+	passwordChange: 'RATE_LIMIT_PASSWORD_CHANGE',
+	twoFactor: 'RATE_LIMIT_TWO_FACTOR',
+	sessionRevoke: 'RATE_LIMIT_SESSION_REVOKE',
 	profileUpdate: 'RATE_LIMIT_PROFILE_UPDATE',
 	contentEdit: 'RATE_LIMIT_CONTENT_EDIT',
 	markRead: 'RATE_LIMIT_MARK_READ',
-	storyView: 'RATE_LIMIT_STORY_VIEW'
+	storyView: 'RATE_LIMIT_STORY_VIEW',
+	pushSubscribe: 'RATE_LIMIT_PUSH_SUBSCRIBE'
 };
 
 const PositiveInt = v.pipe(v.string(), v.trim(), v.regex(/^\d+$/), v.toNumber(), v.minValue(1));
+
+const OnOff = v.pipe(
+	v.string(),
+	v.trim(),
+	v.regex(/^(on|off)$/),
+	v.transform((value) => value === 'on')
+);
+
+const NonEmpty = v.pipe(v.string(), v.trim(), v.nonEmpty());
+
+/** An uncompressed P-256 point (65 bytes) as unpadded base64url. */
+const VapidPublicKey = v.pipe(v.string(), v.trim(), v.regex(/^[A-Za-z0-9_-]{87}$/));
+
+/** Who push services contact about our traffic (RFC 8292). */
+const VapidSubject = v.pipe(v.string(), v.trim(), v.regex(/^(mailto:|https:\/\/)\S+$/));
 
 const RateLimitVar = v.pipe(
 	v.string(),
@@ -224,6 +299,12 @@ function read<T>(vars: Vars, name: string, schema: v.GenericSchema<string, T>, f
 	return fallback;
 }
 
+function readWebPush(vars: Vars): AppConfig['webPush'] {
+	const publicKey = read<string | null>(vars, 'VAPID_PUBLIC_KEY', VapidPublicKey, null);
+	const subject = read<string | null>(vars, 'VAPID_SUBJECT', VapidSubject, null);
+	return publicKey && subject ? { publicKey, subject } : null;
+}
+
 export function loadConfig(env: object | undefined): AppConfig {
 	const vars = (env ?? {}) as Vars;
 	const d = DEFAULT_CONFIG;
@@ -257,6 +338,10 @@ export function loadConfig(env: object | undefined): AppConfig {
 		saved: pageSize('SAVED', d.saved),
 		activity: pageSize('ACTIVITY', d.activity),
 		explore: pageSize('EXPLORE', d.explore),
+		profile: pageSize('PROFILE', d.profile),
+		storyViewers: pageSize('STORY_VIEWERS', d.storyViewers),
+		storyArchive: pageSize('STORY_ARCHIVE', d.storyArchive),
+		moderation: pageSize('MODERATION', d.moderation),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),
 			inbox: pageSize('INBOX', d.chat.inbox)
@@ -265,6 +350,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 			read(vars, 'MEDIA_URL_TTL_SECONDS', PositiveInt, d.mediaUrlTtlSec),
 			MAX_SIGV4_TTL_SEC
 		),
+		imageTransforms: read(vars, 'IMAGE_TRANSFORMS', OnOff, d.imageTransforms),
 		auth: {
 			blockedSignupEmails: read(
 				vars,
@@ -272,7 +358,12 @@ export function loadConfig(env: object | undefined): AppConfig {
 				EmailList,
 				d.auth.blockedSignupEmails
 			)
-		}
+		},
+		// A widget whose tokens nothing verifies would only slow people down.
+		turnstileSiteKey: vars.TURNSTILE_SECRET_KEY
+			? read<string | null>(vars, 'TURNSTILE_SITE_KEY', NonEmpty, d.turnstileSiteKey)
+			: null,
+		webPush: vars.VAPID_PRIVATE_KEY ? readWebPush(vars) : null
 	};
 }
 

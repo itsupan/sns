@@ -4,7 +4,7 @@ import type { TextBackground } from '$lib/post-backgrounds';
 export interface ExploreTile {
 	id: string;
 	title: string;
-	cover: { url: string; type: 'image' | 'video' } | null;
+	cover: { url: string; type: 'image' | 'video'; alt?: string } | null;
 	/** Text posts: the background the title is shown on. */
 	background?: TextBackground;
 	isCarousel: boolean;

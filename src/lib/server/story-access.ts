@@ -1,29 +1,34 @@
 import { ApiError } from '$lib/server/api';
+import type { Database } from '$lib/server/db';
+import { isCloseFriend } from '$lib/server/db/close-friends';
 import { isFollowing } from '$lib/server/db/follows';
-import { getStory, parseStoryId, type StoredStory } from '$lib/server/stories';
+import { getLiveStory, parseStoryId, type StoredStory } from '$lib/server/stories';
+
+async function canSee(db: Database, story: StoredStory, viewerId: string) {
+	if (story.userId === viewerId) return true;
+	const [follows, listed] = await Promise.all([
+		isFollowing(db, viewerId, story.userId),
+		story.audience === 'everyone' || isCloseFriend(db, story.userId, viewerId)
+	]);
+	return follows && listed;
+}
 
 /**
  * The live story `id` when `viewerId` can see it: their own, or one by someone they follow (a
- * block removes the follow, so blocked users never qualify). Anything else is a 404.
+ * block removes the follow, so blocked users never qualify) and, for a close friends story, whose
+ * list they are on. Anything else is a 404.
  */
 export async function requireVisibleStory(
 	locals: App.Locals,
-	platform: App.Platform | undefined,
 	id: string,
 	viewerId: string
-): Promise<{ kv: KVNamespace; story: StoredStory }> {
+): Promise<StoredStory> {
 	if (!parseStoryId(id)) {
 		throw new ApiError(400, 'validation_failed', 'Invalid story id');
 	}
-	const kv = platform?.env?.STORIES;
-	if (!kv) {
-		throw new ApiError(503, 'stories_unavailable', 'Stories are not available right now');
-	}
-	const story = await getStory(kv, id);
-	const canSee =
-		story && (story.userId === viewerId || (await isFollowing(locals.db, viewerId, story.userId)));
-	if (!story || !canSee) {
+	const story = await getLiveStory(locals.db, id);
+	if (!story || !(await canSee(locals.db, story, viewerId))) {
 		throw new ApiError(404, 'not_found', 'Story not found');
 	}
-	return { kv, story };
+	return story;
 }

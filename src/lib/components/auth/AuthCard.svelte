@@ -4,10 +4,16 @@
 	import { page } from '$app/state';
 	import { authClient } from '$lib/auth-client';
 	import { MIN_AGE } from '$lib/constants/legal';
+	import { emailVerifiedUrl } from '$lib/utils/email-links';
+	import { newPasswordError } from '$lib/utils/password';
 	import { toast } from '$lib/utils/toast.svelte';
 	import Button from '$lib/components/shared/Button.svelte';
-	import KizunaLogo from '$lib/components/shared/KizunaLogo.svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import AuthAlert from './AuthAlert.svelte';
+	import AuthPanel from './AuthPanel.svelte';
+	import PasswordField from './PasswordField.svelte';
+	import Turnstile from './Turnstile.svelte';
+	import { inputClass, labelClass, linkClass } from './styles';
 
 	interface Props {
 		mode?: 'login' | 'signup';
@@ -24,9 +30,9 @@
 	let confirmPassword = $state('');
 	let rememberMe = $state(true);
 	let agreeToTerms = $state(false);
+	let captchaToken = $state('');
+	let turnstile = $state<ReturnType<typeof Turnstile>>();
 
-	let showPassword = $state(false);
-	let showConfirmPassword = $state(false);
 	let loading = $state(false);
 	let googleLoading = $state(false);
 	let errorMessage = $state<string | null>(null);
@@ -92,20 +98,9 @@
 				return;
 			}
 
-			if (password.length < 8) {
-				errorMessage = 'Password must be at least 8 characters long.';
-				toast.error(errorMessage);
-				return;
-			}
-
-			if (!confirmPassword) {
-				errorMessage = 'Please confirm your password.';
-				toast.error(errorMessage);
-				return;
-			}
-
-			if (password !== confirmPassword) {
-				errorMessage = 'Passwords do not match.';
+			const passwordError = newPasswordError(password, confirmPassword);
+			if (passwordError) {
+				errorMessage = passwordError;
 				toast.error(errorMessage);
 				return;
 			}
@@ -132,6 +127,11 @@
 					errorMessage = result.error.message || 'Invalid email or password. Please try again.';
 					toast.error(errorMessage);
 					loading = false;
+				} else if ('twoFactorRedirect' in result.data) {
+					// eslint-disable-next-line svelte/no-navigation-without-resolve
+					goto(
+						`${resolve('/login/two-factor')}?redirectTo=${encodeURIComponent(effectiveRedirect)}`
+					);
 				} else {
 					successMessage = 'Signed in successfully! Redirecting...';
 					toast.success('Signed in successfully! Welcome back.');
@@ -144,34 +144,24 @@
 				const result = await authClient.signUp.email({
 					email: trimmedEmail,
 					password,
-					name: trimmedName
+					name: trimmedName,
+					callbackURL: emailVerifiedUrl,
+					fetchOptions: { headers: { 'x-captcha-response': captchaToken } }
 				});
+				turnstile?.reset();
 
 				if (result.error) {
 					errorMessage = result.error.message || 'Could not create account. Please try again.';
 					toast.error(errorMessage);
 					loading = false;
 				} else {
-					// Sign out immediately so user must sign in with their email and password first
-					try {
-						await authClient.signOut();
-					} catch {
-						// Ignore if not authenticated yet
-					}
-
-					successMessage =
-						'Account created successfully! Please sign in with your email and password.';
-					toast.success('Account created successfully! Please sign in.');
-
-					// Redirect user to login with their email and redirectTo prefilled
-					const redirectParam = page.url?.searchParams?.get('redirectTo');
-					const loginUrl = redirectParam
-						? `${resolve('/login')}?email=${encodeURIComponent(trimmedEmail)}&redirectTo=${encodeURIComponent(redirectParam)}`
-						: `${resolve('/login')}?email=${encodeURIComponent(trimmedEmail)}`;
-					setTimeout(() => {
-						// eslint-disable-next-line svelte/no-navigation-without-resolve
-						goto(loginUrl);
-					}, 600);
+					// The new account stays signed in and sets up its profile; the verification email
+					// is already on its way.
+					toast.success('Account created! Check your inbox to verify your email.');
+					// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() is the base; only a query is added
+					await goto(`${resolve('/welcome')}?redirectTo=${encodeURIComponent(effectiveRedirect)}`, {
+						invalidateAll: true
+					});
 				}
 			}
 		} catch (err: unknown) {
@@ -183,11 +173,7 @@
 	}
 </script>
 
-<div
-	class="auth-card relative w-full max-w-[27.5rem] mx-auto box-border transition-colors duration-200 px-4 py-6 sm:p-9 bg-transparent sm:bg-white dark:sm:bg-dark-card rounded-none sm:rounded-3xl border-0 sm:border border-slate-100 dark:border-dark-border shadow-none sm:shadow-[0_20px_45px_-12px_rgba(15,23,42,0.08),0_1px_3px_rgba(15,23,42,0.03)] dark:sm:shadow-[0_12px_28px_0_rgba(0,0,0,0.35)]"
->
-	<KizunaLogo />
-
+<AuthPanel>
 	<!-- Segmented Tab Switcher (Log In / Sign Up) -->
 	<div
 		class="tab-switcher grid grid-cols-2 bg-[#f1f3f5] dark:bg-dark-elevated p-1 rounded-[10px] mb-5 gap-1 transition-colors duration-150"
@@ -278,34 +264,18 @@
 
 	<!-- Alerts -->
 	{#if errorMessage}
-		<div
-			class="alert alert-error flex items-center gap-2.5 p-3 rounded-[10px] text-[13px] mb-4.5 leading-snug bg-red-50 dark:bg-red-950/40 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-900/60"
-			role="alert"
-		>
-			<Icon name="cross-circle" class="alert-icon text-base shrink-0" />
-			<span>{errorMessage}</span>
-		</div>
+		<AuthAlert type="error">{errorMessage}</AuthAlert>
 	{/if}
 
 	{#if successMessage}
-		<div
-			class="alert alert-success flex items-center gap-2.5 p-3 rounded-[10px] text-[13px] mb-4.5 leading-snug bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/60"
-			role="status"
-		>
-			<Icon name="check-circle" class="alert-icon text-base shrink-0" />
-			<span>{successMessage}</span>
-		</div>
+		<AuthAlert type="success">{successMessage}</AuthAlert>
 	{/if}
 
 	<!-- Auth Form -->
 	<form onsubmit={handleSubmit} class="auth-form flex flex-col gap-4.5" novalidate>
 		{#if mode === 'signup'}
 			<div class="form-group flex flex-col gap-1.5">
-				<label
-					for="name"
-					class="form-label text-[13px] font-medium text-slate-900 dark:text-dark-text"
-					>Full name</label
-				>
+				<label for="name" class={labelClass}>Full name</label>
 				<input
 					id="name"
 					name="name"
@@ -315,17 +285,13 @@
 					required
 					autocomplete="name"
 					enterkeyhint="next"
-					class="form-input w-full h-12 sm:h-11 px-3.5 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
+					class={inputClass}
 				/>
 			</div>
 		{/if}
 
 		<div class="form-group flex flex-col gap-1.5">
-			<label
-				for="email"
-				class="form-label text-[13px] font-medium text-slate-900 dark:text-dark-text"
-				>Email address</label
-			>
+			<label for="email" class={labelClass}>Email address</label>
 			<input
 				id="email"
 				name="email"
@@ -337,80 +303,32 @@
 				inputmode="email"
 				autocapitalize="off"
 				enterkeyhint="next"
-				class="form-input w-full h-12 sm:h-11 px-3.5 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
+				class={inputClass}
 			/>
 		</div>
 
-		<div class="form-group flex flex-col gap-1.5">
-			<div class="label-row flex justify-between items-center">
-				<label
-					for="password"
-					class="form-label text-[13px] font-medium text-slate-900 dark:text-dark-text"
-					>Password</label
-				>
-			</div>
-			<div class="password-input-wrapper relative flex items-center">
-				<input
-					id="password"
-					name="password"
-					type={showPassword ? 'text' : 'password'}
-					bind:value={password}
-					placeholder="••••••••"
-					required
-					autocomplete={mode === 'login' ? 'current-password' : 'new-password'}
-					enterkeyhint="go"
-					class="form-input password-input w-full h-12 sm:h-11 px-3.5 pr-11 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
-				/>
-				<button
-					type="button"
-					class="toggle-password-btn absolute right-0.5 size-11 text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150 flex items-center justify-center rounded-md cursor-pointer border-none bg-transparent"
-					onclick={() => (showPassword = !showPassword)}
-					aria-label={showPassword ? 'Hide password' : 'Show password'}
-				>
-					{#if showPassword}
-						<!-- Eye Off SVG -->
-						<Icon name="eye-crossed" size={19} />
-					{:else}
-						<!-- Eye Open SVG -->
-						<Icon name="eye" size={19} />
-					{/if}
-				</button>
-			</div>
-		</div>
+		<PasswordField
+			id="password"
+			name="password"
+			label="Password"
+			bind:value={password}
+			autocomplete={mode === 'login' ? 'current-password' : 'new-password'}
+		>
+			{#snippet aside()}
+				{#if mode === 'login'}
+					<a href={resolve('/forgot-password')} class="text-[13px] {linkClass}">Forgot password?</a>
+				{/if}
+			{/snippet}
+		</PasswordField>
 
 		{#if mode === 'signup'}
-			<div class="form-group flex flex-col gap-1.5">
-				<label
-					for="confirm-password"
-					class="form-label text-[13px] font-medium text-slate-900 dark:text-dark-text"
-					>Confirm password</label
-				>
-				<div class="password-input-wrapper relative flex items-center">
-					<input
-						id="confirm-password"
-						name="confirmPassword"
-						type={showConfirmPassword ? 'text' : 'password'}
-						bind:value={confirmPassword}
-						placeholder="••••••••"
-						required
-						autocomplete="new-password"
-						enterkeyhint="go"
-						class="form-input password-input w-full h-12 sm:h-11 px-3.5 pr-11 text-sm text-slate-900 dark:text-dark-text bg-white dark:bg-dark-elevated border border-slate-200 dark:border-dark-input-border rounded-[10px] outline-none transition-all duration-150 placeholder:text-slate-400 dark:placeholder:text-dark-subtle focus:border-slate-950 dark:focus:border-kizuna-blue focus:ring-1 focus:ring-slate-950 dark:focus:ring-kizuna-blue"
-					/>
-					<button
-						type="button"
-						class="toggle-password-btn absolute right-0.5 size-11 text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150 flex items-center justify-center rounded-md cursor-pointer border-none bg-transparent"
-						onclick={() => (showConfirmPassword = !showConfirmPassword)}
-						aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
-					>
-						{#if showConfirmPassword}
-							<Icon name="eye-crossed" size={19} />
-						{:else}
-							<Icon name="eye" size={19} />
-						{/if}
-					</button>
-				</div>
-			</div>
+			<PasswordField
+				id="confirm-password"
+				name="confirmPassword"
+				label="Confirm password"
+				bind:value={confirmPassword}
+				autocomplete="new-password"
+			/>
 		{/if}
 
 		<!-- Options Row (Remember me / Terms) -->
@@ -456,11 +374,15 @@
 			{/if}
 		</div>
 
+		{#if mode === 'signup'}
+			<Turnstile bind:token={captchaToken} bind:this={turnstile} />
+		{/if}
+
 		<!-- Primary Button Component (Black) -->
 		<Button type="submit" variant="primary" size="lg" fullWidth {loading}>
 			<span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
 			<Icon
-				name="arrow-small-right"
+				name="arrow-right"
 				class="arrow-icon ml-1 text-base transition-transform duration-150 group-hover:translate-x-0.5"
 			/>
 		</Button>
@@ -512,4 +434,4 @@
 			>.
 		</p>
 	{/if}
-</div>
+</AuthPanel>

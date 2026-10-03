@@ -1,11 +1,13 @@
 <script lang="ts">
 	import ProfileHeader from '$lib/components/profile/ProfileHeader.svelte';
+	import HighlightsRow from '$lib/components/profile/HighlightsRow.svelte';
 	import ProfileTabs from '$lib/components/profile/ProfileTabs.svelte';
 	import ProfileGrid from '$lib/components/profile/ProfileGrid.svelte';
 	import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 	import type { TabId, ViewMode } from '$lib/components/profile/ProfileTabs.svelte';
 	import { authClient } from '$lib/auth-client';
 	import { profileStore, resolveProfile } from '$lib/utils/profile.svelte';
+	import { displayHandle } from '$lib/utils/format';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -39,7 +41,7 @@
 
 	const pageTitle = $derived(
 		currentProfile.name
-			? `${currentProfile.name} (@${currentProfile.handle}) — Kizuna`
+			? `${currentProfile.name} (${displayHandle(currentProfile.handle, currentProfile.name)}) — Kizuna`
 			: 'Profile — Kizuna'
 	);
 	const metaDescription = $derived(
@@ -76,6 +78,18 @@
 		<!-- Profile Header (Responsive: Mobile Profile Bar / Desktop Master Curator Card) -->
 		<ProfileHeader user={data?.user} profile={data?.stats} />
 
+		{#if data}
+			<HighlightsRow
+				owner={{
+					id: data.user.id,
+					name: currentProfile.name,
+					handle: currentProfile.handle,
+					image: currentProfile.avatar || null
+				}}
+				isOwner
+			/>
+		{/if}
+
 		<!-- Tabs Bar (Responsive: Mobile Icon Tabs / Desktop Filter Pills) -->
 		<ProfileTabs bind:activeTab bind:viewMode showSaved />
 
@@ -85,11 +99,9 @@
 			savedPosts={data?.saved ?? []}
 			{viewMode}
 			items={userPosts}
-			user={{
-				name: currentProfile.name,
-				handle: currentProfile.handle,
-				image: currentProfile.avatar
-			}}
+			userName={currentProfile.name}
+			userId={data?.user.id}
+			nextCursor={data?.nextCursor}
 		/>
 	</div>
 </main>

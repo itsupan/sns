@@ -148,6 +148,111 @@
       "when": 1790933020095,
       "tag": "0021_post_share",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "6",
+      "when": 1790989466925,
+      "tag": "0022_stories",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "6",
+      "when": 1791010504773,
+      "tag": "0023_moderation",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "6",
+      "when": 1791010550279,
+      "tag": "0024_private_accounts",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1791010661754,
+      "tag": "0025_notification_prefs",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "6",
+      "when": 1791011307677,
+      "tag": "0026_media_alt",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "6",
+      "when": 1791011327586,
+      "tag": "0027_mute",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "6",
+      "when": 1791011349034,
+      "tag": "0028_two_factor",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "6",
+      "when": 1791011493401,
+      "tag": "0029_pinned_posts",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "6",
+      "when": 1791011703238,
+      "tag": "0030_close_friends",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "6",
+      "when": 1791030254815,
+      "tag": "0031_reposts",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "6",
+      "when": 1791030288734,
+      "tag": "0032_post_drafts",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "6",
+      "when": 1791030425319,
+      "tag": "0033_onboarding",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "6",
+      "when": 1791032786014,
+      "tag": "0034_polls",
+      "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "6",
+      "when": 1791032918804,
+      "tag": "0035_push",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "6",
+      "when": 1791032963099,
+      "tag": "0036_story_highlights",
+      "breakpoints": true
     }
   ]
 }

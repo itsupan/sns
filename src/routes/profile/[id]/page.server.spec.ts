@@ -6,7 +6,7 @@ vi.mock('$lib/server/db/profiles', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/db/profiles')>();
 	return {
 		...actual,
-		loadProfilePosts: vi.fn(async () => []),
+		loadProfilePosts: vi.fn(async () => ({ posts: [], nextCursor: null })),
 		loadProfileStats: vi.fn(async () => actual.EMPTY_PROFILE_STATS)
 	};
 });

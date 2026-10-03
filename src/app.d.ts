@@ -10,6 +10,9 @@ declare global {
 		R2_SECRET_ACCESS_KEY?: string;
 		R2_BUCKET_NAME?: string;
 		R2_PUBLIC_URL?: string;
+		TURNSTILE_SECRET_KEY?: string;
+		/** VAPID private key as a P-256 JWK (JSON), from `scripts/vapid-keys.mjs`. */
+		VAPID_PRIVATE_KEY?: string;
 	}
 
 	namespace App {
@@ -31,6 +34,14 @@ declare global {
 			auth: Auth;
 			user: User | null;
 			session: Session | null;
+		}
+
+		/** Returned by the root layout, so every page has it. */
+		interface PageData {
+			imageTransforms: boolean;
+			turnstileSiteKey: string | null;
+			/** VAPID public key browsers subscribe with; null while push is off. */
+			pushPublicKey: string | null;
 		}
 	}
 }
