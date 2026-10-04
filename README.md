@@ -159,6 +159,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | `mediaRefresh`   | `RATE_LIMIT_MEDIA_REFRESH`   | `POST /api/media/refresh` (per user, or per IP)                      | 60 / min  |
 | `accountExport`  | `RATE_LIMIT_ACCOUNT_EXPORT`  | `GET /api/account/export` (per user)                                 | 5 / hour  |
 | `report`         | `RATE_LIMIT_REPORT`          | `POST /api/reports`                                                  | 10 / hour |
+| `moderation`     | `RATE_LIMIT_MODERATION`      | every `/api/admin/*` route (per moderator)                           | 120 / min |
 | `accountDelete`  | `RATE_LIMIT_ACCOUNT_DELETE`  | `DELETE /api/account`                                                | 5 / hour  |
 | `signIn`         | `RATE_LIMIT_SIGN_IN`         | `POST /api/auth/sign-in/email` (per IP)                              | 10 / min  |
 | `signUp`         | `RATE_LIMIT_SIGN_UP`         | `POST /api/auth/sign-up/email` (per IP)                              | 5 / hour  |
@@ -173,6 +174,32 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }` (the `/api/auth/*` limits answer in better-auth's `{ "code", "message" }` shape). A Durable Object handles one request at a time, so counts are exact, and each object deletes its storage when its window ends. If the limiter is unreachable, the costly writes in `FAIL_CLOSED_LIMITS` answer `503` and the rest are allowed. Without the binding (`vite dev`, unit tests) requests are allowed.
 
 To add a limit, extend `RateLimitName`, `DEFAULT_CONFIG` and `RATE_LIMIT_VARS` in `src/lib/server/config.ts`, add a row to the table above, and add its var to **both** `vars` blocks in `wrangler.jsonc`: the top level (local dev and tests) and `env.production`. Wrangler does not inherit `vars` into an environment, so a var missing from `env.production` silently falls back to its default in production. Add the name to `FAIL_CLOSED_LIMITS` (`src/lib/server/api/rate-limit.ts`) if the endpoint is abuse-sensitive.
+
+## Moderation
+
+Users report posts, comments, accounts and messages (`POST /api/reports`). Moderators work the
+queue at `/admin/reports` (linked from Settings): open reports grouped by target, with their
+count, reasons and a preview. Each target is resolved once for all its reports:
+
+- **Dismiss** closes the reports and leaves the content.
+- **Remove** soft-deletes a post or message, or deletes a comment and its replies.
+- **Suspend user** bans the target's owner for 1, 7 or 30 days or until lifted, and signs them
+  out. better-auth's `admin` plugin refuses new sessions while the ban lasts and clears it once it
+  expires.
+
+Every action closes the target's open reports (`resolved_by`, `resolved_at`, `resolution`) and
+writes a `moderation_action` audit row in the same batch. Roles are `user` (or null),
+`moderator` and `admin`; only a higher role may act on a user, and nobody on themselves, so
+moderators cannot touch moderators or admins. Admins also manage moderators and lift
+suspensions at `/admin/moderators`. The `/admin` pages answer 404 to everyone else. The plugin's
+own `/api/auth/admin/*` endpoints grant no role any permission: all moderation goes through
+`/api/admin/*`.
+
+Bootstrap the first admin by hand, then grant moderators from `/admin/moderators`:
+
+```sh
+pnpm exec wrangler d1 execute DB --env production --remote --command "UPDATE user SET role='admin' WHERE email='you@example.com'"
+```
 
 ## Real-time chat
 

@@ -1,5 +1,6 @@
 import type { BetterAuthOptions } from 'better-auth';
 import { APIError } from 'better-auth/api';
+import { admin } from 'better-auth/plugins/admin';
 import { getConfig, normalizeEmail } from './config';
 import {
 	createEmailSender,
@@ -7,6 +8,7 @@ import {
 	passwordResetEmail,
 	verificationEmail
 } from './email';
+import { accessControl, pluginRoles } from './roles';
 
 export function authOptions(env: Env) {
 	const hasGoogleCredentials = Boolean(
@@ -97,6 +99,8 @@ export function authOptions(env: Env) {
 				// Set server-side at account creation; never user input.
 				termsAcceptedAt: { type: 'date', required: false, input: false }
 			}
-		}
+		},
+		// Adds `role` and the ban fields, and refuses to create a session for a banned user.
+		plugins: [admin({ ac: accessControl, roles: pluginRoles })]
 	} satisfies BetterAuthOptions;
 }

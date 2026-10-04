@@ -5,6 +5,7 @@ import {
 	conversation,
 	conversationMember,
 	message,
+	moderationAction,
 	post,
 	postComment,
 	postLike,
@@ -85,7 +86,17 @@ beforeAll(async () => {
 			})
 		),
 		db.insert(storyView).values({ storyId: 'bob:1', viewerId: 'alice', reaction: '🔥' }),
-		db.insert(storyView).values({ storyId: 'alice:1', viewerId: 'carol' })
+		db.insert(storyView).values({ storyId: 'alice:1', viewerId: 'carol' }),
+		db.insert(moderationAction).values([
+			{ id: 'ma-1', moderatorId: 'alice', action: 'dismiss', targetType: 'post', targetId: 'p-b' },
+			{
+				id: 'ma-2',
+				moderatorId: 'bob',
+				action: 'suspend_user',
+				targetType: 'user',
+				targetId: 'carol'
+			}
+		])
 	]);
 }, 60_000);
 
@@ -111,6 +122,9 @@ describe('account export on real D1', { timeout: REAL_D1_TIMEOUT }, () => {
 		]);
 		// Stories alice watched, not who watched hers.
 		expect(data!.storyViews).toMatchObject([{ storyId: 'bob:1', reaction: '🔥' }]);
+		expect(data!.moderationActions).toMatchObject([
+			{ action: 'dismiss', targetType: 'post', targetId: 'p-b' }
+		]);
 
 		// Only conversations alice is in; bob and carol's DM stays out.
 		expect(data!.conversations.map((c) => c.id)).toEqual(['cv-1']);

@@ -8,6 +8,7 @@ import {
 	conversation,
 	conversationMember,
 	message,
+	moderationAction,
 	notification,
 	post,
 	postComment,
@@ -23,7 +24,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 3;
+export const EXPORT_FORMAT_VERSION = 4;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -47,7 +48,8 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		memberships,
 		notifications,
 		stories,
-		storyViews
+		storyViews,
+		moderationActions
 	] = await Promise.all([
 		db
 			.select({ provider: account.providerId, createdAt: account.createdAt })
@@ -135,7 +137,19 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			})
 			.from(storyView)
 			.where(eq(storyView.viewerId, userId))
-			.orderBy(asc(storyView.viewedAt))
+			.orderBy(asc(storyView.viewedAt)),
+		db
+			.select({
+				action: moderationAction.action,
+				targetType: moderationAction.targetType,
+				targetId: moderationAction.targetId,
+				reportId: moderationAction.reportId,
+				note: moderationAction.note,
+				createdAt: moderationAction.createdAt
+			})
+			.from(moderationAction)
+			.where(eq(moderationAction.moderatorId, userId))
+			.orderBy(asc(moderationAction.createdAt))
 	]);
 
 	const postIds = posts.map((p) => p.id);
@@ -207,6 +221,10 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			website: profile.website,
 			location: profile.location,
 			cameraGear: profile.cameraGear,
+			role: profile.role,
+			banned: profile.banned,
+			banReason: profile.banReason,
+			banExpires: profile.banExpires,
 			createdAt: profile.createdAt,
 			updatedAt: profile.updatedAt
 		},
@@ -243,7 +261,9 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		})),
 		notifications,
 		stories,
-		storyViews
+		storyViews,
+		// Actions this account took as a moderator or admin.
+		moderationActions
 	};
 }
 

@@ -58,7 +58,10 @@ beforeAll(async () => {
 
 afterAll(() => dispose?.());
 
-function event(me: { id: string; email: string; emailVerified: boolean } | null, sessionId = '') {
+function event(
+	me: { id: string; email: string; emailVerified: boolean; role?: string } | null,
+	sessionId = ''
+) {
 	return {
 		locals: { db, user: me, session: me ? { id: sessionId } : null },
 		url: new URL('http://localhost:5173/settings?verified=1')
@@ -83,7 +86,8 @@ describe('Settings +page.server.ts', { timeout: REAL_D1_TIMEOUT }, () => {
 			emailVerified: false,
 			hasPassword: true,
 			socialProviders: [],
-			blockedUsers: []
+			blockedUsers: [],
+			isModerator: false
 		});
 		expect(data!.sessions).toEqual([
 			{
@@ -111,5 +115,14 @@ describe('Settings +page.server.ts', { timeout: REAL_D1_TIMEOUT }, () => {
 			event({ id: 'ada', email: 'ada@example.com', emailVerified: false }, 'ada-now')
 		);
 		expect(data!.blockedUsers).toMatchObject([{ id: 'u2', name: 'Bob', image: null }]);
+	});
+
+	it('links moderators and admins to the moderation queue', async () => {
+		for (const role of ['moderator', 'admin']) {
+			const data = await load(
+				event({ id: 'ada', email: 'ada@example.com', emailVerified: false, role }, 'ada-now')
+			);
+			expect(data!.isModerator).toBe(true);
+		}
 	});
 });
