@@ -45,7 +45,8 @@ export const FAIL_CLOSED_LIMITS: ReadonlySet<RateLimitName> = new Set<RateLimitN
 	'accountExport',
 	'report',
 	'signUp',
-	'authEmail'
+	'authEmail',
+	'twoFactor'
 ]);
 
 /** A missing limiter is only acceptable in local dev (`vite dev`) and unit tests. */

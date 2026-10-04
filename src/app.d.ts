@@ -10,6 +10,7 @@ declare global {
 		R2_SECRET_ACCESS_KEY?: string;
 		R2_BUCKET_NAME?: string;
 		R2_PUBLIC_URL?: string;
+		TURNSTILE_SECRET_KEY?: string;
 	}
 
 	namespace App {
@@ -36,6 +37,7 @@ declare global {
 		/** Returned by the root layout, so every page has it. */
 		interface PageData {
 			imageTransforms: boolean;
+			turnstileSiteKey: string | null;
 		}
 	}
 }

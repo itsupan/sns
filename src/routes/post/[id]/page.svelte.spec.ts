@@ -27,6 +27,7 @@ describe('Post Page Component', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					post: mockPost,
 					postUrl: 'https://sns.ecoapsara.com/post/post-test-42',
 					origin: 'https://sns.ecoapsara.com',

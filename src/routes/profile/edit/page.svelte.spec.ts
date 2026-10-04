@@ -8,6 +8,7 @@ describe('Profile Edit Page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					user: {
 						id: 'user-1',
 						name: 'Elena Rostova',

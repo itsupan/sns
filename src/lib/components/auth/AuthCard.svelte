@@ -12,6 +12,7 @@
 	import AuthAlert from './AuthAlert.svelte';
 	import AuthPanel from './AuthPanel.svelte';
 	import PasswordField from './PasswordField.svelte';
+	import Turnstile from './Turnstile.svelte';
 	import { inputClass, labelClass, linkClass } from './styles';
 
 	interface Props {
@@ -29,6 +30,8 @@
 	let confirmPassword = $state('');
 	let rememberMe = $state(true);
 	let agreeToTerms = $state(false);
+	let captchaToken = $state('');
+	let turnstile = $state<ReturnType<typeof Turnstile>>();
 
 	let loading = $state(false);
 	let googleLoading = $state(false);
@@ -124,6 +127,11 @@
 					errorMessage = result.error.message || 'Invalid email or password. Please try again.';
 					toast.error(errorMessage);
 					loading = false;
+				} else if ('twoFactorRedirect' in result.data) {
+					goto(
+						// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolved path plus a query
+						`${resolve('/login/two-factor')}?redirectTo=${encodeURIComponent(effectiveRedirect)}`
+					);
 				} else {
 					successMessage = 'Signed in successfully! Redirecting...';
 					toast.success('Signed in successfully! Welcome back.');
@@ -137,8 +145,10 @@
 					email: trimmedEmail,
 					password,
 					name: trimmedName,
-					callbackURL: emailVerifiedUrl
+					callbackURL: emailVerifiedUrl,
+					fetchOptions: { headers: { 'x-captcha-response': captchaToken } }
 				});
+				turnstile?.reset();
 
 				if (result.error) {
 					errorMessage = result.error.message || 'Could not create account. Please try again.';
@@ -376,6 +386,10 @@
 				</label>
 			{/if}
 		</div>
+
+		{#if mode === 'signup'}
+			<Turnstile bind:token={captchaToken} bind:this={turnstile} />
+		{/if}
 
 		<!-- Primary Button Component (Black) -->
 		<Button type="submit" variant="primary" size="lg" fullWidth {loading}>

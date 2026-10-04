@@ -51,6 +51,7 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					user: testUser,
 					posts: [],
 					nextCursor: null,
@@ -94,6 +95,7 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					user: newRegisteredUser,
 					posts: [],
 					nextCursor: null,
@@ -125,6 +127,7 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					user: testUser,
 					posts: [],
 					nextCursor: null,
@@ -144,6 +147,7 @@ describe('Profile Page', () => {
 			props: {
 				data: {
 					imageTransforms: false,
+					turnstileSiteKey: null,
 					user: testUser,
 					posts: [],
 					nextCursor: null,

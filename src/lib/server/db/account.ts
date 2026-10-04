@@ -28,11 +28,12 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 8;
+export const EXPORT_FORMAT_VERSION = 9;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
- * Secrets are left out: password hashes, OAuth tokens and session tokens never appear.
+ * Secrets are left out: password hashes, OAuth tokens, session tokens and two-factor secrets and
+ * backup codes never appear.
  */
 export async function buildAccountExport(db: Database, userId: string, now = new Date()) {
 	const [profile] = await db.select().from(user).where(eq(user.id, userId));
@@ -267,6 +268,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			banReason: profile.banReason,
 			banExpires: profile.banExpires,
 			isPrivate: profile.isPrivate,
+			twoFactorEnabled: profile.twoFactorEnabled,
 			createdAt: profile.createdAt,
 			updatedAt: profile.updatedAt
 		},
