@@ -5,10 +5,15 @@ import { createAuth } from '$lib/server/auth';
 import { getDb } from '$lib/server/db';
 import { ApiError, enforceRateLimit, rateLimitSubject, type RateLimitName } from '$lib/server/api';
 
-/** better-auth endpoints limited per client IP, against password guessing and signup spam. */
+/** better-auth endpoints limited per client IP: password guessing, signup spam, email floods. */
 const AUTH_RATE_LIMITS: Record<string, RateLimitName> = {
 	'/api/auth/sign-in/email': 'signIn',
-	'/api/auth/sign-up/email': 'signUp'
+	'/api/auth/sign-up/email': 'signUp',
+	'/api/auth/request-password-reset': 'authEmail',
+	'/api/auth/send-verification-email': 'authEmail',
+	'/api/auth/change-email': 'authEmail',
+	'/api/auth/reset-password': 'passwordChange',
+	'/api/auth/change-password': 'passwordChange'
 };
 
 /** Added to every response that does not set them itself (media routes send a stricter CSP). */
@@ -30,7 +35,7 @@ function withSecurityHeaders(response: Response): Response {
 
 export const handle: Handle = async ({ event, resolve }) => {
 	const db = getDb(event.platform);
-	const auth = createAuth(event.platform!.env, db);
+	const auth = createAuth(event.platform!.env, db, event.platform!.ctx);
 
 	event.locals.db = db;
 	event.locals.auth = auth;

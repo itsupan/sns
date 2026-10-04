@@ -13,7 +13,6 @@ const testProfile = {
 	location: 'Tokyo',
 	cameraGear: 'Leica M6',
 	badgeText: '',
-	isVerified: false,
 	postsCount: 10,
 	followersCount: 150,
 	followingCount: 50,

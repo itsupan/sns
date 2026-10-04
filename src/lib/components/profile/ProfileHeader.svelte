@@ -240,16 +240,6 @@
 						<Icon name="camera" class="text-xs" />
 					</button>
 				{/if}
-
-				<!-- Desktop Verified Badge -->
-				{#if profile.isVerified}
-					<div
-						class="hidden sm:flex absolute bottom-1 right-1 size-6 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 items-center justify-center shadow-md ring-2 ring-white dark:ring-dark-card"
-						title="Verified Curator"
-					>
-						<Icon name="check" class="text-xs" />
-					</div>
-				{/if}
 			</div>
 
 			<!-- 2. STATS (Row 1 on Mobile, Spanning Bottom Row on Desktop) -->

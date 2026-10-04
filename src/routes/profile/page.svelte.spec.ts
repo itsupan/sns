@@ -13,8 +13,7 @@ const testUser = {
 	website: 'kenjisato.jp',
 	location: 'Tokyo, Japan',
 	cameraGear: 'Leica M6 · Summicron 35mm',
-	badgeText: 'CURATOR',
-	isVerified: true
+	badgeText: 'CURATOR'
 };
 
 const testStats = {
