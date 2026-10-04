@@ -29,6 +29,9 @@ export const user = sqliteTable("user", {
   followersCount: integer("followers_count").default(0).notNull(),
   followingCount: integer("following_count").default(0).notNull(),
   termsAcceptedAt: integer("terms_accepted_at", { mode: "timestamp_ms" }),
+  isPrivate: integer("is_private", { mode: "boolean" })
+    .default(false)
+    .notNull(),
 });
 
 export const session = sqliteTable(

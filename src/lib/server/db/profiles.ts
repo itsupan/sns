@@ -2,12 +2,13 @@ import { stripFormatting } from '$lib/formatting';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, user } from './schema';
-import { notBlockedWith } from './blocks';
-import { isFollowing } from './follows';
+import { followStatus } from './follows';
+import { visibleTo } from './visibility';
 import { encodeCursor, notDeleted, type FeedCursor } from './posts';
 import { postRowAuthor, toPostCards } from './post-cards';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
+import type { FollowStatus } from '$lib/utils/follow.svelte';
 
 export interface ProfileStats {
 	postsCount: number;
@@ -15,8 +16,8 @@ export interface ProfileStats {
 	followingCount: number;
 	/** Total views across the user's live posts. */
 	impressionsCount: number;
-	/** Whether `viewerId` follows this user (always false for anonymous or own profile). */
-	isFollowing: boolean;
+	/** Whether `viewerId` follows or asked to follow this user (`none` for anonymous or own profile). */
+	followStatus: FollowStatus;
 }
 
 export const EMPTY_PROFILE_STATS: ProfileStats = {
@@ -24,7 +25,7 @@ export const EMPTY_PROFILE_STATS: ProfileStats = {
 	followersCount: 0,
 	followingCount: 0,
 	impressionsCount: 0,
-	isFollowing: false
+	followStatus: 'none'
 };
 
 /** Header stats for a profile: live posts and their views, stored follow counters, viewer state. */
@@ -33,7 +34,7 @@ export async function loadProfileStats(
 	userId: string,
 	viewerId?: string | null
 ): Promise<ProfileStats> {
-	const [[postRow], [userRow], following] = await Promise.all([
+	const [[postRow], [userRow], status] = await Promise.all([
 		db
 			.select({
 				postsCount: sql<number>`count(*)`,
@@ -46,7 +47,9 @@ export async function loadProfileStats(
 			.from(user)
 			.where(eq(user.id, userId))
 			.limit(1),
-		viewerId && viewerId !== userId ? isFollowing(db, viewerId, userId) : Promise.resolve(false)
+		viewerId && viewerId !== userId
+			? followStatus(db, viewerId, userId)
+			: Promise.resolve<FollowStatus>('none')
 	]);
 
 	return {
@@ -54,14 +57,15 @@ export async function loadProfileStats(
 		impressionsCount: Number(postRow?.impressionsCount ?? 0),
 		followersCount: userRow?.followersCount ?? 0,
 		followingCount: userRow?.followingCount ?? 0,
-		isFollowing: following
+		followStatus: status
 	};
 }
 
 /**
  * One page of a profile's live posts in the `PostCard` shape, newest first, keyset-paginated on
  * (created_at, id) via `post_userId_createdAt_idx`. Empty when the author and `viewerId` are
- * blocked in either direction, which is how the profile page hides them.
+ * blocked in either direction, or the author is private and not followed by `viewerId`: that is
+ * how the profile page hides them.
  */
 export async function loadProfilePosts(
 	db: Database,
@@ -77,7 +81,7 @@ export async function loadProfilePosts(
 			and(
 				eq(post.userId, userId),
 				notDeleted,
-				notBlockedWith(viewerId, post.userId),
+				visibleTo(viewerId, post.userId),
 				cursor
 					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
 					: undefined

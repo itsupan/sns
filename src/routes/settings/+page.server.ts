@@ -50,6 +50,8 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 		}))
 	);
 	return {
+		userId: me.id,
+		isPrivate: me.isPrivate,
 		email: me.email,
 		emailVerified: me.emailVerified,
 		// Email/password accounts must re-enter their password to change it or delete the account.

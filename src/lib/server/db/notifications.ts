@@ -33,7 +33,7 @@ export const UNREAD_CAP = 99;
 
 /**
  * One row per action: a like or reaction is per actor and target, a comment or reply is the
- * comment itself, a follow is per pair, a mention is per post and tagged user. Repeating an
+ * comment itself, a follow (or follow request, or its acceptance) is per pair, a mention is per post and tagged user. Repeating an
  * action hits the same key; undoing deletes it.
  */
 export function dedupeKey(t: NotificationTarget): string {
@@ -52,6 +52,10 @@ export function dedupeKey(t: NotificationTarget): string {
 			return `mention:${t.postId}:${t.recipientId}`;
 		case 'story_reaction':
 			return `story_reaction:${t.actorId}:${t.storyId}`;
+		case 'follow_request':
+			return `follow_request:${t.actorId}:${t.recipientId}`;
+		case 'follow_accepted':
+			return `follow_accepted:${t.actorId}:${t.recipientId}`;
 	}
 }
 

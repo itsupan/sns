@@ -97,7 +97,9 @@ export function authOptions(env: Env) {
 				followersCount: { type: 'number', required: true, defaultValue: 0, input: false },
 				followingCount: { type: 'number', required: true, defaultValue: 0, input: false },
 				// Set server-side at account creation; never user input.
-				termsAcceptedAt: { type: 'date', required: false, input: false }
+				termsAcceptedAt: { type: 'date', required: false, input: false },
+				// Toggled through PATCH /api/users/:id, which approves pending requests on going public.
+				isPrivate: { type: 'boolean', required: true, defaultValue: false, input: false }
 			}
 		},
 		// Adds `role` and the ban fields, and refuses to create a session for a banned user.

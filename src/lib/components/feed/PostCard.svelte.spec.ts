@@ -318,7 +318,7 @@ describe('PostCard component', () => {
 
 	it('follows and unfollows the author, keeping every card by them in sync', async () => {
 		const fetchMock = vi.fn(async (_url: string, init?: RequestInit) =>
-			Response.json({ following: init?.method === 'POST', followersCount: 1 })
+			Response.json({ status: init?.method === 'POST' ? 'following' : 'none', followersCount: 1 })
 		);
 		vi.stubGlobal('fetch', fetchMock);
 		const screen = render(PostCard, { props: { post: otherPost } });

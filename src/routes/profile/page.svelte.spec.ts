@@ -21,7 +21,7 @@ const testStats = {
 	followersCount: 120,
 	followingCount: 85,
 	impressionsCount: 1200,
-	isFollowing: false
+	followStatus: 'none' as const
 };
 
 const newRegisteredUser = {
@@ -42,7 +42,7 @@ const emptyStats = {
 	followersCount: 0,
 	followingCount: 0,
 	impressionsCount: 0,
-	isFollowing: false
+	followStatus: 'none' as const
 };
 
 describe('Profile Page', () => {

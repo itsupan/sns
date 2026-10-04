@@ -25,7 +25,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('RightSidebar', () => {
 	it('follows a real suggested creator through the API and links to their profile', async () => {
-		const fetchMock = vi.fn(async () => Response.json({ following: true, followersCount: 4 }));
+		const fetchMock = vi.fn(async () => Response.json({ status: 'following', followersCount: 4 }));
 		vi.stubGlobal('fetch', fetchMock);
 		const screen = render(RightSidebar, { props: { suggestions } });
 

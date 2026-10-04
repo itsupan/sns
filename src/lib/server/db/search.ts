@@ -6,6 +6,7 @@ import { notDeleted } from './posts';
 import { displayHandle } from '$lib/utils/format';
 import { searchTermsOf } from '$lib/search';
 import { notBlockedWith } from './blocks';
+import { visibleTo } from './visibility';
 
 /**
  * Turns user input into a safe FTS5 MATCH expression, or `null` when nothing is searchable.
@@ -107,7 +108,7 @@ export async function searchPosts(
 		.from(sql`post_fts`)
 		.innerJoin(post, sql`${post}.rowid = post_fts.rowid`)
 		.innerJoin(user, eq(user.id, post.userId))
-		.where(and(sql`post_fts MATCH ${match}`, notDeleted, notBlockedWith(viewerId, post.userId)))
+		.where(and(sql`post_fts MATCH ${match}`, notDeleted, visibleTo(viewerId, post.userId)))
 		.orderBy(rank, asc(post.id))
 		.limit(limit);
 

@@ -1,3 +1,5 @@
+import type { FollowStatus } from './follow.svelte';
+
 export interface ProfileData {
 	id?: string;
 	name: string;
@@ -14,7 +16,7 @@ export interface ProfileData {
 	followersCount: number;
 	followingCount: number;
 	impressionsCount: number;
-	isFollowing: boolean;
+	followStatus: FollowStatus;
 	isOwnProfile?: boolean;
 }
 
@@ -33,7 +35,7 @@ export const defaultProfile: ProfileData = {
 	followersCount: 18400,
 	followingCount: 620,
 	impressionsCount: 94200,
-	isFollowing: true,
+	followStatus: 'following',
 	isOwnProfile: false
 };
 
@@ -121,7 +123,7 @@ export function resolveProfile(
 		followersCount: countOr(user.followersCount, custom?.followersCount),
 		followingCount: countOr(user.followingCount, custom?.followingCount),
 		impressionsCount: countOr(user.impressionsCount, custom?.impressionsCount),
-		isFollowing: custom?.isFollowing ?? false,
+		followStatus: custom?.followStatus ?? 'none',
 		isOwnProfile: custom?.isOwnProfile ?? true,
 		...custom
 	};

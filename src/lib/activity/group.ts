@@ -83,5 +83,9 @@ export function activityVerb(group: ActivityGroup): string {
 			return 'tagged you in a post';
 		case 'story_reaction':
 			return 'reacted to your story';
+		case 'follow_request':
+			return 'asked to follow you';
+		case 'follow_accepted':
+			return 'accepted your follow request';
 	}
 }
