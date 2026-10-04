@@ -8,6 +8,7 @@
 	import type { ResolveAction } from '$lib/moderation';
 	import { readApiError } from '$lib/utils/api-error';
 	import { displayHandle, formatTimeAgo } from '$lib/utils/format';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -18,7 +19,12 @@
 	const REASON_LABEL = new Map<string, string>(
 		REPORT_REASON_OPTIONS.map((o) => [o.value, o.label])
 	);
-	const TYPE_LABEL = { post: 'Post', comment: 'Comment', user: 'Account', message: 'Message' };
+	const TYPE_LABEL = {
+		post: m.moderation_type_post(),
+		comment: m.moderation_type_comment(),
+		user: m.moderation_type_user(),
+		message: m.moderation_type_message()
+	};
 
 	/** Pages loaded while scrolling, appended after the server-rendered first page. */
 	let more = $state<Item[]>([]);
@@ -63,27 +69,27 @@
 			const res = await fetch(`/api/admin/reports?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load reports').message;
+				loadError = readApiError(body, m.moderation_reports_load_error()).message;
 				return;
 			}
 			const page = body as { items: Item[]; nextCursor: string | null };
 			more = [...more, ...page.items];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load reports';
+			loadError = m.moderation_reports_load_error();
 		} finally {
 			loadingMore = false;
 		}
 	}
 </script>
 
-<svelte:head><title>Reports · Kizuna</title></svelte:head>
+<svelte:head><title>{m.moderation_reports_title()}</title></svelte:head>
 
 {#if items.length === 0}
 	<p
 		class="m-0 rounded-2xl border border-slate-100 dark:border-dark-border bg-white dark:bg-dark-card py-12 px-6 text-center text-sm text-slate-500 dark:text-dark-muted"
 	>
-		No open reports. All caught up.
+		{m.moderation_no_reports()}
 	</p>
 {:else}
 	<ul class="list-none m-0 p-0 flex flex-col gap-3">
@@ -101,8 +107,7 @@
 						{TYPE_LABEL[item.targetType]}
 					</span>
 					<span class="font-semibold text-red-600 dark:text-red-400">
-						{item.reportCount}
-						{item.reportCount === 1 ? 'report' : 'reports'}
+						{m.moderation_report_count(item.reportCount)}
 					</span>
 					<span>{item.reasons.map((r) => REASON_LABEL.get(r) ?? r).join(', ')}</span>
 					<span class="ml-auto">{formatTimeAgo(item.latestReportAt)}</span>
@@ -118,7 +123,7 @@
 							<span class="text-xs text-slate-500 dark:text-dark-muted">
 								{displayHandle(target.owner.handle, target.owner.name)}
 								{#if target.owner.role !== 'user'}· {target.owner.role}{/if}
-								{#if target.owner.banned}· suspended{/if}
+								{#if target.owner.banned}· {m.moderation_suspended()}{/if}
 							</span>
 						</div>
 					</div>
@@ -133,7 +138,7 @@
 						{#if target.media.type === 'image'}
 							<img
 								src={target.media.url}
-								alt={target.media.alt || 'First media item of the reported post'}
+								alt={target.media.alt || m.moderation_media_alt()}
 								loading="lazy"
 								class="max-h-64 w-fit rounded-xl object-contain bg-slate-50 dark:bg-dark-elevated"
 							/>
@@ -148,11 +153,13 @@
 						{/if}
 					{/if}
 					{#if target.removed}
-						<p class="m-0 text-xs text-slate-500 dark:text-dark-muted">Already removed.</p>
+						<p class="m-0 text-xs text-slate-500 dark:text-dark-muted">
+							{m.moderation_already_removed()}
+						</p>
 					{/if}
 				{:else}
 					<p class="m-0 text-sm text-slate-500 dark:text-dark-muted">
-						This content no longer exists.
+						{m.moderation_content_gone()}
 					</p>
 				{/if}
 
@@ -162,7 +169,7 @@
 							{href}
 							class="text-xs font-medium text-slate-700 dark:text-dark-text underline mr-auto"
 						>
-							View
+							{m.moderation_view()}
 						</a>
 					{/if}
 					<button
@@ -170,7 +177,7 @@
 						class="ml-auto h-9 px-4 rounded-full text-xs font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text hover:bg-slate-200 dark:hover:bg-dark-hover border-0 cursor-pointer"
 						onclick={() => confirm(item, 'dismiss')}
 					>
-						Dismiss
+						{m.moderation_confirm_dismiss()}
 					</button>
 					{#if target && !target.removed && item.targetType !== 'user'}
 						<button
@@ -178,7 +185,7 @@
 							class="h-9 px-4 rounded-full text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60 border-0 cursor-pointer"
 							onclick={() => confirm(item, 'remove_content')}
 						>
-							Remove
+							{m.moderation_confirm_remove()}
 						</button>
 					{/if}
 					{#if target}
@@ -187,7 +194,7 @@
 							class="h-9 px-4 rounded-full text-xs font-semibold text-white bg-red-600 hover:bg-red-700 border-0 cursor-pointer"
 							onclick={() => confirm(item, 'suspend_user')}
 						>
-							Suspend user
+							{m.moderation_title_suspend()}
 						</button>
 					{/if}
 				</div>

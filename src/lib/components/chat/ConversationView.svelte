@@ -23,6 +23,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { ChatSocket, type SocketLike } from '$lib/chat/socket.svelte';
 	import { MAX_MESSAGE_LENGTH, type ChatServerEvent, type ChatUser } from '$lib/chat/types';
+	import { locale, m } from '$lib/i18n';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { isStoryExpired } from '$lib/stories';
@@ -43,7 +44,7 @@
 
 	/** Confirmed messages by id, plus local pending ones (keyed by temp id). */
 	let byId = $state<Record<string, ViewMessage>>(
-		untrack(() => Object.fromEntries(initialMessages.map((m) => [m.id, m])))
+		untrack(() => Object.fromEntries(initialMessages.map((message) => [message.id, message])))
 	);
 	let olderCursor = $state<string | null>(untrack(() => initialCursor));
 	let loadingOlder = $state(false);
@@ -62,8 +63,8 @@
 	const api = (path = '') => `/api/conversations/${encodeURIComponent(conversationId)}${path}`;
 
 	function merge(list: ChatMessage[]) {
-		for (const m of list) {
-			if (m.conversationId === conversationId) byId[m.id] = m;
+		for (const message of list) {
+			if (message.conversationId === conversationId) byId[message.id] = message;
 		}
 	}
 
@@ -97,7 +98,7 @@
 		try {
 			const stick = isNearBottom();
 			const countBefore = Object.keys(byId).length;
-			let after = messages.filter((m) => !m.pending).at(-1)?.id;
+			let after = messages.filter((message) => !message.pending).at(-1)?.id;
 			// With no messages yet, the latest page is the catch-up; otherwise page forward. Only the
 			// first request overlaps; the rest are strict, so a burst can never return the same page.
 			for (let more = true, strict = ''; more; strict = '&strict=1') {
@@ -179,7 +180,7 @@
 		try {
 			const res = await fetch(api(`/messages?cursor=${encodeURIComponent(olderCursor)}`));
 			const body = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(body, 'Could not load earlier messages').message);
+			if (!res.ok) throw new Error(readApiError(body, m.chat_load_older_error()).message);
 			const page = body as { messages: ChatMessage[]; nextCursor: string | null };
 			merge(page.messages);
 			olderCursor = page.nextCursor;
@@ -187,7 +188,7 @@
 			await tick();
 			if (scroller) scroller.scrollTop += scroller.scrollHeight - previousHeight;
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not load earlier messages');
+			toast.show(err instanceof Error ? err.message : m.chat_load_older_error());
 		} finally {
 			loadingOlder = false;
 		}
@@ -207,14 +208,14 @@
 				body: JSON.stringify({ id, content })
 			});
 			const body = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(body, 'Message not sent').message);
+			if (!res.ok) throw new Error(readApiError(body, m.chat_not_sent_error()).message);
 			merge([(body as { message: ChatMessage }).message]);
 		} catch (err) {
 			// The response can be lost after the server stored it; if the echo already
 			// confirmed the message, it was sent.
 			if (!byId[id]?.pending) return;
 			byId[id] = { ...byId[id], pending: 'failed' };
-			toast.show(err instanceof Error ? err.message : 'Message not sent');
+			toast.show(err instanceof Error ? err.message : m.chat_not_sent_error());
 		}
 	}
 
@@ -223,7 +224,7 @@
 		const content = draft.trim();
 		if (!content) return;
 		if (content.length > MAX_MESSAGE_LENGTH) {
-			toast.show(`Messages can be up to ${MAX_MESSAGE_LENGTH} characters`);
+			toast.show(m.chat_too_long(MAX_MESSAGE_LENGTH));
 			return;
 		}
 		const id = crypto.randomUUID();
@@ -242,12 +243,12 @@
 		deliver(id, content);
 	}
 
-	function retry(m: ViewMessage) {
-		deliver(m.id, m.content);
+	function retry(message: ViewMessage) {
+		deliver(message.id, message.content);
 	}
 
-	function discard(m: ViewMessage) {
-		delete byId[m.id];
+	function discard(message: ViewMessage) {
+		delete byId[message.id];
 	}
 
 	function onKeydown(e: KeyboardEvent) {
@@ -263,9 +264,9 @@
 	}
 
 	const timeLabel = (ms: number) =>
-		new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+		new Date(ms).toLocaleTimeString(locale, { hour: 'numeric', minute: '2-digit' });
 	const dayLabel = (ms: number) =>
-		new Date(ms).toLocaleDateString(undefined, {
+		new Date(ms).toLocaleDateString(locale, {
 			weekday: 'short',
 			month: 'short',
 			day: 'numeric'
@@ -276,7 +277,7 @@
 
 <section
 	class="w-full max-w-2xl mx-auto flex flex-col chat-height bg-white dark:bg-dark-card sm:border-x border-slate-200 dark:border-dark-border"
-	aria-label="Conversation with {other.name}"
+	aria-label={m.chat_conversation_with(other.name)}
 >
 	<header
 		class="flex items-center gap-3 px-3 sm:px-4 h-14 border-b border-slate-100 dark:border-dark-border shrink-0"
@@ -284,7 +285,7 @@
 		<a
 			href={resolve('/messages')}
 			class="size-9 rounded-full flex items-center justify-center text-slate-600 dark:text-dark-muted hover:bg-slate-100 dark:hover:bg-dark-elevated"
-			aria-label="Back to messages"
+			aria-label={m.chat_back()}
 		>
 			<Icon name="angle-left" class="text-lg" />
 		</a>
@@ -298,7 +299,7 @@
 					{other.name}
 				</p>
 				<p class="text-[11px] text-slate-500 dark:text-dark-muted truncate m-0" aria-live="polite">
-					{otherTyping ? 'typing…' : other.handle}
+					{otherTyping ? m.chat_typing() : other.handle}
 				</p>
 			</div>
 		</a>
@@ -308,7 +309,7 @@
 				role="status"
 			>
 				<span class="size-1.5 rounded-full bg-amber-500"></span>
-				{socket.status === 'connecting' ? 'Connecting…' : 'Reconnecting…'}
+				{socket.status === 'connecting' ? m.chat_connecting() : m.chat_reconnecting()}
 			</span>
 		{/if}
 	</header>
@@ -317,7 +318,7 @@
 		bind:this={scroller}
 		class="flex-1 overflow-y-auto px-3 sm:px-4 py-4 flex flex-col gap-1"
 		role="log"
-		aria-label="Messages"
+		aria-label={m.chat_messages_label()}
 		aria-live="polite"
 	>
 		{#if olderCursor}
@@ -327,7 +328,7 @@
 				disabled={loadingOlder}
 				class="self-center mb-2 h-8 px-4 rounded-full border border-slate-200 dark:border-dark-border bg-transparent text-xs font-semibold text-slate-600 dark:text-dark-muted cursor-pointer disabled:opacity-50"
 			>
-				{loadingOlder ? 'Loading…' : 'Load earlier messages'}
+				{loadingOlder ? m.common_loading() : m.chat_load_earlier()}
 			</button>
 		{/if}
 
@@ -335,65 +336,65 @@
 			<div class="m-auto flex flex-col items-center gap-2 text-center py-10">
 				<Avatar src={other.image ?? ''} name={other.name} size="xl" />
 				<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">{other.name}</p>
-				<p class="text-xs text-slate-500 dark:text-dark-muted m-0">Say hello 👋</p>
+				<p class="text-xs text-slate-500 dark:text-dark-muted m-0">{m.chat_say_hello()}</p>
 			</div>
 		{/if}
 
-		{#each messages as m, i (m.id)}
-			{@const mine = m.senderId === viewerId}
+		{#each messages as message, i (message.id)}
+			{@const mine = message.senderId === viewerId}
 			{@const prev = messages[i - 1]}
-			{#if !prev || !sameDay(prev.createdAt, m.createdAt)}
-				<p class="self-center text-[11px] text-slate-400 my-2 m-0">{dayLabel(m.createdAt)}</p>
+			{#if !prev || !sameDay(prev.createdAt, message.createdAt)}
+				<p class="self-center text-[11px] text-slate-400 my-2 m-0">{dayLabel(message.createdAt)}</p>
 			{/if}
 			<div
 				class="flex flex-col max-w-[80%] {mine ? 'self-end items-end' : 'self-start items-start'}"
 				data-testid="message"
 			>
-				{#if m.storyRef}
+				{#if message.storyRef}
 					<p
 						class="m-0 mb-1 text-[11px] text-slate-500 dark:text-dark-muted flex items-center gap-1"
 					>
 						<Icon name="circle" size={10} />
-						{mine ? `You replied to ${other.name}'s story` : 'Replied to your story'}
-						{#if isStoryExpired(m.storyRef)}
-							<span class="text-slate-400">· Story expired</span>
+						{mine ? m.chat_you_replied_story(other.name) : m.chat_replied_your_story()}
+						{#if isStoryExpired(message.storyRef)}
+							<span class="text-slate-400">{m.chat_story_expired()}</span>
 						{/if}
 					</p>
 				{/if}
 				<p
 					class="m-0 px-3.5 py-2 rounded-2xl text-sm whitespace-pre-wrap break-words {mine
 						? 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 rounded-br-md'
-						: 'bg-slate-100 text-slate-900 dark:bg-dark-elevated dark:text-dark-text rounded-bl-md'} {m.pending ===
+						: 'bg-slate-100 text-slate-900 dark:bg-dark-elevated dark:text-dark-text rounded-bl-md'} {message.pending ===
 					'sending'
 						? 'opacity-60'
 						: ''}"
 				>
-					{m.content}
+					{message.content}
 				</p>
-				{#if m.pending === 'failed'}
+				{#if message.pending === 'failed'}
 					<p class="m-0 mt-1 text-[11px] text-rose-600 flex items-center gap-2">
-						Not sent
+						{m.chat_not_sent()}
 						<button
 							type="button"
-							onclick={() => retry(m)}
+							onclick={() => retry(message)}
 							class="font-semibold underline bg-transparent border-0 p-0 text-inherit cursor-pointer"
 						>
-							Retry
+							{m.common_retry()}
 						</button>
 						<button
 							type="button"
-							onclick={() => discard(m)}
+							onclick={() => discard(message)}
 							class="font-semibold underline bg-transparent border-0 p-0 text-inherit cursor-pointer"
 						>
-							Delete
+							{m.common_delete()}
 						</button>
 					</p>
 				{:else}
 					<time
 						class="text-[10px] text-slate-400 mt-0.5 px-1"
-						datetime={new Date(m.createdAt).toISOString()}
+						datetime={new Date(message.createdAt).toISOString()}
 					>
-						{m.pending === 'sending' ? 'Sending…' : timeLabel(m.createdAt)}
+						{message.pending === 'sending' ? m.common_sending() : timeLabel(message.createdAt)}
 					</time>
 				{/if}
 			</div>
@@ -410,14 +411,14 @@
 			onkeydown={onKeydown}
 			rows="1"
 			maxlength={MAX_MESSAGE_LENGTH}
-			placeholder="Message {other.name}…"
-			aria-label="Message {other.name}"
+			placeholder={m.chat_placeholder(other.name)}
+			aria-label={m.chat_label(other.name)}
 			class="flex-1 resize-none max-h-32 field-sizing-content min-h-10 px-4 py-2.5 text-sm bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-2xl text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none focus:ring-1.5 focus:ring-slate-900 dark:focus:ring-white"
 		></textarea>
 		<button
 			type="submit"
 			disabled={!draft.trim()}
-			aria-label="Send"
+			aria-label={m.common_send()}
 			class="size-10 shrink-0 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 flex items-center justify-center border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
 		>
 			<Icon name="paper-plane" class="text-sm" />

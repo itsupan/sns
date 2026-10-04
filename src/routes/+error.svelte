@@ -2,21 +2,18 @@
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import { m } from '$lib/i18n';
 
 	const status = $derived(page.status && page.status > 0 ? page.status : 404);
 	const is404 = $derived(status === 404);
-	const pageTitle = $derived(
-		is404 ? '404: Page Not Found — Kizuna' : `${status}: Something Went Wrong — Kizuna`
-	);
+	const pageTitle = $derived(is404 ? m.error_title_not_found() : m.error_title(status));
 </script>
 
 <svelte:head>
 	<title>{pageTitle}</title>
 	<meta
 		name="description"
-		content={is404
-			? 'The requested page could not be found on Kizuna.'
-			: 'An error occurred while loading this page.'}
+		content={is404 ? m.error_description_not_found() : m.error_description()}
 	/>
 </svelte:head>
 
@@ -48,18 +45,18 @@
 				? 'bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted border-slate-200 dark:border-dark-border'
 				: 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 border-red-200 dark:border-red-900/50'}"
 		>
-			{is404 ? 'Page Not Found · ページが見つかりません' : 'Application Error · エラー'}
+			{is404 ? m.error_badge_not_found() : m.error_badge()}
 		</span>
 
 		<!-- Explanatory message -->
 		<p class="text-sm leading-relaxed text-slate-600 dark:text-dark-muted max-w-md mb-8">
 			{#if is404}
-				The page you are looking for doesn't exist, has been removed, or the link may be mistyped.
+				{m.error_not_found_text()}
 			{:else}
-				{page.error?.message || 'An unexpected error occurred. Please try again or return home.'}
+				{page.error?.message || m.error_unexpected()}
 				{#if page.error?.id}
 					<span class="block mt-2 text-xs text-slate-400 dark:text-dark-muted">
-						Reference: {page.error.id}
+						{m.error_reference(page.error.id)}
 					</span>
 				{/if}
 			{/if}
@@ -72,7 +69,7 @@
 				class="h-11 px-6 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 font-semibold text-xs inline-flex items-center justify-center gap-2 hover:opacity-90 active:scale-95 transition-all no-underline shadow-xs"
 			>
 				<Icon name="home" class="text-xs" />
-				<span>Return to Feed</span>
+				<span>{m.error_return_to_feed()}</span>
 			</a>
 
 			<a
@@ -80,7 +77,7 @@
 				class="h-11 px-6 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text hover:bg-slate-200 dark:hover:bg-dark-hover active:scale-95 font-semibold text-xs inline-flex items-center justify-center gap-2 border border-slate-200 dark:border-dark-border transition-all no-underline shadow-xs"
 			>
 				<Icon name="user" class="text-xs" />
-				<span>Go to Profile</span>
+				<span>{m.error_go_to_profile()}</span>
 			</a>
 		</div>
 
@@ -90,7 +87,7 @@
 			onclick={() => history.back()}
 			class="mt-6 text-xs text-slate-400 hover:text-slate-700 dark:text-dark-muted dark:hover:text-dark-text underline underline-offset-4 cursor-pointer transition-colors bg-transparent border-0"
 		>
-			Go back to previous page
+			{m.error_go_back()}
 		</button>
 	</div>
 </main>

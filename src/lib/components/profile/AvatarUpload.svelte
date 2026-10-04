@@ -3,6 +3,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
 	import { uploadToR2 } from '$lib/utils/upload';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		/** The avatar URL; `''` for none. */
@@ -42,9 +43,9 @@
 			});
 
 			url = result.publicUrl;
-			toast.show('Avatar uploaded successfully');
+			toast.show(m.profile_avatar_uploaded());
 		} catch (err) {
-			const message = err instanceof Error ? err.message : 'Failed to upload image';
+			const message = err instanceof Error ? err.message : m.profile_avatar_upload_failed();
 			uploadError = message;
 			toast.show(message);
 		} finally {
@@ -64,7 +65,7 @@
 	<div class="relative group shrink-0">
 		<Avatar
 			src={url || ''}
-			name={name || 'User'}
+			name={name || m.common_user()}
 			size="lg"
 			class="size-24 sm:size-28 ring-4 ring-slate-100 dark:ring-dark-elevated shadow-sm"
 		/>
@@ -74,8 +75,8 @@
 			onclick={triggerFileInput}
 			disabled={uploading}
 			class="absolute -bottom-1 -right-1 size-8 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 flex items-center justify-center shadow-md border-2 border-white dark:border-dark-card hover:scale-105 active:scale-95 transition cursor-pointer disabled:opacity-50"
-			aria-label="Upload new avatar"
-			title="Upload avatar"
+			aria-label={m.profile_avatar_upload_new()}
+			title={m.profile_avatar_upload()}
 		>
 			<Icon name="camera" class="text-xs" />
 		</button>
@@ -90,7 +91,7 @@
 				class="h-9 px-4 rounded-full text-xs font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text hover:bg-slate-200 dark:hover:bg-dark-hover transition-colors cursor-pointer border-0 disabled:opacity-50 inline-flex items-center gap-1.5"
 			>
 				<Icon name="upload" class="text-xs" />
-				<span>{uploading ? 'Uploading...' : 'Change Photo'}</span>
+				<span>{uploading ? m.profile_avatar_uploading() : m.profile_avatar_change()}</span>
 			</button>
 
 			{#if url}
@@ -100,13 +101,13 @@
 					disabled={uploading}
 					class="h-9 px-3.5 rounded-full text-xs font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors cursor-pointer border-0 disabled:opacity-50"
 				>
-					Remove
+					{m.common_remove()}
 				</button>
 			{/if}
 		</div>
 
 		<p class="text-[11px] sm:text-xs text-slate-500 dark:text-dark-muted m-0">
-			JPG, PNG, WEBP or GIF up to 10MB. Uploads directly to Cloudflare R2 storage.
+			{m.profile_avatar_hint()}
 		</p>
 
 		<!-- Upload Progress Bar -->
@@ -119,7 +120,7 @@
 					></div>
 				</div>
 				<span class="text-[10px] text-slate-500 dark:text-dark-muted font-medium">
-					Uploading {uploadProgress}%
+					{m.common_upload_progress(uploadProgress)}
 				</span>
 			</div>
 		{/if}
@@ -138,7 +139,7 @@
 			onchange={handleFileSelect}
 			accept="image/jpeg,image/png,image/webp,image/gif,image/avif"
 			class="hidden"
-			aria-label="Avatar file input"
+			aria-label={m.profile_avatar_input()}
 		/>
 	</div>
 </div>

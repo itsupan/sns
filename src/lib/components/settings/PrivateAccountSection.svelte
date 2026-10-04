@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import SettingsSection from './SettingsSection.svelte';
 	import Switch from './Switch.svelte';
 	import { hintClass, rowClass } from './styles';
@@ -28,26 +29,25 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.error(readApiError(body, 'Could not update your account').message);
+				toast.error(readApiError(body, m.settings_account_error()).message);
 				return;
 			}
 			override = next;
-			toast.success(next ? 'Your account is now private' : 'Your account is now public');
+			toast.success(next ? m.settings_now_private() : m.settings_now_public());
 		} catch {
-			toast.error('Could not update your account');
+			toast.error(m.settings_account_error());
 		} finally {
 			saving = false;
 		}
 	}
 </script>
 
-<SettingsSection id="settings-privacy" title="Account privacy">
+<SettingsSection id="settings-privacy" title={m.settings_privacy()}>
 	<div class={rowClass}>
 		<span class="flex flex-col min-w-0">
-			<span id="private-account-label">Private account</span>
+			<span id="private-account-label">{m.settings_private_account()}</span>
 			<span id="private-account-hint" class={hintClass}>
-				Only people you approve can follow you and see your posts. Going public approves everyone
-				waiting.
+				{m.settings_private_hint()}
 			</span>
 		</span>
 		<Switch

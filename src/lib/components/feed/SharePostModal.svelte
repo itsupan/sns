@@ -5,6 +5,7 @@
 	import Modal from '$lib/components/shared/Modal.svelte';
 	import ShareLinks from '$lib/components/shared/ShareLinks.svelte';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import type { PostData } from './PostCard.svelte';
 
 	interface Props {
@@ -21,12 +22,15 @@
 	let origin = $derived(typeof window !== 'undefined' ? window.location.origin : '');
 	let postUrl = $derived(origin ? `${origin}/post/${post.id}` : `/post/${post.id}`);
 
-	let shareTitle = $derived(post.title || `Post by ${post.author.name}`);
+	let shareTitle = $derived(post.title || m.post_by(post.author.name));
 	let plainDescription = $derived(post.description ? stripFormatting(post.description) : '');
 	let shareText = $derived(
 		plainDescription
-			? `${shareTitle} — "${plainDescription.slice(0, 100)}${plainDescription.length > 100 ? '…' : ''}" on Kizuna`
-			: `${shareTitle} on Kizuna`
+			? m.share_post_text_with_excerpt(
+					shareTitle,
+					`${plainDescription.slice(0, 100)}${plainDescription.length > 100 ? '…' : ''}`
+				)
+			: m.share_post_text(shareTitle)
 	);
 
 	let canNativeShare = $derived(typeof navigator !== 'undefined' && Boolean(navigator.share));
@@ -41,7 +45,7 @@
 		try {
 			await navigator.clipboard.writeText(postUrl);
 			copied = true;
-			toast.show('Post link copied to clipboard!');
+			toast.show(m.share_post_copied());
 			onShare?.();
 
 			if (copyTimeout) clearTimeout(copyTimeout);
@@ -49,7 +53,7 @@
 				copied = false;
 			}, 2500);
 		} catch {
-			toast.show('Failed to copy link');
+			toast.show(m.share_copy_link_failed());
 		}
 	}
 
@@ -75,7 +79,7 @@
 	}
 </script>
 
-<Modal bind:open label="Share Post">
+<Modal bind:open label={m.share_post()}>
 	<div
 		class="w-full max-w-md max-h-full overflow-y-auto bg-white dark:bg-dark-card border border-slate-200/80 dark:border-dark-border rounded-3xl p-6 shadow-2xl flex flex-col gap-5"
 	>
@@ -88,14 +92,14 @@
 					<Icon name="paper-plane" class="text-lg" />
 				</div>
 				<h3 class="text-lg font-bold text-slate-950 dark:text-white m-0 tracking-tight">
-					Share Post
+					{m.share_post()}
 				</h3>
 			</div>
 			<button
 				type="button"
 				onclick={close}
 				class="size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated transition cursor-pointer border-0 bg-transparent"
-				aria-label="Close share dialog"
+				aria-label={m.share_close()}
 			>
 				<Icon name="cross" class="text-sm" />
 			</button>
@@ -133,7 +137,7 @@
 			<span
 				class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-muted"
 			>
-				Or copy link
+				{m.share_or_copy_link()}
 			</span>
 			<div
 				class="flex items-center gap-2 p-1.5 pl-3 rounded-2xl bg-slate-100 dark:bg-dark-elevated border border-slate-200/60 dark:border-dark-border"
@@ -143,7 +147,7 @@
 					type="text"
 					readonly
 					value={postUrl}
-					aria-label="Post URL"
+					aria-label={m.share_post_url()}
 					class="flex-1 bg-transparent border-0 text-xs text-slate-700 dark:text-dark-text font-mono truncate focus:outline-none select-all"
 				/>
 				<button
@@ -153,7 +157,7 @@
 						? 'bg-emerald-600 text-white'
 						: 'bg-slate-950 text-white dark:bg-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-slate-200'}"
 				>
-					{copied ? 'Copied!' : 'Copy'}
+					{copied ? m.share_copied() : m.common_copy()}
 				</button>
 			</div>
 		</div>
@@ -166,7 +170,7 @@
 				class="w-full py-2.5 rounded-2xl bg-slate-100 dark:bg-dark-elevated hover:bg-slate-200 dark:hover:bg-dark-hover text-slate-800 dark:text-dark-text text-xs font-semibold flex items-center justify-center gap-2 transition cursor-pointer border-0"
 			>
 				<Icon name="share" class="text-sm" />
-				<span>More share options</span>
+				<span>{m.share_more_share_options()}</span>
 			</button>
 		{/if}
 	</div>

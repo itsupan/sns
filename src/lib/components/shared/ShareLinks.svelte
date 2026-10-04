@@ -1,4 +1,6 @@
 <script lang="ts">
+	import { m } from '$lib/i18n';
+
 	interface Props {
 		/** The page being shared. */
 		url: string;
@@ -47,7 +49,7 @@
 
 <div class="flex flex-col gap-2">
 	<span class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-muted">
-		Share via
+		{m.share_via()}
 	</span>
 	<div class="grid grid-cols-4 gap-2.5 pt-1">
 		<!-- eslint-disable svelte/no-navigation-without-resolve -- external share URLs -->

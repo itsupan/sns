@@ -6,6 +6,7 @@
 	import { toast } from '$lib/utils/toast.svelte';
 	import { displayHandle } from '$lib/utils/format';
 	import type { ProfileData } from '$lib/utils/profile.svelte';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		open?: boolean;
@@ -29,8 +30,8 @@
 
 	const shareText = $derived(
 		profile.handle
-			? `Check out ${profile.name} (@${profile.handle}) on Kizuna`
-			: `Check out ${profile.name} on Kizuna`
+			? m.share_profile_text_with_handle(profile.name, profile.handle)
+			: m.share_profile_text(profile.name)
 	);
 
 	const canNativeShare = $derived(
@@ -43,13 +44,13 @@
 				await navigator.clipboard.writeText(shareUrl);
 			}
 			copied = true;
-			toast.show('Profile link copied to clipboard');
+			toast.show(m.share_profile_copied());
 			if (copyTimeout) clearTimeout(copyTimeout);
 			copyTimeout = setTimeout(() => {
 				copied = false;
 			}, 2500);
 		} catch {
-			toast.show('Could not copy link to clipboard');
+			toast.show(m.share_copy_failed());
 		}
 	}
 
@@ -57,7 +58,7 @@
 		if (navigator.share) {
 			try {
 				await navigator.share({
-					title: `${profile.name} on Kizuna`,
+					title: m.share_profile_title(profile.name),
 					text: profile.bio || shareText,
 					url: shareUrl
 				});
@@ -69,20 +70,20 @@
 	}
 </script>
 
-<Modal bind:open label="Share Profile" variant="sheet">
+<Modal bind:open label={m.share_profile()} variant="sheet">
 	<div
 		class="w-full md:max-w-md max-h-[90dvh] overflow-y-auto bg-white dark:bg-dark-card border-t md:border border-slate-200 dark:border-dark-border rounded-t-3xl md:rounded-3xl p-5 md:p-6 shadow-2xl flex flex-col gap-5"
 	>
 		<!-- Header -->
 		<div class="flex items-center justify-between">
 			<h2 class="text-base md:text-lg font-bold text-slate-900 dark:text-white m-0">
-				Share Profile
+				{m.share_profile()}
 			</h2>
 			<button
 				type="button"
 				class="size-8 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-500 hover:text-slate-800 dark:text-dark-muted dark:hover:text-dark-text flex items-center justify-center cursor-pointer border-0 transition-colors"
 				onclick={() => (open = false)}
-				aria-label="Close"
+				aria-label={m.common_close()}
 			>
 				<Icon name="cross" class="text-xs" />
 			</button>
@@ -115,7 +116,7 @@
 			<span
 				class="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-dark-muted"
 			>
-				Profile Link
+				{m.share_profile_link()}
 			</span>
 			<div
 				class="flex items-center gap-2 p-1.5 pl-3 rounded-2xl bg-slate-100 dark:bg-dark-elevated border border-slate-200 dark:border-dark-border"
@@ -125,7 +126,7 @@
 					type="text"
 					readonly
 					value={shareUrl}
-					aria-label="Profile URL"
+					aria-label={m.share_profile_url()}
 					class="w-full bg-transparent border-0 text-xs font-medium text-slate-800 dark:text-dark-text focus:outline-none select-all truncate"
 				/>
 				<button
@@ -137,10 +138,10 @@
 				>
 					{#if copied}
 						<Icon name="check" class="text-xs" />
-						<span>Copied!</span>
+						<span>{m.share_copied()}</span>
 					{:else}
 						<Icon name="copy" class="text-xs" />
-						<span>Copy</span>
+						<span>{m.common_copy()}</span>
 					{/if}
 				</button>
 			</div>
@@ -154,7 +155,7 @@
 				onclick={triggerNativeShare}
 			>
 				<Icon name="share" class="text-xs" />
-				<span>More options...</span>
+				<span>{m.share_more_options()}</span>
 			</button>
 		{/if}
 	</div>

@@ -8,6 +8,7 @@
 	import { authClient } from '$lib/auth-client';
 	import { profileStore, resolveProfile } from '$lib/utils/profile.svelte';
 	import { displayHandle } from '$lib/utils/format';
+	import { m } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -41,11 +42,14 @@
 
 	const pageTitle = $derived(
 		currentProfile.name
-			? `${currentProfile.name} (${displayHandle(currentProfile.handle, currentProfile.name)}) — Kizuna`
-			: 'Profile — Kizuna'
+			? m.profile_page_title(
+					currentProfile.name,
+					displayHandle(currentProfile.handle, currentProfile.name)
+				)
+			: m.profile_page_title_fallback()
 	);
 	const metaDescription = $derived(
-		currentProfile.bio || `${currentProfile.name}'s profile on Kizuna.`
+		currentProfile.bio || m.profile_page_description(currentProfile.name)
 	);
 	const ogImage = $derived(
 		userPosts.find((p) => Boolean(p.image))?.image || currentProfile.avatar || ''

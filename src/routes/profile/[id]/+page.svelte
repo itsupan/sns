@@ -8,6 +8,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import { resolveProfile } from '$lib/utils/profile.svelte';
 	import { displayHandle } from '$lib/utils/format';
+	import { m } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	interface Props {
@@ -35,11 +36,14 @@
 
 	const pageTitle = $derived(
 		currentProfile.name
-			? `${currentProfile.name} (${displayHandle(currentProfile.handle, currentProfile.name)}) — Kizuna`
-			: 'Curator Profile — Kizuna'
+			? m.profile_page_title(
+					currentProfile.name,
+					displayHandle(currentProfile.handle, currentProfile.name)
+				)
+			: m.profile_page_title_unknown()
 	);
 	const metaDescription = $derived(
-		currentProfile.bio || `${currentProfile.name}'s photography and curation profile on Kizuna.`
+		currentProfile.bio || m.profile_page_description_other(currentProfile.name)
 	);
 	function toAbsoluteUrl(pathOrUrl: string | undefined | null, origin: string): string {
 		if (!pathOrUrl) return '';
@@ -116,9 +120,7 @@
 			<p
 				class="mx-4 sm:mx-0 mt-6 p-6 rounded-2xl border border-slate-100 dark:border-dark-border text-center text-sm text-slate-500 dark:text-dark-muted"
 			>
-				{data.block.blocked
-					? 'You blocked this user. Unblock them to see their posts.'
-					: "This profile isn't available."}
+				{data.block.blocked ? m.profile_you_blocked() : m.profile_unavailable()}
 			</p>
 		{:else if data.isLocked}
 			<div
@@ -126,10 +128,10 @@
 			>
 				<Icon name="lock" class="text-2xl text-slate-400 dark:text-dark-muted" />
 				<p class="m-0 text-sm font-semibold text-slate-900 dark:text-dark-text">
-					This account is private
+					{m.profile_private()}
 				</p>
 				<p class="m-0 text-xs text-slate-500 dark:text-dark-muted">
-					Follow {currentProfile.name} to see their posts.
+					{m.profile_private_hint(currentProfile.name)}
 				</p>
 			</div>
 		{:else}

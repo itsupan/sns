@@ -1,3 +1,5 @@
+import { locale } from '$lib/i18n';
+
 /** Stories disappear this long after they are shared. */
 export const STORY_TTL_SEC = 24 * 60 * 60;
 
@@ -11,9 +13,9 @@ export function isStoryExpired(id: string, now = Date.now()): boolean {
 	return !(createdAt + STORY_TTL_SEC * 1000 > now);
 }
 
-const storyDateFormat = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' });
+const storyDateFormat = new Intl.DateTimeFormat(locale, { dateStyle: 'medium' });
 
-/** The day a story was shared, in the viewer's locale and time zone: "Oct 3, 2026". */
+/** The day a story was shared, in the UI's locale and the viewer's time zone: "Oct 3, 2026". */
 export function formatStoryDate(createdAt: number): string {
 	return storyDateFormat.format(createdAt);
 }

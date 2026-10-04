@@ -1,17 +1,19 @@
 <script lang="ts" module>
+	import { m } from '$lib/i18n';
+
 	export type ReportTargetType = 'post' | 'comment' | 'user' | 'message';
 
 	/** Same values as `REPORT_REASONS` in the server schema. */
 	export const REPORT_REASON_OPTIONS = [
-		{ value: 'spam', label: 'Spam' },
-		{ value: 'harassment', label: 'Harassment or bullying' },
-		{ value: 'hate', label: 'Hate speech or symbols' },
-		{ value: 'nudity', label: 'Nudity or sexual content' },
-		{ value: 'violence', label: 'Violence or dangerous content' },
-		{ value: 'self_harm', label: 'Self-harm or suicide' },
-		{ value: 'copyright', label: 'Intellectual property violation' },
-		{ value: 'impersonation', label: 'Impersonation' },
-		{ value: 'other', label: 'Something else' }
+		{ value: 'spam', label: m.report_reason_spam() },
+		{ value: 'harassment', label: m.report_reason_harassment() },
+		{ value: 'hate', label: m.report_reason_hate() },
+		{ value: 'nudity', label: m.report_reason_nudity() },
+		{ value: 'violence', label: m.report_reason_violence() },
+		{ value: 'self_harm', label: m.report_reason_self_harm() },
+		{ value: 'copyright', label: m.report_reason_copyright() },
+		{ value: 'impersonation', label: m.report_reason_impersonation() },
+		{ value: 'other', label: m.report_reason_other() }
 	] as const;
 
 	export type ReportReasonValue = (typeof REPORT_REASON_OPTIONS)[number]['value'];
@@ -37,10 +39,10 @@
 	const formId = `report-${uid}`;
 
 	const NOUN: Record<ReportTargetType, string> = {
-		post: 'post',
-		comment: 'comment',
-		user: 'account',
-		message: 'message'
+		post: m.report_target_post(),
+		comment: m.report_target_comment(),
+		user: m.report_target_user(),
+		message: m.report_target_message()
 	};
 
 	let reason = $state<ReportReasonValue | null>(null);
@@ -71,22 +73,22 @@
 			});
 			if (!res.ok) {
 				const data = await res.json().catch(() => null);
-				error = readApiError(data, 'Could not send the report').message;
+				error = readApiError(data, m.report_error()).message;
 				return;
 			}
 			open = false;
 			reset();
-			toast.success('Thanks for reporting. Our team will review it.');
+			toast.success(m.report_sent());
 			onreported?.();
 		} catch {
-			error = 'Could not send the report';
+			error = m.report_error();
 		} finally {
 			submitting = false;
 		}
 	}
 </script>
 
-<BottomSheet bind:open title="Report {NOUN[targetType]}" showTitle onclose={reset}>
+<BottomSheet bind:open title={m.report_title(NOUN[targetType])} showTitle onclose={reset}>
 	<form
 		id={formId}
 		class="flex flex-col gap-1 px-2"
@@ -97,7 +99,7 @@
 	>
 		<fieldset class="flex flex-col border-0 p-0 m-0">
 			<legend class="px-2 pb-2 text-sm text-slate-600 dark:text-dark-muted">
-				Why are you reporting this {NOUN[targetType]}?
+				{m.report_why(NOUN[targetType])}
 			</legend>
 			{#each REPORT_REASON_OPTIONS as option (option.value)}
 				<label
@@ -117,13 +119,13 @@
 
 		<label class="flex flex-col gap-1.5 px-2 pt-2">
 			<span class="text-sm font-medium text-slate-700 dark:text-dark-text">
-				Details <span class="font-normal text-slate-400">(optional)</span>
+				{m.report_details()} <span class="font-normal text-slate-400">{m.common_optional()}</span>
 			</span>
 			<textarea
 				bind:value={details}
 				maxlength={REPORT_DETAILS_MAX}
 				rows="3"
-				placeholder="Add anything that helps us understand the problem"
+				placeholder={m.report_details_placeholder()}
 				class="w-full resize-none rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-elevated px-3 py-2 text-sm text-slate-900 dark:text-dark-text outline-none focus:border-slate-400"
 			></textarea>
 			<span class="self-end text-xs text-slate-400">{details.length}/{REPORT_DETAILS_MAX}</span>
@@ -144,7 +146,7 @@
 					reset();
 				}}
 			>
-				Cancel
+				{m.common_cancel()}
 			</button>
 			<button
 				type="submit"
@@ -152,7 +154,7 @@
 				class="h-10 px-5 rounded-full text-sm font-semibold bg-red-600 text-white border-0 cursor-pointer hover:bg-red-700 disabled:opacity-50 disabled:cursor-default"
 				disabled={!reason || submitting}
 			>
-				{submitting ? 'Sending…' : 'Submit'}
+				{submitting ? m.common_sending() : m.report_submit()}
 			</button>
 		</div>
 	{/snippet}

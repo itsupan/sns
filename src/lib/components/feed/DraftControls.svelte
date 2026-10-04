@@ -8,6 +8,7 @@
 		formatPublishAt,
 		toLocalInputValue
 	} from '$lib/drafts';
+	import { m } from '$lib/i18n';
 	import type { PostDraft } from './post-draft.svelte';
 
 	interface Props {
@@ -49,12 +50,12 @@
 		try {
 			const saved = await draft.saveDraft(at);
 			toast.show(
-				saved.publishAt ? `Scheduled for ${formatPublishAt(saved.publishAt)}` : 'Draft saved'
+				saved.publishAt ? m.draft_scheduled_for(formatPublishAt(saved.publishAt)) : m.draft_saved()
 			);
 			scheduleOpen = false;
 			onsaved();
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not save the draft');
+			toast.show(err instanceof Error ? err.message : m.draft_save_error());
 		} finally {
 			saving = false;
 		}
@@ -68,7 +69,7 @@
 			class="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white no-underline transition-colors"
 		>
 			<Icon name="document" class="text-xs" />
-			<span>Drafts</span>
+			<span>{m.draft_drafts()}</span>
 		</a>
 		<div class="flex items-center gap-1.5">
 			<button
@@ -77,7 +78,7 @@
 				disabled={disabled || saving}
 				class="h-8 px-3.5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-800 dark:text-dark-text font-semibold text-xs border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover disabled:opacity-40 disabled:cursor-not-allowed transition"
 			>
-				{saving && !scheduleOpen ? 'Saving…' : 'Save draft'}
+				{saving && !scheduleOpen ? m.common_saving() : m.draft_save()}
 			</button>
 			<button
 				type="button"
@@ -89,7 +90,7 @@
 					: 'bg-slate-100 dark:bg-dark-elevated text-slate-800 dark:text-dark-text hover:bg-slate-200 dark:hover:bg-dark-hover'}"
 			>
 				<Icon name="clock" class="text-xs" />
-				<span>Schedule</span>
+				<span>{m.draft_schedule()}</span>
 			</button>
 		</div>
 	</div>
@@ -99,7 +100,7 @@
 			class="flex flex-wrap items-center gap-2 p-2.5 rounded-2xl bg-slate-50 dark:bg-dark-elevated/40 border border-slate-100 dark:border-dark-border text-xs"
 		>
 			<label for="{id}-publish-at" class="font-medium text-slate-600 dark:text-dark-muted">
-				Publish at
+				{m.draft_publish_at()}
 			</label>
 			<input
 				id="{id}-publish-at"
@@ -116,12 +117,12 @@
 				disabled={disabled || saving || !publishAt}
 				class="h-8 px-3.5 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-xs border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition"
 			>
-				{saving ? 'Scheduling…' : 'Schedule post'}
+				{saving ? m.draft_scheduling() : m.draft_schedule_post()}
 			</button>
 		</div>
 	{:else if draft.scheduledAt}
 		<p class="m-0 text-[11px] text-slate-500 dark:text-dark-muted">
-			Scheduled for {formatPublishAt(draft.scheduledAt)}. Saving it as a draft unschedules it.
+			{m.draft_scheduled_notice(formatPublishAt(draft.scheduledAt))}
 		</p>
 	{/if}
 </div>

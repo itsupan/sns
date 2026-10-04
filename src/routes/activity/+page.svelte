@@ -10,6 +10,7 @@
 	import { activityVerb, actorNames, groupActivity } from '$lib/activity/group';
 	import type { ActivityItem, ActivityPage, ActivityType } from '$lib/activity/types';
 	import type { IconName } from '$lib/components/shared/icons';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -50,14 +51,14 @@
 			const res = await fetch(`/api/notifications?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load activity').message;
+				loadError = readApiError(body, m.activity_load_error()).message;
 				return;
 			}
 			const page = body as ActivityPage;
 			more = [...more, ...page.items];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load activity';
+			loadError = m.activity_load_error();
 		} finally {
 			loadingMore = false;
 		}
@@ -79,11 +80,13 @@
 </script>
 
 <svelte:head>
-	<title>Activity · Kizuna</title>
+	<title>{m.activity_page_title()}</title>
 </svelte:head>
 
 <main class="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
-	<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">Activity</h1>
+	<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">
+		{m.nav_activity()}
+	</h1>
 
 	<FollowRequests initial={data.requests} />
 
@@ -92,9 +95,11 @@
 			class="rounded-3xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card py-16 px-6 flex flex-col items-center gap-2 text-center"
 		>
 			<Icon name="heart" class="text-3xl text-slate-300" />
-			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">No activity yet</p>
+			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">
+				{m.activity_empty()}
+			</p>
 			<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-				Likes, comments, tags and new followers will show up here.
+				{m.activity_empty_hint()}
 			</p>
 		</div>
 	{:else}
@@ -144,13 +149,14 @@
 						{/if}
 					</div>
 					{#if group.unread}
-						<span class="size-2 rounded-full bg-blue-600 shrink-0" aria-label="New"></span>
+						<span class="size-2 rounded-full bg-blue-600 shrink-0" aria-label={m.activity_new()}
+						></span>
 					{/if}
 					{#if group.post}
 						<a
 							href={resolve('/post/[id]', { id: group.post.id })}
 							class="shrink-0 size-11 rounded-lg overflow-hidden bg-slate-100 dark:bg-dark-elevated flex items-center justify-center no-underline"
-							aria-label="View post"
+							aria-label={m.activity_view_post()}
 						>
 							{#if group.post.thumbnail}
 								<img

@@ -1,6 +1,7 @@
 import { tick } from 'svelte';
 import { goto } from '$app/navigation';
 import { resolve } from '$app/paths';
+import { m } from '$lib/i18n';
 import type { IconName } from './icons';
 
 export type NavId = 'home' | 'explore' | 'create' | 'activity' | 'saved' | 'profile';
@@ -13,12 +14,12 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-	{ id: 'home', label: 'Home', icon: 'home', href: resolve('/') },
-	{ id: 'explore', label: 'Explore', icon: 'compass-alt', href: resolve('/explore') },
-	{ id: 'create', label: 'Create', icon: 'plus', href: resolve('/') },
-	{ id: 'activity', label: 'Activity', icon: 'heart', href: resolve('/activity') },
-	{ id: 'saved', label: 'Saved', icon: 'bookmark', href: resolve('/saved') },
-	{ id: 'profile', label: 'Profile', icon: 'user', href: resolve('/profile') }
+	{ id: 'home', label: m.nav_home(), icon: 'home', href: resolve('/') },
+	{ id: 'explore', label: m.nav_explore(), icon: 'compass-alt', href: resolve('/explore') },
+	{ id: 'create', label: m.nav_create(), icon: 'plus', href: resolve('/') },
+	{ id: 'activity', label: m.nav_activity(), icon: 'heart', href: resolve('/activity') },
+	{ id: 'saved', label: m.nav_saved(), icon: 'bookmark', href: resolve('/saved') },
+	{ id: 'profile', label: m.nav_profile(), icon: 'user', href: resolve('/profile') }
 ];
 
 export function activeNavId(pathname: string): NavId | null {

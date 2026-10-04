@@ -12,15 +12,16 @@
 		SecuritySection,
 		TwoFactorSection
 	} from '$lib/components/settings';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>
 
-<svelte:head><title>Settings · Kizuna</title></svelte:head>
+<svelte:head><title>{m.settings_page_title()}</title></svelte:head>
 
 <main class="w-full max-w-2xl mx-auto px-4 py-6 sm:py-10 flex flex-col gap-6">
-	<h1 class="text-2xl font-bold m-0">Settings</h1>
+	<h1 class="text-2xl font-bold m-0">{m.settings_title()}</h1>
 
 	<AccountSection isModerator={data.isModerator} />
 	<SecuritySection

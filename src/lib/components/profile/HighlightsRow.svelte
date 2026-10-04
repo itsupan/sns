@@ -10,6 +10,7 @@
 	import { highlightCover, type HighlightData } from '$lib/highlights';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import HighlightEditor from './HighlightEditor.svelte';
 
 	interface Props {
@@ -103,13 +104,13 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not delete the highlight').message);
+				toast.show(readApiError(body, m.highlight_delete_error()).message);
 				return;
 			}
 			highlights = highlights.filter((h) => h.id !== target.id);
-			toast.show('Highlight deleted');
+			toast.show(m.highlight_deleted());
 		} catch {
-			toast.show('Could not delete the highlight');
+			toast.show(m.highlight_delete_error());
 		} finally {
 			deleting = false;
 			confirmDelete = false;
@@ -127,7 +128,7 @@
 {#if loaded && (highlights.length > 0 || isOwner)}
 	<nav
 		class="w-full overflow-x-auto no-scrollbar py-3 sm:py-4 border-b border-slate-100 dark:border-dark-border"
-		aria-label="Highlights"
+		aria-label={m.highlight_nav()}
 	>
 		<ul class="flex items-start gap-3 lg:gap-5 min-w-max px-4 sm:px-0 list-none m-0">
 			{#if isOwner}
@@ -135,14 +136,14 @@
 					<a
 						href={resolve('/stories/archive')}
 						class={itemButton}
-						aria-label="New highlight from your archive"
+						aria-label={m.highlight_new_from_archive()}
 					>
 						<span
 							class="size-16 rounded-full border-1.5 border-dashed border-slate-300 dark:border-dark-border flex items-center justify-center text-slate-500 dark:text-dark-muted bg-slate-50 dark:bg-dark-elevated"
 						>
 							<Icon name="plus" class="text-lg" />
 						</span>
-						<span class={label}>New</span>
+						<span class={label}>{m.highlight_new()}</span>
 					</a>
 				</li>
 			{/if}
@@ -154,7 +155,9 @@
 						type="button"
 						class={itemButton}
 						onclick={() => (cover ? play(highlight) : openOptions(highlight))}
-						aria-label={cover ? `Play highlight ${highlight.title}` : `${highlight.title}, empty`}
+						aria-label={cover
+							? m.highlight_play(highlight.title)
+							: m.highlight_empty(highlight.title)}
 					>
 						<span class={circle}>
 							<span
@@ -174,7 +177,7 @@
 							type="button"
 							class="absolute top-11 left-11 size-6 rounded-full bg-white dark:bg-dark-elevated text-slate-700 dark:text-dark-text flex items-center justify-center border border-slate-200 dark:border-dark-border cursor-pointer p-0 shadow-xs"
 							onclick={() => openOptions(highlight)}
-							aria-label={`Options for highlight ${highlight.title}`}
+							aria-label={m.highlight_options(highlight.title)}
 						>
 							<Icon name="menu-dots" class="text-[10px]" />
 						</button>
@@ -196,10 +199,10 @@
 
 {#if isOwner && selected}
 	{@const target = selected}
-	<BottomSheet bind:open={optionsOpen} title={`Highlight ${target.title}`}>
+	<BottomSheet bind:open={optionsOpen} title={m.highlight_sheet_title(target.title)}>
 		<SheetAction
 			icon="pencil"
-			label="Edit highlight"
+			label={m.highlight_edit()}
 			onclick={() => {
 				optionsOpen = false;
 				editorOpen = true;
@@ -207,7 +210,7 @@
 		/>
 		<SheetAction
 			icon="trash"
-			label="Delete highlight"
+			label={m.highlight_delete()}
 			danger
 			onclick={() => {
 				optionsOpen = false;
@@ -218,9 +221,9 @@
 
 	<HighlightEditor bind:open={editorOpen} highlight={target} onSaved={handleSaved} />
 
-	<BottomSheet bind:open={confirmDelete} title={`Delete ${target.title}?`} showTitle>
+	<BottomSheet bind:open={confirmDelete} title={m.highlight_confirm_delete(target.title)} showTitle>
 		<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
-			The highlight leaves your profile. Its stories stay in your archive.
+			{m.highlight_delete_hint()}
 		</p>
 		{#snippet footer()}
 			<div class="flex justify-end gap-2">
@@ -229,7 +232,7 @@
 					class="h-10 px-4 rounded-full text-sm font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover"
 					onclick={() => (confirmDelete = false)}
 				>
-					Cancel
+					{m.common_cancel()}
 				</button>
 				<button
 					type="button"
@@ -237,7 +240,7 @@
 					disabled={deleting}
 					onclick={deleteSelected}
 				>
-					{deleting ? 'Deleting…' : 'Delete'}
+					{deleting ? m.common_deleting() : m.common_delete()}
 				</button>
 			</div>
 		{/snippet}

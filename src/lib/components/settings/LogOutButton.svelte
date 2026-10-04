@@ -3,6 +3,7 @@
 	import { resolve } from '$app/paths';
 	import { authClient } from '$lib/auth-client';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import { m } from '$lib/i18n';
 
 	let signingOut = $state(false);
 
@@ -20,5 +21,5 @@
 	disabled={signingOut}
 >
 	<Icon name="sign-out-alt" />
-	Log out
+	{m.settings_log_out()}
 </button>

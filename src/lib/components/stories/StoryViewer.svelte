@@ -6,6 +6,7 @@
 	import Icon from '$lib/components/shared/Icon.svelte';
 	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import Modal from '$lib/components/shared/Modal.svelte';
+	import { m } from '$lib/i18n';
 	import HighlightPicker from './HighlightPicker.svelte';
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
@@ -255,15 +256,15 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not delete this story').message);
+				toast.show(readApiError(body, m.story_delete_error()).message);
 				return;
 			}
-			toast.show('Story deleted');
+			toast.show(m.story_deleted());
 			// The parent removes it from `groups`; stay on the same position (now the next story).
 			if (si > 0 && si >= group.stories.length - 1) si -= 1;
 			onDeleted?.(target);
 		} catch {
-			toast.show('Could not delete this story');
+			toast.show(m.story_delete_error());
 		} finally {
 			deleting = false;
 			confirmDelete = false;
@@ -279,9 +280,9 @@
 		try {
 			const res = await fetch(`/api/stories/${encodeURIComponent(storyId)}/views${query}`);
 			const body = await res.json().catch(() => null);
-			return res.ok ? (body as ViewersPage) : readApiError(body, 'Could not load viewers').message;
+			return res.ok ? (body as ViewersPage) : readApiError(body, m.story_viewers_error()).message;
 		} catch {
-			return 'Could not load viewers';
+			return m.story_viewers_error();
 		}
 	}
 
@@ -330,7 +331,7 @@
 		try {
 			await followStore.set(person.id, followStatusOf(person) === 'none');
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+			toast.show(err instanceof Error ? err.message : m.follow_error());
 		}
 	}
 
@@ -348,11 +349,11 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				throw new Error(readApiError(body, 'Could not send your reaction').message);
+				throw new Error(readApiError(body, m.story_reaction_error()).message);
 			}
 		} catch (err) {
 			reactions[target.id] = previous;
-			toast.show(err instanceof Error ? err.message : 'Could not send your reaction');
+			toast.show(err instanceof Error ? err.message : m.story_reaction_error());
 		}
 	}
 
@@ -373,13 +374,13 @@
 			});
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not send your reply').message);
+				toast.show(readApiError(body, m.story_reply_error()).message);
 				return;
 			}
 			replyDraft = '';
-			toast.show('Reply sent');
+			toast.show(m.story_reply_sent());
 		} catch {
-			toast.show('Could not send your reply');
+			toast.show(m.story_reply_error());
 		} finally {
 			sendingReply = false;
 		}
@@ -395,7 +396,7 @@
 {#if group && story}
 	<Modal
 		bind:open
-		label={`Stories from ${group.user.name}`}
+		label={m.story_from(group.user.name)}
 		variant="fullscreen"
 		closeOnBackdrop={false}
 		class="items-center justify-center bg-slate-50/95 dark:bg-dark-canvas/95 backdrop-blur-md select-none"
@@ -407,7 +408,7 @@
 			class="hidden sm:flex absolute left-[max(1rem,calc(50%-19rem))] top-1/2 -translate-y-1/2 size-11 rounded-full bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 shadow-md dark:bg-dark-elevated dark:hover:bg-dark-hover dark:text-dark-text dark:border-dark-border items-center justify-center cursor-pointer transition disabled:opacity-0"
 			onclick={prev}
 			disabled={gi === 0 && si === 0}
-			aria-label="Previous story"
+			aria-label={m.story_previous()}
 		>
 			<Icon name="angle-left" />
 		</button>
@@ -415,7 +416,7 @@
 			type="button"
 			class="hidden sm:flex absolute right-[max(1rem,calc(50%-19rem))] top-1/2 -translate-y-1/2 size-11 rounded-full bg-white hover:bg-slate-100 text-slate-900 border border-slate-200 shadow-md dark:bg-dark-elevated dark:hover:bg-dark-hover dark:text-dark-text dark:border-dark-border items-center justify-center cursor-pointer transition"
 			onclick={next}
-			aria-label="Next story"
+			aria-label={m.story_next()}
 		>
 			<Icon name="angle-right" />
 		</button>
@@ -449,7 +450,7 @@
 				{:else}
 					<img
 						src={story.mediaUrl}
-						alt={story.caption || `Story from ${group.user.name}`}
+						alt={story.caption || m.story_alt(group.user.name)}
 						class="absolute inset-0 w-full h-full object-cover"
 						draggable="false"
 					/>
@@ -496,7 +497,7 @@
 					<span class="flex flex-col min-w-0 leading-tight">
 						<span class="flex items-center gap-1.5 text-sm font-semibold drop-shadow">
 							<span class="truncate"
-								>{group.title ?? (group.isSelf ? 'Your story' : group.user.name)}</span
+								>{group.title ?? (group.isSelf ? m.story_yours() : group.user.name)}</span
 							>
 							<span class="text-xs font-normal text-white/75 shrink-0">
 								· {formatTimeAgo(story.createdAt)}
@@ -506,7 +507,7 @@
 							<span
 								class="self-start mt-0.5 px-1.5 py-px rounded-full bg-green-500 text-white text-[10px] font-semibold"
 							>
-								Close friends
+								{m.story_close_friends()}
 							</span>
 						{/if}
 						{#if story.location}
@@ -524,7 +525,7 @@
 							type="button"
 							class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
 							onclick={() => (muted = !muted)}
-							aria-label={muted ? 'Unmute' : 'Mute'}
+							aria-label={muted ? m.story_unmute() : m.story_mute()}
 						>
 							<Icon name={muted ? 'volume-mute' : 'volume'} />
 						</button>
@@ -533,7 +534,7 @@
 						type="button"
 						class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
 						onclick={() => (paused = !paused)}
-						aria-label={paused ? 'Play' : 'Pause'}
+						aria-label={paused ? m.story_play() : m.story_pause()}
 					>
 						<Icon name={paused ? 'play' : 'pause'} />
 					</button>
@@ -542,7 +543,7 @@
 							type="button"
 							class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
 							onclick={() => (pickerOpen = true)}
-							aria-label="Add to highlight"
+							aria-label={m.highlight_add_to()}
 						>
 							<Icon name="plus" />
 						</button>
@@ -550,7 +551,7 @@
 							type="button"
 							class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
 							onclick={() => (confirmDelete = true)}
-							aria-label="Delete story"
+							aria-label={m.story_delete()}
 						>
 							<Icon name="trash" />
 						</button>
@@ -561,7 +562,7 @@
 						type="button"
 						class="size-10 rounded-full flex items-center justify-center bg-transparent hover:bg-white/15 border-0 cursor-pointer text-white"
 						onclick={close}
-						aria-label="Close stories"
+						aria-label={m.story_close()}
 					>
 						<Icon name="cross" />
 					</button>
@@ -590,14 +591,18 @@
 						type="button"
 						class="self-start flex items-center gap-2 h-9 px-3.5 rounded-full bg-black/45 hover:bg-black/60 backdrop-blur-md text-white text-xs font-semibold border-0 cursor-pointer"
 						onclick={openViewers}
-						aria-label={`${story.viewCount ?? 0} ${story.viewCount === 1 ? 'view' : 'views'}, see who viewed`}
+						aria-label={m.story_view_count_label(story.viewCount ?? 0)}
 					>
 						<Icon name="eye" class="text-sm" />
-						<span>{story.viewCount ?? 0} {story.viewCount === 1 ? 'view' : 'views'}</span>
+						<span>{m.story_view_count(story.viewCount ?? 0)}</span>
 					</button>
 				{:else if live}
 					{@const mine = reactionOf(story)}
-					<div class="flex items-center justify-between gap-1" role="group" aria-label="React">
+					<div
+						class="flex items-center justify-between gap-1"
+						role="group"
+						aria-label={m.story_react_label()}
+					>
 						{#each STORY_REACTIONS as emoji (emoji)}
 							<button
 								type="button"
@@ -605,7 +610,7 @@
 								emoji
 									? 'bg-white/35 scale-110'
 									: 'bg-black/30 hover:bg-black/45'}"
-								aria-label={`React ${emoji}`}
+								aria-label={m.story_react(emoji)}
 								aria-pressed={mine === emoji}
 								onclick={() => react(emoji)}
 							>
@@ -619,8 +624,8 @@
 							bind:value={replyDraft}
 							type="text"
 							maxlength={MAX_MESSAGE_LENGTH}
-							placeholder={`Reply to ${group.user.name}…`}
-							aria-label={`Reply to ${group.user.name}`}
+							placeholder={m.story_reply_placeholder(group.user.name)}
+							aria-label={m.story_reply_label(group.user.name)}
 							class="flex-1 min-w-0 h-11 px-4 rounded-full bg-black/30 border border-white/50 text-sm text-white placeholder:text-white/70 focus:outline-none focus:border-white"
 							onfocus={() => (replying = true)}
 							onblur={() => (replying = false)}
@@ -631,7 +636,7 @@
 								class="shrink-0 h-11 px-4 rounded-full bg-white text-slate-950 text-sm font-semibold border-0 cursor-pointer disabled:opacity-50"
 								disabled={sendingReply}
 							>
-								Send
+								{m.common_send()}
 							</button>
 						{/if}
 					</form>
@@ -649,14 +654,10 @@
 			/>
 		{/if}
 
-		<BottomSheet bind:open={viewersOpen} title="Story viewers">
+		<BottomSheet bind:open={viewersOpen} title={m.story_viewers_title()}>
 			<h2 class="m-0 px-3 pt-1 pb-2 text-sm font-semibold flex items-center gap-2">
 				<Icon name="eye" class="text-sm text-slate-500 dark:text-dark-muted" />
-				<span
-					>{viewersLoading
-						? 'Viewers'
-						: `${viewersCount} ${viewersCount === 1 ? 'viewer' : 'viewers'}`}</span
-				>
+				<span>{viewersLoading ? m.story_viewers() : m.story_viewer_count(viewersCount)}</span>
 			</h2>
 			<ul class="list-none m-0 p-0">
 				{#if viewersLoading}
@@ -672,7 +673,7 @@
 					{/each}
 				{:else if viewers.length === 0}
 					<li class="px-3 py-8 text-center text-xs text-slate-500 dark:text-dark-muted">
-						No one has viewed this story yet.
+						{m.story_no_viewers()}
 					</li>
 				{:else}
 					{#each viewers as person (person.id)}
@@ -691,7 +692,7 @@
 								</span>
 							</a>
 							{#if person.reaction}
-								<span class="shrink-0 text-xl" aria-label={`Reacted ${person.reaction}`}
+								<span class="shrink-0 text-xl" aria-label={m.story_reacted(person.reaction)}
 									>{person.reaction}</span
 								>
 							{/if}
@@ -715,9 +716,9 @@
 			{/if}
 		</BottomSheet>
 
-		<BottomSheet bind:open={confirmDelete} title="Delete this story?" showTitle>
+		<BottomSheet bind:open={confirmDelete} title={m.story_confirm_delete()} showTitle>
 			<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
-				It will disappear for everyone right away.
+				{m.story_delete_hint()}
 			</p>
 			{#snippet footer()}
 				<div class="flex justify-end gap-2">
@@ -726,7 +727,7 @@
 						class="h-10 px-4 rounded-full text-sm font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover"
 						onclick={() => (confirmDelete = false)}
 					>
-						Cancel
+						{m.common_cancel()}
 					</button>
 					<button
 						type="button"
@@ -734,7 +735,7 @@
 						disabled={deleting}
 						onclick={deleteStory}
 					>
-						{deleting ? 'Deleting…' : 'Delete'}
+						{deleting ? m.common_deleting() : m.common_delete()}
 					</button>
 				</div>
 			{/snippet}

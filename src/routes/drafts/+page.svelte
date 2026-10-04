@@ -8,6 +8,7 @@
 	import { formatTimeAgo } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -29,12 +30,12 @@
 			const res = await request();
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Something went wrong').message);
+				toast.show(readApiError(body, m.common_something_went_wrong()).message);
 				return;
 			}
 			toast.show(done);
 		} catch {
-			toast.show('Something went wrong');
+			toast.show(m.common_something_went_wrong());
 		} finally {
 			await invalidateAll();
 			busyId = null;
@@ -45,7 +46,7 @@
 		return act(
 			draft,
 			() => fetch(`/api/drafts/${draft.id}/publish`, { method: 'POST' }),
-			'Post published'
+			m.draft_published()
 		);
 	}
 
@@ -57,21 +58,27 @@
 	async function deletePending() {
 		if (!pendingDelete) return;
 		const draft = pendingDelete;
-		await act(draft, () => fetch(`/api/drafts/${draft.id}`, { method: 'DELETE' }), 'Draft deleted');
+		await act(
+			draft,
+			() => fetch(`/api/drafts/${draft.id}`, { method: 'DELETE' }),
+			m.draft_deleted()
+		);
 		confirmOpen = false;
 	}
 </script>
 
 <svelte:head>
-	<title>Drafts · Kizuna</title>
+	<title>{m.draft_page_title()}</title>
 </svelte:head>
 
 <main class="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
 	<div class="flex items-end justify-between gap-3">
 		<div>
-			<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">Drafts</h1>
+			<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">
+				{m.draft_drafts()}
+			</h1>
 			<p class="text-xs text-slate-500 dark:text-dark-muted m-0 mt-1">
-				Only you can see your drafts. Scheduled ones publish on their own.
+				{m.draft_page_hint()}
 			</p>
 		</div>
 		<span class="text-[11px] font-mono text-slate-400 dark:text-dark-subtle shrink-0">
@@ -84,9 +91,9 @@
 			class="rounded-3xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card py-16 px-6 flex flex-col items-center gap-2 text-center"
 		>
 			<Icon name="document" class="text-3xl text-slate-300" />
-			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">No drafts yet</p>
+			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">{m.draft_empty()}</p>
 			<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-				Use "Save draft" or "Schedule" in the composer to keep a post for later.
+				{m.draft_empty_hint()}
 			</p>
 		</div>
 	{:else}
@@ -118,7 +125,7 @@
 							<Icon name={type.icon} class="text-xs" />
 							<span>{type.label}</span>
 							<span aria-hidden="true">·</span>
-							<span>Edited {formatTimeAgo(draft.updatedAt)}</span>
+							<span>{m.draft_edited(formatTimeAgo(draft.updatedAt))}</span>
 						</div>
 
 						{#if draft.payload.title}
@@ -137,13 +144,13 @@
 								class="m-0 flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-kizuna-blue"
 							>
 								<Icon name="clock" class="text-xs" />
-								<span>Scheduled for {formatPublishAt(draft.publishAt)}</span>
+								<span>{m.draft_scheduled_for(formatPublishAt(draft.publishAt))}</span>
 							</p>
 						{/if}
 						{#if draft.lastError}
 							<p class="m-0 flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400">
 								<Icon name="exclamation" class="text-xs shrink-0" />
-								<span>Could not publish: {draft.lastError}</span>
+								<span>{m.draft_publish_failed(draft.lastError)}</span>
 							</p>
 						{/if}
 
@@ -154,7 +161,7 @@
 								class="h-9 px-4 rounded-full text-xs font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text hover:bg-slate-200 dark:hover:bg-dark-hover no-underline flex items-center gap-1.5 transition-colors"
 							>
 								<Icon name="pencil" class="text-xs" />
-								<span>Edit</span>
+								<span>{m.draft_edit()}</span>
 							</a>
 							<button
 								type="button"
@@ -162,7 +169,11 @@
 								onclick={() => publishNow(draft)}
 								class="h-9 px-4 rounded-full text-xs font-semibold bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5 transition"
 							>
-								<span>{busyId === draft.id && !confirmOpen ? 'Publishing…' : 'Publish now'}</span>
+								<span
+									>{busyId === draft.id && !confirmOpen
+										? m.composer_publishing()
+										: m.draft_publish_now()}</span
+								>
 								<Icon name="arrow-right" class="text-[10px]" />
 							</button>
 							<button
@@ -171,7 +182,7 @@
 								onclick={() => confirmDelete(draft)}
 								class="ml-auto h-9 px-4 rounded-full text-xs font-semibold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-950/60 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
 							>
-								Delete
+								{m.common_delete()}
 							</button>
 						</div>
 					</div>
@@ -182,9 +193,9 @@
 </main>
 
 {#if confirmOpen}
-	<BottomSheet bind:open={confirmOpen} title="Delete draft?" showTitle>
+	<BottomSheet bind:open={confirmOpen} title={m.draft_confirm_delete()} showTitle>
 		<p class="px-3 pb-2 text-sm text-slate-600 dark:text-dark-muted">
-			This deletes the draft and the photos and videos uploaded for it. You can't undo this.
+			{m.draft_delete_hint()}
 		</p>
 		{#snippet footer()}
 			<div class="flex justify-end gap-2">
@@ -193,7 +204,7 @@
 					class="h-10 px-4 rounded-full text-sm font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-dark-text border-0 cursor-pointer hover:bg-slate-200 dark:hover:bg-dark-hover"
 					onclick={() => (confirmOpen = false)}
 				>
-					Cancel
+					{m.common_cancel()}
 				</button>
 				<button
 					type="button"
@@ -201,7 +212,7 @@
 					disabled={busyId !== null}
 					onclick={deletePending}
 				>
-					{busyId ? 'Deleting…' : 'Delete'}
+					{busyId ? m.common_deleting() : m.common_delete()}
 				</button>
 			</div>
 		{/snippet}

@@ -8,6 +8,7 @@
 	import { resolve } from '$app/paths';
 	import type { SuggestedCreator } from '$lib/explore/types';
 	import { LEGAL_LINKS } from '$lib/constants/legal';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		class?: string;
@@ -31,7 +32,7 @@
 
 	async function toggleFollow(curator: SuggestedCreator) {
 		if (!$session.data?.user) {
-			toast.show('Please log in to follow curators');
+			toast.show(m.follow_log_in());
 			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- resolve() is the base; only a query is added
 			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
@@ -41,14 +42,14 @@
 		try {
 			await followStore.set(curator.id, next);
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+			toast.show(err instanceof Error ? err.message : m.follow_error());
 		}
 	}
 </script>
 
 <aside
 	class="w-60 lg:w-60 xl:w-72 2xl:w-80 shrink-0 hidden lg:flex flex-col gap-3.5 xl:gap-5 py-4 xl:py-6 select-none transition-all duration-200 {className}"
-	aria-label="Secondary Sidebar"
+	aria-label={m.nav_secondary_label()}
 >
 	{#if curators.length > 0}
 		<!-- Curators to Follow Card -->
@@ -57,13 +58,13 @@
 		>
 			<div class="flex items-center justify-between mb-3 xl:mb-4">
 				<h3 class="font-bold text-xs xl:text-sm text-slate-900 dark:text-dark-text m-0">
-					Curators to Follow
+					{m.feed_curators()}
 				</h3>
 				<a
 					href={resolve('/explore')}
 					class="text-[11px] xl:text-xs font-semibold text-blue-600 dark:text-kizuna-blue hover:underline no-underline"
 				>
-					Explore all
+					{m.feed_explore_all()}
 				</a>
 			</div>
 
@@ -115,7 +116,7 @@
 	>
 		<div class="flex items-center justify-between mb-3 xl:mb-3.5">
 			<h3 class="font-bold text-xs xl:text-sm text-slate-900 dark:text-dark-text m-0">
-				Curated Topics
+				{m.feed_curated_topics()}
 			</h3>
 			<Icon name="arrow-trend-up" class="text-slate-400 text-xs xl:text-sm" />
 		</div>
@@ -136,7 +137,7 @@
 	<footer
 		class="px-2 text-[11px] xl:text-xs text-slate-400 dark:text-dark-subtle flex flex-col gap-1.5 xl:gap-2"
 	>
-		<nav aria-label="Legal" class="flex flex-wrap gap-x-3 gap-y-1">
+		<nav aria-label={m.nav_legal()} class="flex flex-wrap gap-x-3 gap-y-1">
 			{#each LEGAL_LINKS as link (link.href)}
 				<a
 					href={resolve(link.href)}

@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { m } from '$lib/i18n';
 	import Avatar from './Avatar.svelte';
 	import { insertMention, mentionAt } from '$lib/formatting-editor';
 
@@ -106,7 +107,7 @@
 {#if open}
 	<ul
 		class="list-none m-0 p-1 rounded-2xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card shadow-lg"
-		aria-label="People to tag"
+		aria-label={m.composer_people_to_tag()}
 	>
 		{#each users as user, i (user.id)}
 			<li>

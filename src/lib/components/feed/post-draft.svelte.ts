@@ -10,6 +10,7 @@ import {
 } from '$lib/constants/post-limits';
 import { DEFAULT_TEXT_BACKGROUND, type TextBackground } from '$lib/post-backgrounds';
 import { DEFAULT_POLL_DURATION_MINUTES, MIN_POLL_OPTIONS } from '$lib/polls';
+import { m } from '$lib/i18n';
 import type { MediaItem, PostData, PostType } from './PostCard.svelte';
 import type { IconName } from '$lib/components/shared/icons';
 
@@ -29,16 +30,16 @@ export interface MediaPlate {
 }
 
 export const POST_TYPES: { id: PostType; label: string; icon: IconName }[] = [
-	{ id: 'photo', label: 'Photo', icon: 'picture' },
-	{ id: 'story', label: 'Story', icon: 'play-alt' },
-	{ id: 'article', label: 'Article', icon: 'document' },
-	{ id: 'text', label: 'Text', icon: 'text' }
+	{ id: 'photo', label: m.composer_type_photo(), icon: 'picture' },
+	{ id: 'story', label: m.composer_type_story(), icon: 'play-alt' },
+	{ id: 'article', label: m.composer_type_article(), icon: 'document' },
+	{ id: 'text', label: m.composer_type_text(), icon: 'text' }
 ];
 
 export const ASPECT_RATIOS: { id: AspectRatio; label: string; sub: string }[] = [
-	{ id: '1:1', label: '1:1', sub: 'Square' },
-	{ id: '4:5', label: '4:5', sub: 'Gallery' },
-	{ id: '16:9', label: '16:9', sub: 'Cinema' }
+	{ id: '1:1', label: '1:1', sub: m.composer_ratio_square() },
+	{ id: '4:5', label: '4:5', sub: m.composer_ratio_gallery() },
+	{ id: '16:9', label: '16:9', sub: m.composer_ratio_cinema() }
 ];
 
 export const MAX_CONTENT_LENGTH = 2200;
@@ -54,12 +55,12 @@ function pollOptionField(label: string): PollOptionField {
 }
 
 function platesFrom(media: MediaItem[]): MediaPlate[] {
-	return media.map((m) => ({
+	return media.map((item) => ({
 		id: crypto.randomUUID(),
-		url: m.url,
-		previewUrl: m.url,
-		type: m.type,
-		alt: m.alt ?? ''
+		url: item.url,
+		previewUrl: item.url,
+		type: item.type,
+		alt: item.alt ?? ''
 	}));
 }
 
@@ -152,7 +153,7 @@ export class PostDraft {
 			})
 		});
 		const data = await res.json().catch(() => null);
-		if (!res.ok) throw new Error(readApiError(data, 'Could not save the draft').message);
+		if (!res.ok) throw new Error(readApiError(data, m.draft_save_error()).message);
 		const { draft } = data as { draft: DraftData };
 		this.draftId = draft.id;
 		this.scheduledAt = draft.publishAt;
@@ -168,7 +169,7 @@ export class PostDraft {
 
 		const room = MAX_MEDIA_PER_POST - this.mediaPlates.length;
 		if (mediaFiles.length > room) {
-			toast.show(`A post can have at most ${MAX_MEDIA_PER_POST} photos or videos`);
+			toast.show(m.composer_media_limit(MAX_MEDIA_PER_POST));
 		}
 		const validFiles = mediaFiles.slice(0, Math.max(room, 0));
 
@@ -211,10 +212,10 @@ export class PostDraft {
 								}
 							: p
 					);
-					toast.show(`${isVideo ? 'Video' : 'Photo'} uploaded`);
+					toast.show(isVideo ? m.composer_video_uploaded() : m.composer_photo_uploaded());
 				})
 				.catch((err) => {
-					toast.show(err instanceof Error ? err.message : 'Media upload failed');
+					toast.show(err instanceof Error ? err.message : m.composer_upload_failed());
 					this.removePlate(plateId);
 				});
 		}
@@ -240,7 +241,7 @@ export class PostDraft {
 	addTag() {
 		const clean = this.tagInput.trim().replace(/^#+/, '').slice(0, MAX_TAG_LENGTH);
 		if (clean && this.tags.length >= MAX_TAGS_PER_POST) {
-			toast.show(`A post can have at most ${MAX_TAGS_PER_POST} tags`);
+			toast.show(m.composer_tag_limit(MAX_TAGS_PER_POST));
 			return;
 		}
 		if (clean && !this.tags.some((t) => t.toLowerCase() === `#${clean}`.toLowerCase())) {

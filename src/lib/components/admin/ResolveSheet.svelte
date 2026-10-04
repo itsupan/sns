@@ -3,6 +3,7 @@
 	import { MODERATION_NOTE_MAX, SUSPENSION_OPTIONS, type ResolveAction } from '$lib/moderation';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		open?: boolean;
@@ -25,16 +26,21 @@
 	const uid = $props.id();
 	const formId = `resolve-${uid}`;
 
-	const NOUN = { post: 'post', comment: 'comment', user: 'account', message: 'message' };
+	const NOUN = {
+		post: m.report_target_post(),
+		comment: m.report_target_comment(),
+		user: m.report_target_user(),
+		message: m.report_target_message()
+	};
 	const TITLE: Record<ResolveAction, string> = {
-		dismiss: 'Dismiss reports',
-		remove_content: 'Remove content',
-		suspend_user: 'Suspend user'
+		dismiss: m.moderation_title_dismiss(),
+		remove_content: m.moderation_title_remove(),
+		suspend_user: m.moderation_title_suspend()
 	};
 	const CONFIRM: Record<ResolveAction, string> = {
-		dismiss: 'Dismiss',
-		remove_content: 'Remove',
-		suspend_user: 'Suspend'
+		dismiss: m.moderation_confirm_dismiss(),
+		remove_content: m.moderation_confirm_remove(),
+		suspend_user: m.moderation_confirm_suspend()
 	};
 
 	let days = $state<number | null>(7);
@@ -44,9 +50,9 @@
 
 	let description = $derived(
 		{
-			dismiss: `Close every open report on this ${NOUN[targetType]} and leave it up.`,
-			remove_content: `Remove this ${NOUN[targetType]} and close every open report on it.`,
-			suspend_user: `Sign ${ownerName ?? 'this user'} out and block them from signing in.`
+			dismiss: m.moderation_describe_dismiss(NOUN[targetType]),
+			remove_content: m.moderation_describe_remove(NOUN[targetType]),
+			suspend_user: m.moderation_describe_suspend(ownerName ?? m.moderation_this_user())
 		}[action]
 	);
 
@@ -73,15 +79,18 @@
 				})
 			});
 			if (!res.ok) {
-				error = readApiError(await res.json().catch(() => null), 'Could not resolve').message;
+				error = readApiError(
+					await res.json().catch(() => null),
+					m.moderation_resolve_error()
+				).message;
 				return;
 			}
 			open = false;
 			reset();
-			toast.success('Resolved');
+			toast.success(m.moderation_resolved());
 			onresolved();
 		} catch {
-			error = 'Could not resolve';
+			error = m.moderation_resolve_error();
 		} finally {
 			submitting = false;
 		}
@@ -101,7 +110,9 @@
 
 		{#if action === 'suspend_user'}
 			<label class="flex flex-col gap-1.5">
-				<span class="text-sm font-medium text-slate-700 dark:text-dark-text">Duration</span>
+				<span class="text-sm font-medium text-slate-700 dark:text-dark-text"
+					>{m.moderation_duration()}</span
+				>
 				<select
 					bind:value={days}
 					class="h-10 px-3 rounded-xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-elevated text-sm text-slate-900 dark:text-dark-text"
@@ -115,7 +126,8 @@
 
 		<label class="flex flex-col gap-1.5">
 			<span class="text-sm font-medium text-slate-700 dark:text-dark-text">
-				Note <span class="font-normal text-slate-400">(optional, kept in the audit log)</span>
+				{m.moderation_note()}
+				<span class="font-normal text-slate-400">{m.moderation_note_hint()}</span>
 			</span>
 			<textarea
 				bind:value={note}
@@ -140,7 +152,7 @@
 					reset();
 				}}
 			>
-				Cancel
+				{m.common_cancel()}
 			</button>
 			<button
 				type="submit"
@@ -151,7 +163,7 @@
 					: 'bg-red-600 text-white hover:bg-red-700'}"
 				disabled={submitting}
 			>
-				{submitting ? 'Working…' : CONFIRM[action]}
+				{submitting ? m.moderation_working() : CONFIRM[action]}
 			</button>
 		</div>
 	{/snippet}

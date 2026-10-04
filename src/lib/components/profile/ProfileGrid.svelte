@@ -9,6 +9,7 @@
 	import { formatCount } from '$lib/utils/format';
 	import { readApiError } from '$lib/utils/api-error';
 	import { GRID_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
+	import { m } from '$lib/i18n';
 	import type { TabId, ViewMode } from './ProfileTabs.svelte';
 
 	export interface GridItem {
@@ -129,14 +130,14 @@
 			);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load more posts').message;
+				loadError = readApiError(body, m.feed_load_more_error()).message;
 				return;
 			}
 			const page = body as { posts: GridItem[]; nextCursor: string | null };
 			more = [...more, ...page.posts];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load more posts';
+			loadError = m.feed_load_more_error();
 		} finally {
 			loadingMore = false;
 		}
@@ -213,12 +214,14 @@
 				>
 					<Icon name="camera" class="text-2xl" />
 				</div>
-				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">No posts yet</h3>
+				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+					{m.profile_no_posts()}
+				</h3>
 				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm mb-5">
 					{#if isOwnProfile}
-						When you share photos or architectural studies, they will appear here on your profile.
+						{m.profile_no_posts_own()}
 					{:else}
-						{userName || 'This user'} hasn't shared any posts yet.
+						{m.profile_no_posts_other(userName || m.profile_this_user())}
 					{/if}
 				</p>
 				{#if isOwnProfile}
@@ -227,7 +230,7 @@
 						class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 font-semibold text-xs transition hover:opacity-90 no-underline shadow-xs"
 					>
 						<Icon name="plus" class="text-xs" />
-						<span>Create your first post</span>
+						<span>{m.profile_create_first()}</span>
 					</a>
 				{/if}
 			</div>
@@ -239,7 +242,7 @@
 						type="button"
 						class="group relative w-full aspect-square overflow-hidden rounded-2xl bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
 						onclick={() => openItem(item)}
-						aria-label={`View ${item.post.pinned ? 'pinned ' : ''}post ${item.title}`}
+						aria-label={m.profile_view_post(item.title, Boolean(item.post.pinned))}
 					>
 						{@render preview(item, 'text-[11px] sm:text-sm', GRID_CELL_SIZES)}
 
@@ -304,7 +307,7 @@
 						type="button"
 						class="w-full flex items-center justify-between gap-4 py-3 sm:py-3.5 hover:bg-slate-50/80 dark:hover:bg-dark-elevated/40 px-2 sm:px-3 rounded-xl transition-colors cursor-pointer border-0 bg-transparent text-left"
 						onclick={() => openItem(item)}
-						aria-label={`View ${item.post.pinned ? 'pinned ' : ''}post ${item.title}`}
+						aria-label={m.profile_view_post(item.title, Boolean(item.post.pinned))}
 					>
 						<!-- Left: Thumbnail + Title -->
 						<div class="flex items-center gap-3.5 min-w-0">
@@ -355,7 +358,7 @@
 							<span
 								class="px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 dark:bg-dark-elevated text-slate-900 dark:text-white"
 							>
-								View
+								{m.profile_view()}
 							</span>
 						</div>
 					</button>
@@ -376,9 +379,11 @@
 				>
 					<Icon name="bookmark" class="text-2xl" />
 				</div>
-				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">No saved posts</h3>
+				<h3 class="text-base font-bold text-slate-900 dark:text-white mb-1">
+					{m.profile_no_saved()}
+				</h3>
 				<p class="text-xs text-slate-500 dark:text-dark-muted max-w-sm">
-					Save posts to revisit them later in your private archive.
+					{m.profile_no_saved_hint()}
 				</p>
 			</div>
 		{:else}
@@ -388,7 +393,7 @@
 						type="button"
 						class="group relative w-full aspect-square overflow-hidden bg-slate-100 dark:bg-dark-elevated cursor-pointer border-0 p-0 text-left focus:outline-none"
 						onclick={() => openItem(item)}
-						aria-label={`View saved post ${item.title}`}
+						aria-label={m.profile_view_saved(item.title)}
 					>
 						{@render preview(item, 'text-[11px] sm:text-sm', GRID_CELL_SIZES)}
 						<div class="absolute top-2 right-2 text-white drop-shadow-md">
@@ -401,7 +406,7 @@
 				href={resolve('/saved')}
 				class="block text-center py-4 text-xs font-semibold text-slate-600 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white no-underline"
 			>
-				See all saved posts
+				{m.profile_see_all_saved()}
 			</a>
 		{/if}
 	{/if}

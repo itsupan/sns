@@ -64,6 +64,7 @@
 		REACTION_LABEL,
 		type CommentReaction
 	} from '$lib/reactions';
+	import { m } from '$lib/i18n';
 	import type { PostData, PostComment } from './PostCard.svelte';
 
 	interface Props {
@@ -147,7 +148,7 @@
 	async function fetchPage(url: string): Promise<Page> {
 		const res = await fetch(url);
 		const data = await res.json().catch(() => null);
-		if (!res.ok) throw new Error(readApiError(data, 'Could not load comments').message);
+		if (!res.ok) throw new Error(readApiError(data, m.comment_load_error()).message);
 		return data as Page;
 	}
 
@@ -171,7 +172,7 @@
 			thread.loaded = true;
 		} catch (err) {
 			if (thread !== top) return;
-			loadError = err instanceof Error ? err.message : 'Could not load comments';
+			loadError = err instanceof Error ? err.message : m.comment_load_error();
 		} finally {
 			thread.loading = false;
 		}
@@ -194,7 +195,7 @@
 			thread.nextCursor = page.nextCursor;
 			thread.loaded = true;
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not load replies');
+			toast.show(err instanceof Error ? err.message : m.comment_replies_load_error());
 		} finally {
 			thread.loading = false;
 		}
@@ -234,7 +235,7 @@
 		e.preventDefault();
 		const trimmed = commentText.trim();
 		if (!trimmed || submitting) return;
-		if (!(await requireSignIn('Please log in to add comments'))) return;
+		if (!(await requireSignIn(m.comment_log_in()))) return;
 
 		submitting = true;
 		const parentId = replyingTo ? (replyingTo.parentCommentId ?? replyingTo.id) : null;
@@ -245,7 +246,7 @@
 				body: JSON.stringify({ content: trimmed, parentCommentId: parentId })
 			});
 			const data = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(data, 'Failed to post comment').message);
+			if (!res.ok) throw new Error(readApiError(data, m.comment_post_failed()).message);
 
 			const created = data as {
 				comment: CommentItem;
@@ -266,7 +267,7 @@
 			totalOverride = created.commentsCount;
 			commentText = '';
 			replyingTo = null;
-			toast.show(parentId ? 'Reply posted' : 'Comment posted');
+			toast.show(parentId ? m.comment_reply_posted() : m.comment_posted());
 
 			onCommentAdded?.(
 				{
@@ -277,7 +278,7 @@
 				created.commentsCount
 			);
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not post comment');
+			toast.show(err instanceof Error ? err.message : m.comment_post_error());
 		} finally {
 			submitting = false;
 		}
@@ -298,7 +299,7 @@
 
 	async function react(comment: CommentItem, type: CommentReaction) {
 		pickerFor = null;
-		if (!(await requireSignIn('Please log in to react to comments'))) return;
+		if (!(await requireSignIn(m.comment_log_in_to_react()))) return;
 
 		const before = comment.reactions;
 		comment.reactions = toggled(before, type);
@@ -311,13 +312,13 @@
 				body: JSON.stringify({ type })
 			});
 			const data = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(data, 'Could not save your reaction').message);
+			if (!res.ok) throw new Error(readApiError(data, m.comment_reaction_error()).message);
 			if (seq === reactionSeq[comment.id]) {
 				comment.reactions = (data as { reactions: ReactionSummary }).reactions;
 			}
 		} catch (err) {
 			if (seq === reactionSeq[comment.id]) comment.reactions = before;
-			toast.show(err instanceof Error ? err.message : 'Could not save your reaction');
+			toast.show(err instanceof Error ? err.message : m.comment_reaction_error());
 		}
 	}
 
@@ -331,7 +332,7 @@
 		try {
 			const res = await fetch(`/api/comments/${comment.id}`, { method: 'DELETE' });
 			const data = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(data, 'Could not delete the comment').message);
+			if (!res.ok) throw new Error(readApiError(data, m.comment_delete_error()).message);
 			const result = data as { commentsCount: number; repliesCount: number | null };
 
 			const drop = (t: Thread) => {
@@ -354,10 +355,10 @@
 				cancelReply();
 			}
 			totalOverride = result.commentsCount;
-			toast.show('Comment deleted');
+			toast.show(m.comment_deleted());
 			onCommentDeleted?.(comment.id, result.commentsCount);
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not delete the comment');
+			toast.show(err instanceof Error ? err.message : m.comment_delete_error());
 		} finally {
 			deleting = null;
 		}
@@ -380,15 +381,15 @@
 				{#if isPostAuthor(comment)}
 					<span
 						class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-slate-950 text-white dark:bg-white dark:text-slate-950 text-[9px] font-bold tracking-wider uppercase shadow-2xs"
-						title="Post Creator"
+						title={m.comment_post_creator()}
 					>
-						Author
+						{m.comment_author()}
 					</span>
 				{:else if isMine(comment)}
 					<span
 						class="inline-flex items-center px-1.5 py-0.5 rounded-full bg-slate-100 dark:bg-dark-elevated text-slate-700 dark:text-dark-muted text-[9px] font-medium border border-slate-200 dark:border-dark-border"
 					>
-						You
+						{m.comment_you()}
 					</span>
 				{/if}
 				<span class="text-[11px] text-slate-400 dark:text-dark-muted ml-auto sm:ml-1">
@@ -410,9 +411,11 @@
 							type="button"
 							onclick={() => react(comment, type)}
 							aria-pressed={mine}
-							aria-label="{REACTION_LABEL[type]}: {comment.reactions.counts[type]}{mine
-								? ', remove your reaction'
-								: ''}"
+							aria-label={m.comment_reaction_count(
+								REACTION_LABEL[type],
+								comment.reactions.counts[type] ?? 0,
+								mine
+							)}
 							class="inline-flex items-center gap-1 h-6 px-2 rounded-full text-[11px] border cursor-pointer transition active:scale-95 {mine
 								? 'bg-blue-50 border-blue-200 text-blue-700 dark:bg-kizuna-blue/15 dark:border-kizuna-blue/40 dark:text-kizuna-blue font-semibold'
 								: 'bg-slate-50 border-slate-200 text-slate-600 dark:bg-dark-elevated dark:border-dark-border dark:text-dark-muted'}"
@@ -431,18 +434,18 @@
 					class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1"
 				>
 					<Icon name="reply" class="text-[10px]" />
-					<span>Reply</span>
+					<span>{m.comment_reply()}</span>
 				</button>
 
 				<button
 					type="button"
 					onclick={() => (pickerFor = pickerFor === comment.id ? null : comment.id)}
 					aria-expanded={pickerFor === comment.id}
-					aria-label="Add reaction"
+					aria-label={m.comment_add_reaction()}
 					class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white transition cursor-pointer border-0 bg-transparent p-0 flex items-center gap-1"
 				>
 					<Icon name="smile" class="text-[11px]" />
-					<span>React</span>
+					<span>{m.comment_react()}</span>
 				</button>
 
 				{#if comment.canDelete}
@@ -458,10 +461,10 @@
 						<Icon name="trash" class="text-[10px]" />
 						<span>
 							{deleting === comment.id
-								? 'Deleting…'
+								? m.common_deleting()
 								: confirmingDelete === comment.id
-									? 'Tap again to delete'
-									: 'Delete'}
+									? m.comment_tap_to_delete()
+									: m.common_delete()}
 						</span>
 					</button>
 				{/if}
@@ -469,7 +472,7 @@
 				{#if pickerFor === comment.id}
 					<div
 						role="group"
-						aria-label="Pick a reaction"
+						aria-label={m.comment_pick_reaction()}
 						class="absolute left-0 bottom-full mb-1 z-20 flex items-center gap-0.5 p-1 rounded-full bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border shadow-lg"
 					>
 						{#each COMMENT_REACTIONS as type (type)}
@@ -494,7 +497,7 @@
 	</div>
 {/snippet}
 
-<Modal bind:open label="Comments" onclose={close} onkeydown={handleKeydown}>
+<Modal bind:open label={m.comment_comments()} onclose={close} onkeydown={handleKeydown}>
 	<div
 		class="w-full max-w-lg bg-white dark:bg-dark-card border border-slate-200/80 dark:border-dark-border rounded-3xl shadow-2xl flex flex-col max-h-[85vh] overflow-hidden"
 	>
@@ -504,14 +507,14 @@
 			<div class="flex items-center gap-2.5">
 				<Icon name="comment" class="text-lg text-slate-700 dark:text-dark-text" />
 				<h3 class="text-base font-bold text-slate-950 dark:text-white m-0 tracking-tight">
-					Comments ({total})
+					{m.comment_title(total)}
 				</h3>
 			</div>
 			<button
 				type="button"
 				onclick={close}
 				class="size-8 rounded-full flex items-center justify-center text-slate-400 hover:text-slate-700 dark:hover:text-dark-text hover:bg-slate-100 dark:hover:bg-dark-elevated transition cursor-pointer border-0 bg-transparent"
-				aria-label="Close comments"
+				aria-label={m.comment_close()}
 			>
 				<Icon name="cross" class="text-sm" />
 			</button>
@@ -523,7 +526,7 @@
 					<span
 						class="size-6 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin"
 					></span>
-					<span class="text-xs">Loading comments…</span>
+					<span class="text-xs">{m.comment_loading()}</span>
 				</div>
 			{:else if !top.loaded && loadError}
 				<div class="py-12 flex flex-col items-center justify-center gap-3 text-center">
@@ -533,7 +536,7 @@
 						onclick={() => loadTop(true)}
 						class="h-9 px-4 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 text-xs font-semibold border-0 cursor-pointer"
 					>
-						Try again
+						{m.common_try_again()}
 					</button>
 				</div>
 			{:else if visible(top).length === 0}
@@ -541,8 +544,8 @@
 					class="py-12 flex flex-col items-center justify-center text-slate-400 dark:text-dark-muted gap-2 text-center"
 				>
 					<Icon name="comment" class="text-3xl opacity-40" />
-					<p class="text-sm font-medium m-0">No comments yet</p>
-					<p class="text-xs text-slate-400 m-0">Be the first to share your thoughts.</p>
+					<p class="text-sm font-medium m-0">{m.comment_none()}</p>
+					<p class="text-xs text-slate-400 m-0">{m.comment_be_first()}</p>
 				</div>
 			{:else}
 				{#each visible(top) as comment (comment.id)}
@@ -563,14 +566,14 @@
 							{/if}
 							<div class="ml-11 flex items-center gap-3">
 								{#if thread.loading}
-									<span class="text-[11px] text-slate-400">Loading replies…</span>
+									<span class="text-[11px] text-slate-400">{m.comment_loading_replies()}</span>
 								{:else if more > 0}
 									<button
 										type="button"
 										onclick={() => loadReplies(comment.id)}
 										class="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
 									>
-										View {more} more {more === 1 ? 'reply' : 'replies'}
+										{m.comment_view_more_replies(more)}
 									</button>
 								{/if}
 								{#if visible(thread).length > 0}
@@ -579,7 +582,7 @@
 										onclick={() => (thread.open = false)}
 										class="text-[11px] font-semibold text-slate-400 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
 									>
-										Hide replies
+										{m.comment_hide_replies()}
 									</button>
 								{/if}
 							</div>
@@ -589,8 +592,7 @@
 								onclick={() => showReplies(comment.id)}
 								class="ml-11 self-start text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-white cursor-pointer border-0 bg-transparent p-0"
 							>
-								View {comment.repliesCount}
-								{comment.repliesCount === 1 ? 'reply' : 'replies'}
+								{m.comment_view_replies(comment.repliesCount)}
 							</button>
 						{/if}
 					</div>
@@ -603,7 +605,7 @@
 						disabled={top.loading}
 						class="self-center h-8 px-4 rounded-full border border-slate-200 dark:border-dark-border bg-transparent text-xs font-semibold text-slate-600 dark:text-dark-muted cursor-pointer disabled:opacity-50"
 					>
-						{top.loading ? 'Loading…' : 'Load more comments'}
+						{top.loading ? m.common_loading() : m.comment_load_more()}
 					</button>
 				{/if}
 				{#if loadError && top.loaded}
@@ -619,9 +621,8 @@
 				<span class="flex items-center gap-1.5 truncate">
 					<Icon name="reply" class="text-xs text-blue-600 dark:text-kizuna-blue shrink-0" />
 					<span class="truncate">
-						Replying to <strong class="text-slate-900 dark:text-white"
-							>{replyingTo.author.name}</strong
-						>
+						{m.comment_replying_to()}
+						<strong class="text-slate-900 dark:text-white">{replyingTo.author.name}</strong>
 						<span class="text-slate-500 dark:text-dark-subtle">{replyingTo.author.handle}</span>
 					</span>
 				</span>
@@ -629,7 +630,7 @@
 					type="button"
 					onclick={cancelReply}
 					class="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer border-0 bg-transparent text-xs p-1 shrink-0"
-					aria-label="Cancel reply"
+					aria-label={m.comment_cancel_reply()}
 				>
 					✕
 				</button>
@@ -640,15 +641,17 @@
 			onsubmit={handleSubmit}
 			class="p-3 sm:p-4 bg-slate-50 dark:bg-dark-elevated border-t border-slate-100 dark:border-dark-border flex items-center gap-3"
 		>
-			<Avatar src={currentUser.image} name={currentUser.name || 'You'} size="sm" />
+			<Avatar src={currentUser.image} name={currentUser.name || m.comment_you()} size="sm" />
 			<div class="flex-1 relative">
 				<input
 					bind:this={inputElement}
 					type="text"
 					bind:value={commentText}
 					maxlength={1000}
-					placeholder={replyingTo ? `Reply to ${replyingTo.author.handle}...` : 'Add a comment...'}
-					aria-label="Add a comment"
+					placeholder={replyingTo
+						? m.comment_reply_placeholder(replyingTo.author.handle)
+						: m.comment_add_placeholder()}
+					aria-label={m.comment_add_label()}
 					disabled={submitting}
 					class="w-full h-10 px-4 text-xs bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-full text-slate-900 dark:text-dark-text placeholder:text-slate-400 focus:outline-none focus:ring-1.5 focus:ring-slate-900 dark:focus:ring-white transition"
 				/>
@@ -658,7 +661,7 @@
 				disabled={!commentText.trim() || submitting}
 				class="h-10 px-4 rounded-full bg-slate-950 dark:bg-white text-white dark:text-slate-950 font-semibold text-xs border-0 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition"
 			>
-				{submitting ? 'Posting…' : 'Post'}
+				{submitting ? m.comment_posting() : m.comment_post()}
 			</button>
 		</form>
 	</div>

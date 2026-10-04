@@ -5,6 +5,7 @@
 	import { MAX_HIGHLIGHT_TITLE, highlightCover, type HighlightData } from '$lib/highlights';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import StoryThumb from './StoryThumb.svelte';
 
 	interface Props {
@@ -37,11 +38,11 @@
 		try {
 			const res = await fetch(`/api/users/${encodeURIComponent(userId)}/highlights`);
 			const body = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(body, 'Could not load your highlights').message);
+			if (!res.ok) throw new Error(readApiError(body, m.highlight_load_error()).message);
 			highlights = (body as { highlights: HighlightData[] }).highlights;
 			loaded = true;
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not load your highlights');
+			toast.show(err instanceof Error ? err.message : m.highlight_load_error());
 			open = false;
 		}
 	}
@@ -56,7 +57,7 @@
 			const res = await request();
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				toast.show(readApiError(body, 'Could not update your highlights').message);
+				toast.show(readApiError(body, m.highlight_update_error()).message);
 				return false;
 			}
 			toast.show(done);
@@ -64,7 +65,7 @@
 			await load();
 			return true;
 		} catch {
-			toast.show('Could not update your highlights');
+			toast.show(m.highlight_update_error());
 			return false;
 		} finally {
 			busy = false;
@@ -80,7 +81,7 @@
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({ storyId })
 				}),
-			remove ? `Removed from ${highlight.title}` : `Added to ${highlight.title}`
+			remove ? m.highlight_removed_from(highlight.title) : m.highlight_added_to(highlight.title)
 		);
 	}
 
@@ -95,13 +96,13 @@
 					headers: { 'content-type': 'application/json' },
 					body: JSON.stringify({ title: name, storyId })
 				}),
-			`Added to ${name}`
+			m.highlight_added_to(name)
 		);
 		if (created) title = '';
 	}
 </script>
 
-<BottomSheet bind:open title="Add to highlight" showTitle>
+<BottomSheet bind:open title={m.highlight_add_to()} showTitle>
 	<ul class="list-none m-0 p-0" aria-busy={!loaded}>
 		{#if !loaded}
 			{#each [0, 1] as i (i)}
@@ -130,8 +131,7 @@
 						<span class="flex flex-col min-w-0 flex-1 leading-tight">
 							<span class="text-sm font-semibold truncate">{highlight.title}</span>
 							<span class="text-xs text-slate-500 dark:text-dark-muted">
-								{highlight.stories.length}
-								{highlight.stories.length === 1 ? 'story' : 'stories'}
+								{m.highlight_story_count(highlight.stories.length)}
 							</span>
 						</span>
 						{#if added}
@@ -141,7 +141,7 @@
 				</li>
 			{:else}
 				<li class="px-3 py-6 text-center text-xs text-slate-500 dark:text-dark-muted">
-					No highlights yet. Name one below to start it with this story.
+					{m.highlight_none_yet()}
 				</li>
 			{/each}
 		{/if}
@@ -153,8 +153,8 @@
 				bind:value={title}
 				type="text"
 				maxlength={MAX_HIGHLIGHT_TITLE}
-				placeholder="New highlight"
-				aria-label="New highlight title"
+				placeholder={m.highlight_new_placeholder()}
+				aria-label={m.highlight_new_title_label()}
 				class="flex-1 min-w-0 h-10 px-4 rounded-full bg-slate-100 dark:bg-dark-elevated border-0 text-sm text-slate-900 dark:text-dark-text placeholder:text-slate-500 dark:placeholder:text-dark-muted focus:outline-2 focus:outline-blue-600 dark:focus:outline-kizuna-blue"
 			/>
 			<button
@@ -162,7 +162,7 @@
 				class="shrink-0 h-10 px-4 rounded-full text-sm font-semibold bg-slate-950 dark:bg-white text-white dark:text-slate-950 border-0 cursor-pointer disabled:opacity-40 disabled:cursor-default"
 				disabled={busy || !title.trim()}
 			>
-				Create
+				{m.highlight_create()}
 			</button>
 		</form>
 	{/snippet}

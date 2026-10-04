@@ -11,15 +11,16 @@
 	import { FOLLOW_LABELS, followActionLabel, followStore } from '$lib/utils/follow.svelte';
 	import { HANDLE_PATTERN, HANDLE_RULES, normalizeHandle } from '$lib/utils/handle';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
 
 	const STEPS = [
-		{ title: 'Pick your handle', description: 'This is how people find and mention you.' },
-		{ title: 'Add a photo and bio', description: 'Help people recognise you. You can skip this.' },
-		{ title: 'Follow some creators', description: 'Fill your feed with work you like.' },
-		{ title: "You're all set", description: 'Your profile is ready. Welcome to Kizuna.' }
+		{ title: m.welcome_handle_title(), description: m.welcome_handle_description() },
+		{ title: m.welcome_profile_title(), description: m.welcome_profile_description() },
+		{ title: m.welcome_follow_title(), description: m.welcome_follow_description() },
+		{ title: m.welcome_done_title(), description: m.welcome_done_description() }
 	];
 	const BIO_MAX = 500;
 	const AVAILABILITY_DELAY_MS = 300;
@@ -46,18 +47,18 @@
 	);
 
 	const handleMessage = $derived.by(() => {
-		if (!candidate) return 'Choose a handle to continue.';
+		if (!candidate) return m.welcome_handle_empty();
 		switch (availability) {
 			case 'checking':
-				return 'Checking availability…';
+				return m.welcome_handle_checking();
 			case 'available':
-				return `@${candidate} is available.`;
+				return m.welcome_handle_available(candidate);
 			case 'taken':
-				return `@${candidate} is already taken.`;
+				return m.welcome_handle_taken(candidate);
 			case 'invalid':
 				return HANDLE_RULES;
 			case 'error':
-				return 'Could not check this handle. Try again.';
+				return m.welcome_handle_error();
 		}
 	});
 
@@ -109,7 +110,7 @@
 				user?: { handle: string | null; image: string | null; bio: string | null };
 			} | null;
 			if (!res.ok || !body?.user) {
-				const error = readApiError(body, 'Could not save your profile');
+				const error = readApiError(body, m.welcome_save_error());
 				if (error.code === 'handle_taken') availability = 'taken';
 				errorMessage = error.message;
 				return false;
@@ -118,7 +119,7 @@
 			window.dispatchEvent(new CustomEvent('kizuna:profile-updated', { detail: body.user }));
 			return true;
 		} catch {
-			errorMessage = 'Network error. Please try again.';
+			errorMessage = m.welcome_network_error();
 			return false;
 		} finally {
 			saving = false;
@@ -143,7 +144,7 @@
 		try {
 			await followStore.set(creator.id, followStore.status(creator.id) === 'none');
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+			toast.show(err instanceof Error ? err.message : m.follow_error());
 		}
 	}
 
@@ -154,21 +155,21 @@
 			const res = await fetch('/api/account/onboarding', { method: 'POST' });
 			if (!res.ok) {
 				const body = await res.json().catch(() => null);
-				errorMessage = readApiError(body, 'Could not finish setting up').message;
+				errorMessage = readApiError(body, m.welcome_finish_error()).message;
 				saving = false;
 				return;
 			}
 			// eslint-disable-next-line svelte/no-navigation-without-resolve -- a same-origin path checked by the server
 			await goto(data.redirectTo, { invalidateAll: true });
 		} catch {
-			errorMessage = 'Network error. Please try again.';
+			errorMessage = m.welcome_network_error();
 			saving = false;
 		}
 	}
 </script>
 
 <svelte:head>
-	<title>Welcome — Kizuna</title>
+	<title>{m.welcome_title()}</title>
 	<meta name="robots" content="noindex" />
 </svelte:head>
 
@@ -180,9 +181,9 @@
 	>
 		<KizunaLogo />
 
-		<nav aria-label="Setup progress" class="mb-6">
+		<nav aria-label={m.welcome_progress()} class="mb-6">
 			<p class="text-xs font-semibold text-slate-500 dark:text-dark-muted mb-2">
-				Step {step + 1} of {STEPS.length}
+				{m.welcome_step(step + 1, STEPS.length)}
 			</p>
 			<ol class="grid grid-cols-4 gap-1.5 list-none p-0 m-0">
 				{#each STEPS as { title }, index (title)}
@@ -194,7 +195,7 @@
 							aria-hidden="true"
 						></span>
 						<span class="sr-only">
-							{title}{index < step ? ' (done)' : ''}
+							{index < step ? m.welcome_step_done(title) : title}
 						</span>
 					</li>
 				{/each}
@@ -219,7 +220,7 @@
 		{#if step === 0}
 			<form onsubmit={submitHandle} class="flex flex-col gap-5" novalidate>
 				<div class="flex flex-col gap-1.5">
-					<label for="welcome-handle" class={labelClass}>Handle</label>
+					<label for="welcome-handle" class={labelClass}>{m.welcome_handle()}</label>
 					<div class="relative flex items-center">
 						<span
 							class="absolute left-3.5 text-sm font-medium text-slate-400 dark:text-dark-muted pointer-events-none"
@@ -259,7 +260,7 @@
 					disabled={availability !== 'available'}
 					loading={saving}
 				>
-					Continue
+					{m.welcome_continue()}
 				</Button>
 			</form>
 		{:else if step === 1}
@@ -267,7 +268,7 @@
 				<AvatarUpload bind:url={avatarUrl} bind:uploading name={data.user.name} />
 				<div class="flex flex-col gap-1.5">
 					<div class="flex items-center justify-between">
-						<label for="welcome-bio" class={labelClass}>Bio</label>
+						<label for="welcome-bio" class={labelClass}>{m.welcome_bio()}</label>
 						<span class="text-[11px] text-slate-400 dark:text-dark-muted font-mono">
 							{bio.length} / {BIO_MAX}
 						</span>
@@ -281,12 +282,16 @@
 						class="{inputClass} h-auto min-h-20 py-3 resize-y"></textarea>
 				</div>
 				<div class="flex items-center justify-between gap-3">
-					<Button variant="ghost" disabled={saving} onclick={() => goTo(0)}>Back</Button>
+					<Button variant="ghost" disabled={saving} onclick={() => goTo(0)}
+						>{m.welcome_back()}</Button
+					>
 					<div class="flex items-center gap-2">
 						<Button variant="outline" disabled={saving || uploading} onclick={() => goTo(2)}>
-							Skip
+							{m.welcome_skip()}
 						</Button>
-						<Button type="submit" disabled={uploading} loading={saving}>Continue</Button>
+						<Button type="submit" disabled={uploading} loading={saving}
+							>{m.welcome_continue()}</Button
+						>
 					</div>
 				</div>
 			</form>
@@ -324,13 +329,13 @@
 					</ul>
 				{:else}
 					<p class="text-sm text-slate-500 dark:text-dark-muted m-0">
-						No suggestions yet. You can find people to follow on Explore later.
+						{m.welcome_no_suggestions()}
 					</p>
 				{/if}
 				<div class="flex items-center justify-between gap-3">
-					<Button variant="ghost" onclick={() => goTo(1)}>Back</Button>
+					<Button variant="ghost" onclick={() => goTo(1)}>{m.welcome_back()}</Button>
 					<Button variant={followedAny ? 'primary' : 'outline'} onclick={() => goTo(3)}>
-						{followedAny ? 'Continue' : 'Skip'}
+						{followedAny ? m.welcome_continue() : m.welcome_skip()}
 					</Button>
 				</div>
 			</div>
@@ -348,8 +353,10 @@
 					</div>
 				</div>
 				<div class="flex items-center justify-between gap-3">
-					<Button variant="ghost" disabled={saving} onclick={() => goTo(2)}>Back</Button>
-					<Button size="lg" loading={saving} onclick={finish}>Start exploring</Button>
+					<Button variant="ghost" disabled={saving} onclick={() => goTo(2)}
+						>{m.welcome_back()}</Button
+					>
+					<Button size="lg" loading={saving} onclick={finish}>{m.welcome_start()}</Button>
 				</div>
 			</div>
 		{/if}

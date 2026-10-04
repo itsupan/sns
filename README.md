@@ -103,6 +103,31 @@ sonar-project.properties  SonarCloud project settings
 .github/pull_request_template.md
 ```
 
+## Translations
+
+The UI ships in English, but none of its text is hard-coded: every string comes from
+`src/lib/i18n/en.ts`. Each message is a typed function named after the part of the app it
+belongs to (`nav_home`, `post_like_count`, …), and code reads it through `m`:
+
+```svelte
+<script lang="ts">
+	import { m } from '$lib/i18n';
+</script>
+
+<button aria-label={m.post_like()}>{m.post_like_count(count, formatCount(count))}</button>
+```
+
+**Adding a string:** add a function to the matching section of `en.ts`. Values go in as
+parameters (``(name: string) => `Follow ${name}` ``), and a count picks its wording through
+`plural(count, { one, other })`, which follows the language's `Intl.PluralRules`. Server API error
+messages, the legal pages and test files stay in English and are not part of the catalogue.
+
+**Adding a language:** copy `en.ts` to e.g. `km.ts`, translate every message with the same names
+and parameters, and call `pluralFor('km')` in it. Then point `src/lib/i18n/index.ts` at it (set
+`locale` to `'km'` and export `m` from `./km`) and set `<html lang>` in `src/app.html` to match.
+Dates and numbers (`formatTimeAgo`, `formatCount`, the `Intl` formatters) already follow `locale`.
+Offering several languages at once would mean picking the catalogue per request instead.
+
 ## API conventions
 
 Shared helpers for `/api/*` routes live in `src/lib/server/api`. Every error response has the same shape:

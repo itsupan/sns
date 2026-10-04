@@ -5,6 +5,7 @@
 	import type { ActivityType } from '$lib/activity/types';
 	import { readApiError } from '$lib/utils/api-error';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import PushNotificationsToggle from './PushNotificationsToggle.svelte';
 	import SettingsSection from './SettingsSection.svelte';
 	import Switch from './Switch.svelte';
@@ -41,19 +42,19 @@
 			});
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				toast.error(readApiError(body, 'Could not update notifications').message);
+				toast.error(readApiError(body, m.settings_notifications_error()).message);
 				return;
 			}
 			preferences = body as Record<ActivityType, boolean>;
 		} catch {
-			toast.error('Could not update notifications');
+			toast.error(m.settings_notifications_error());
 		} finally {
 			saving = null;
 		}
 	}
 </script>
 
-<SettingsSection id="settings-notifications" title="Notifications">
+<SettingsSection id="settings-notifications" title={m.settings_notifications()}>
 	{#if page.data.pushPublicKey}
 		<PushNotificationsToggle publicKey={page.data.pushPublicKey} />
 	{/if}
@@ -69,7 +70,7 @@
 		</div>
 	{:else}
 		<p class="{rowClass} m-0 text-sm text-slate-500 dark:text-dark-muted">
-			{loadFailed ? 'Could not load your notification settings.' : 'Loading…'}
+			{loadFailed ? m.settings_notifications_load_failed() : m.common_loading()}
 		</p>
 	{/each}
 </SettingsSection>

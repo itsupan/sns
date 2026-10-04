@@ -5,6 +5,7 @@
 	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import { readApiError } from '$lib/utils/api-error';
 	import type { ExploreTile } from '$lib/explore/types';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -37,14 +38,14 @@
 			);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load more posts').message;
+				loadError = readApiError(body, m.feed_load_more_error()).message;
 				return;
 			}
 			const page = body as { tiles: ExploreTile[]; nextCursor: string | null };
 			more = [...more, ...page.tiles];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load more posts';
+			loadError = m.feed_load_more_error();
 		} finally {
 			loading = false;
 		}
@@ -52,8 +53,8 @@
 </script>
 
 <svelte:head>
-	<title>#{data.tag.name} · Kizuna</title>
-	<meta name="description" content="Posts tagged #{data.tag.name} on Kizuna." />
+	<title>{m.explore_tag_title(data.tag.name)}</title>
+	<meta name="description" content={m.explore_tag_description(data.tag.name)} />
 </svelte:head>
 
 <main class="w-full max-w-3xl mx-auto py-6 flex flex-col gap-4">
@@ -61,7 +62,7 @@
 		<a
 			href={resolve('/explore')}
 			class="size-9 rounded-full flex items-center justify-center text-slate-600 dark:text-dark-muted hover:bg-slate-100 dark:hover:bg-dark-elevated no-underline"
-			aria-label="Back to Explore"
+			aria-label={m.explore_back()}
 		>
 			<Icon name="angle-left" />
 		</a>
@@ -72,7 +73,7 @@
 
 	{#if tiles.length === 0}
 		<p class="px-4 py-16 text-center text-sm text-slate-500 dark:text-dark-muted m-0">
-			No posts with this tag right now.
+			{m.explore_tag_empty()}
 		</p>
 	{:else}
 		<TileGrid {tiles} />

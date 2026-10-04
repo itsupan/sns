@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { Snippet } from 'svelte';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import { m } from '$lib/i18n';
 	import { inputClass, labelClass } from './styles';
 
 	interface Props {
@@ -39,7 +40,7 @@
 			type="button"
 			class="toggle-password-btn absolute right-0.5 size-11 text-slate-500 dark:text-dark-muted hover:text-slate-900 dark:hover:text-dark-text transition-colors duration-150 flex items-center justify-center rounded-md cursor-pointer border-none bg-transparent"
 			onclick={() => (visible = !visible)}
-			aria-label="{visible ? 'Hide' : 'Show'} {label.toLowerCase()}"
+			aria-label={visible ? m.auth_hide_field(label) : m.auth_show_field(label)}
 		>
 			<Icon name={visible ? 'eye-crossed' : 'eye'} size={19} />
 		</button>

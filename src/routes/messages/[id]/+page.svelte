@@ -1,12 +1,13 @@
 <script lang="ts">
 	import ConversationView from '$lib/components/chat/ConversationView.svelte';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
 </script>
 
 <svelte:head>
-	<title>{data.conversation.other.name} · Messages · Kizuna</title>
+	<title>{m.chat_page_title(data.conversation.other.name)}</title>
 </svelte:head>
 
 {#key data.conversation.id}

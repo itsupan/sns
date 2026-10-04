@@ -12,6 +12,7 @@
 		type Story,
 		type StoryGroup
 	} from '$lib/components/stories/stories.svelte';
+	import { m } from '$lib/i18n';
 
 	interface Props {
 		class?: string;
@@ -52,7 +53,7 @@
 
 	async function addStory() {
 		if (!me) {
-			toast.show('Please log in to share a story');
+			toast.show(m.story_log_in());
 			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
 			// eslint-disable-next-line svelte/no-navigation-without-resolve
 			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
@@ -103,7 +104,7 @@
 					type="button"
 					class={itemButton}
 					onclick={() => openViewer(own)}
-					aria-label="View your story"
+					aria-label={m.story_view_yours()}
 				>
 					<div class="size-16 rounded-full p-[2.5px] {ringClass(own)}">
 						<div class="size-full rounded-full p-[2px] bg-white dark:bg-dark-card">
@@ -113,19 +114,24 @@
 					<span
 						class="w-full truncate text-center text-xs font-medium text-slate-700 dark:text-dark-muted leading-tight"
 					>
-						Your story
+						{m.story_yours()}
 					</span>
 				</button>
 				<button
 					type="button"
 					class="absolute top-11 left-11 size-6 rounded-full bg-blue-600 dark:bg-kizuna-blue text-white flex items-center justify-center border-2 border-white dark:border-dark-card cursor-pointer p-0"
 					onclick={addStory}
-					aria-label="Add to your story"
+					aria-label={m.story_add_to_yours()}
 				>
 					<Icon name="plus" class="text-[10px]" />
 				</button>
 			{:else}
-				<button type="button" class={itemButton} onclick={addStory} aria-label="Add your story">
+				<button
+					type="button"
+					class={itemButton}
+					onclick={addStory}
+					aria-label={m.story_add_yours()}
+				>
 					<div
 						class="size-16 rounded-full border-1.5 border-dashed border-slate-300 dark:border-dark-border group-hover:border-slate-900 dark:group-hover:border-white flex items-center justify-center text-slate-500 dark:text-dark-muted group-hover:text-slate-900 dark:group-hover:text-white transition-all duration-150 bg-slate-50 dark:bg-dark-elevated"
 					>
@@ -134,7 +140,7 @@
 					<span
 						class="w-full truncate text-center text-xs font-medium text-slate-700 dark:text-dark-muted leading-tight"
 					>
-						Your story
+						{m.story_yours()}
 					</span>
 				</button>
 			{/if}
@@ -158,7 +164,7 @@
 						type="button"
 						class={itemButton}
 						onclick={() => openViewer(group)}
-						aria-label={`View story from ${group.user.name}${unseen ? ', new' : ''}${hasCloseFriends(group) ? ', close friends' : ''}`}
+						aria-label={m.story_view_from(group.user.name, unseen, hasCloseFriends(group))}
 					>
 						<div class="size-16 rounded-full p-[2.5px] {ringClass(group)}">
 							<div class="size-full rounded-full p-[2px] bg-white dark:bg-dark-card">

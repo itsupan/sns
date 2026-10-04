@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { navigating } from '$app/state';
+	import { m } from '$lib/i18n';
 
 	/** Navigations that finish sooner than this never show the bar, so fast ones don't flicker. */
 	const SHOW_AFTER_MS = 150;
@@ -20,7 +21,7 @@
 	<div
 		class="fixed inset-x-0 top-0 z-60 pt-safe pointer-events-none"
 		role="progressbar"
-		aria-label="Loading page"
+		aria-label={m.nav_loading_page()}
 	>
 		<div class="bar h-0.5 bg-blue-600 dark:bg-kizuna-blue"></div>
 	</div>

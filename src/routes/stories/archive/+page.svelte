@@ -8,6 +8,7 @@
 	import type { SavedStory } from '$lib/highlights';
 	import { formatStoryDate } from '$lib/stories';
 	import { readApiError } from '$lib/utils/api-error';
+	import { m } from '$lib/i18n';
 	import type { PageProps } from './$types';
 
 	let { data }: PageProps = $props();
@@ -40,14 +41,14 @@
 			const res = await fetch(`/api/stories/archive?cursor=${encodeURIComponent(nextCursor)}`);
 			const body = await res.json().catch(() => null);
 			if (!res.ok) {
-				loadError = readApiError(body, 'Could not load your archive').message;
+				loadError = readApiError(body, m.story_archive_load_error()).message;
 				return;
 			}
 			const page = body as { stories: SavedStory[]; nextCursor: string | null };
 			more = [...more, ...page.stories];
 			moreCursor = page.nextCursor;
 		} catch {
-			loadError = 'Could not load your archive';
+			loadError = m.story_archive_load_error();
 		} finally {
 			loadingMore = false;
 		}
@@ -70,14 +71,16 @@
 </script>
 
 <svelte:head>
-	<title>Archive · Kizuna</title>
+	<title>{m.story_archive_title()}</title>
 </svelte:head>
 
 <main class="w-full max-w-2xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-4">
 	<div>
-		<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">Archive</h1>
+		<h1 class="text-xl font-bold tracking-tight text-slate-950 dark:text-white m-0">
+			{m.profile_archive()}
+		</h1>
 		<p class="text-xs text-slate-500 dark:text-dark-muted m-0 mt-1">
-			Only you can see your archive. Every story you share stays here after its 24 hours.
+			{m.story_archive_hint()}
 		</p>
 	</div>
 
@@ -86,9 +89,11 @@
 			class="rounded-3xl border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-card py-16 px-6 flex flex-col items-center gap-2 text-center"
 		>
 			<Icon name="clock" class="text-3xl text-slate-300" />
-			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">No stories yet</p>
+			<p class="text-sm font-semibold text-slate-900 dark:text-dark-text m-0">
+				{m.story_archive_empty()}
+			</p>
 			<p class="text-xs text-slate-500 dark:text-dark-muted m-0">
-				Stories you share appear here, ready to add to a highlight.
+				{m.story_archive_empty_hint()}
 			</p>
 		</div>
 	{:else}
@@ -105,7 +110,7 @@
 							? 'ring-2 ring-inset ring-green-500'
 							: ''}"
 						onclick={() => play(story)}
-						aria-label={`Story from ${date}${closeFriends ? ', close friends' : ''}`}
+						aria-label={m.story_archived(date, closeFriends)}
 					>
 						<StoryThumb {story} />
 					</button>
@@ -119,7 +124,7 @@
 						type="button"
 						class="absolute bottom-1.5 right-1.5 size-8 rounded-full bg-black/55 hover:bg-black/70 text-white flex items-center justify-center border-0 cursor-pointer p-0"
 						onclick={() => addToHighlight(story)}
-						aria-label={`Add story from ${date} to a highlight`}
+						aria-label={m.story_add_to_highlight(date)}
 					>
 						<Icon name="plus" class="text-sm" />
 					</button>

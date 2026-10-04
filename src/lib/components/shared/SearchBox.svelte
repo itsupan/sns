@@ -24,6 +24,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
+	import { m } from '$lib/i18n';
 	import Avatar from './Avatar.svelte';
 	import Icon from './Icon.svelte';
 	import { readApiError } from '$lib/utils/api-error';
@@ -90,7 +91,7 @@
 				const data = await res.json().catch(() => null);
 				// A superseded request must never touch state, even if it resolved anyway.
 				if (controller.signal.aborted) return;
-				if (!res.ok) throw new Error(readApiError(data, 'Search failed').message);
+				if (!res.ok) throw new Error(readApiError(data, m.search_failed()).message);
 				const result = data as { users: SearchUser[]; posts: SearchPost[] };
 				users = result.users;
 				posts = result.posts;
@@ -98,7 +99,7 @@
 				status = 'done';
 			} catch (err) {
 				if (controller.signal.aborted) return;
-				errorMessage = err instanceof Error ? err.message : 'Search failed';
+				errorMessage = err instanceof Error ? err.message : m.search_failed();
 				status = 'error';
 			}
 		}, SEARCH_DEBOUNCE_MS);
@@ -191,8 +192,8 @@
 			aria-expanded={showDropdown}
 			aria-controls={listboxId}
 			aria-activedescendant={activeIndex >= 0 ? options[activeIndex]?.id : undefined}
-			placeholder="Search creators and posts…"
-			aria-label="Search creators and posts"
+			placeholder={m.search_placeholder()}
+			aria-label={m.search_label()}
 			class="w-full h-10 pl-10 pr-4 text-sm bg-slate-100/85 dark:bg-dark-elevated text-slate-900 dark:text-dark-text placeholder:text-slate-500 dark:placeholder:text-dark-subtle rounded-full border-0 focus:outline-none focus:ring-1.5 focus:ring-slate-900 dark:focus:ring-white transition-all duration-150"
 		/>
 		{#if status === 'loading'}
@@ -206,19 +207,19 @@
 	<div
 		id={listboxId}
 		role="listbox"
-		aria-label="Search results"
+		aria-label={m.search_results()}
 		hidden={!showDropdown}
 		class="absolute left-0 right-0 top-full mt-2 z-50 max-h-[70vh] overflow-y-auto rounded-2xl bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border shadow-xl py-2"
 	>
 		{#if !searchable}
 			<p class="px-4 py-3 text-xs text-slate-500 dark:text-dark-muted m-0" role="presentation">
-				Type at least {MIN_TERM_LENGTH} characters to search.
+				{m.search_min_chars(MIN_TERM_LENGTH)}
 			</p>
 		{:else if status === 'error'}
 			<p class="px-4 py-3 text-xs text-rose-600 m-0" role="presentation">{errorMessage}</p>
 		{:else if status === 'done' && users.length === 0 && posts.length === 0}
 			<p class="px-4 py-3 text-xs text-slate-500 dark:text-dark-muted m-0" role="presentation">
-				No results for “{query.trim()}”.
+				{m.search_no_results(query.trim())}
 			</p>
 		{/if}
 
@@ -229,7 +230,7 @@
 					class="px-4 pt-1 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 m-0"
 					role="presentation"
 				>
-					Users
+					{m.search_users()}
 				</p>
 				{#each users as u (u.id)}
 					{@const id = `${uid}-user-${u.id}`}
@@ -267,7 +268,7 @@
 					class="px-4 pt-2 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 m-0"
 					role="presentation"
 				>
-					Posts
+					{m.search_posts()}
 				</p>
 				{#each posts as p (p.id)}
 					{@const id = `${uid}-post-${p.id}`}

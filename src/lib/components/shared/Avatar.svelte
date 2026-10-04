@@ -20,10 +20,11 @@
 	}
 
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
+	import { m } from '$lib/i18n';
 
 	let {
 		src = null,
-		alt = 'User avatar',
+		alt = m.common_avatar_alt(),
 		name = '',
 		size = 'md',
 		loading = 'lazy',

@@ -3,6 +3,7 @@
 	import { invalidateAll } from '$app/navigation';
 	import { authClient } from '$lib/auth-client';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import SettingsSection from './SettingsSection.svelte';
 	import {
 		buttonClass,
@@ -27,9 +28,9 @@
 	type Action = 'enable' | 'disable' | 'regenerate';
 
 	const CONFIRM_LABELS: Record<Action, string> = {
-		enable: 'Continue',
-		disable: 'Turn off',
-		regenerate: 'Create new codes'
+		enable: m.settings_2fa_continue(),
+		disable: m.settings_2fa_turn_off(),
+		regenerate: m.settings_2fa_new_codes()
 	};
 
 	let action = $state<Action | null>(null);
@@ -69,7 +70,7 @@
 
 	function failure(err: { code?: string; message?: string }, fallback: string) {
 		return err.code === 'INVALID_PASSWORD'
-			? 'Your password is incorrect.'
+			? m.settings_2fa_password_incorrect()
 			: err.message || fallback;
 	}
 
@@ -77,7 +78,7 @@
 		event.preventDefault();
 		if (busy || !action) return;
 		if (!password) {
-			error = 'Please enter your password.';
+			error = m.settings_2fa_enter_password();
 			return;
 		}
 		error = '';
@@ -86,7 +87,7 @@
 			if (action === 'enable') {
 				const { data, error: err } = await authClient.twoFactor.enable({ password });
 				if (err) {
-					error = failure(err, 'Could not set up two-factor authentication');
+					error = failure(err, m.settings_2fa_enable_error());
 					return;
 				}
 				if (!('totpURI' in data)) {
@@ -99,25 +100,25 @@
 			} else if (action === 'regenerate') {
 				const { data, error: err } = await authClient.twoFactor.generateBackupCodes({ password });
 				if (err) {
-					error = failure(err, 'Could not create new backup codes');
+					error = failure(err, m.settings_2fa_codes_error());
 					return;
 				}
 				backupCodes = data.backupCodes;
 				stage = 'codes';
-				toast.success('New backup codes created. The old ones no longer work.');
+				toast.success(m.settings_2fa_codes_created());
 			} else {
 				const { error: err } = await authClient.twoFactor.disable({ password });
 				if (err) {
-					error = failure(err, 'Could not turn off two-factor authentication');
+					error = failure(err, m.settings_2fa_disable_error());
 					return;
 				}
 				close();
-				toast.success('Two-factor authentication is off');
+				toast.success(m.settings_2fa_is_off());
 				await invalidateAll();
 			}
 			password = '';
 		} catch {
-			error = 'Something went wrong. Please try again.';
+			error = m.common_something_wrong();
 		} finally {
 			busy = false;
 		}
@@ -128,7 +129,7 @@
 		if (busy) return;
 		const trimmedCode = code.replace(/\s/g, '');
 		if (!/^\d{6}$/.test(trimmedCode)) {
-			error = 'Enter the 6-digit code from your authenticator app.';
+			error = m.settings_2fa_code_format();
 			return;
 		}
 		error = '';
@@ -138,18 +139,18 @@
 			if (err) {
 				error =
 					err.code === 'INVALID_CODE'
-						? 'That code is not right. Check your app and try again.'
-						: err.message || 'Could not verify the code';
+						? m.settings_2fa_code_wrong()
+						: err.message || m.settings_2fa_verify_error();
 				return;
 			}
 			totpURI = '';
 			code = '';
 			stage = 'codes';
-			toast.success('Two-factor authentication is on');
+			toast.success(m.settings_2fa_is_on());
 			// Turning it on replaced this session with one that carries the new setting.
 			await invalidateAll();
 		} catch {
-			error = 'Could not verify the code';
+			error = m.settings_2fa_verify_error();
 		} finally {
 			busy = false;
 		}
@@ -158,20 +159,20 @@
 	async function copyCodes() {
 		try {
 			await navigator.clipboard.writeText(backupCodes.join('\n'));
-			toast.success('Backup codes copied');
+			toast.success(m.settings_2fa_codes_copied());
 		} catch {
-			toast.error('Could not copy. Select the codes and copy them yourself.');
+			toast.error(m.settings_2fa_copy_error());
 		}
 	}
 </script>
 
 {#if hasPassword}
-	<SettingsSection id="settings-two-factor" title="Two-factor authentication">
+	<SettingsSection id="settings-two-factor" title={m.settings_2fa()}>
 		{#if enabled}
 			<div class={rowClass}>
 				<span class="flex flex-col min-w-0">
-					<span>Authenticator app</span>
-					<span class={hintClass}>On. Logging in with your password also asks for a code.</span>
+					<span>{m.settings_2fa_app()}</span>
+					<span class={hintClass}>{m.settings_2fa_on_hint()}</span>
 				</span>
 				<button
 					type="button"
@@ -180,13 +181,13 @@
 					aria-expanded={action === 'disable'}
 					aria-controls="two-factor-panel"
 				>
-					Turn off
+					{m.settings_2fa_turn_off()}
 				</button>
 			</div>
 			<div class={rowClass}>
 				<span class="flex flex-col min-w-0">
-					<span>Backup codes</span>
-					<span class={hintClass}>One-time codes for when you cannot use your app</span>
+					<span>{m.settings_2fa_backup_codes()}</span>
+					<span class={hintClass}>{m.settings_2fa_backup_codes_hint()}</span>
 				</span>
 				<button
 					type="button"
@@ -195,14 +196,14 @@
 					aria-expanded={action === 'regenerate'}
 					aria-controls="two-factor-panel"
 				>
-					Regenerate
+					{m.settings_2fa_regenerate()}
 				</button>
 			</div>
 		{:else}
 			<div class={rowClass}>
 				<span class="flex flex-col min-w-0">
-					<span>Authenticator app</span>
-					<span class={hintClass}>Ask for a code from your phone when you log in</span>
+					<span>{m.settings_2fa_app()}</span>
+					<span class={hintClass}>{m.settings_2fa_off_hint()}</span>
 				</span>
 				<button
 					type="button"
@@ -211,7 +212,7 @@
 					aria-expanded={action === 'enable'}
 					aria-controls="two-factor-panel"
 				>
-					Turn on
+					{m.settings_2fa_turn_on()}
 				</button>
 			</div>
 		{/if}
@@ -219,7 +220,7 @@
 		{#if action && stage === 'password'}
 			<form id="two-factor-panel" class={panelClass} onsubmit={confirmPassword} novalidate>
 				<label class={fieldClass}>
-					<span>Confirm your password</span>
+					<span>{m.settings_2fa_confirm_password()}</span>
 					<input
 						type="password"
 						bind:value={password}
@@ -229,45 +230,44 @@
 					/>
 				</label>
 				{#if action === 'regenerate'}
-					<p class="m-0 {hintClass}">Your current backup codes will stop working.</p>
+					<p class="m-0 {hintClass}">{m.settings_2fa_regenerate_warning()}</p>
 				{:else if action === 'disable'}
-					<p class="m-0 {hintClass}">Logging in will only ask for your password.</p>
+					<p class="m-0 {hintClass}">{m.settings_2fa_disable_warning()}</p>
 				{/if}
 				{#if error}
 					<p class={errorClass} role="alert">{error}</p>
 				{/if}
 				<div class="flex justify-end gap-2">
-					<button type="button" class={buttonClass} onclick={close}>Cancel</button>
+					<button type="button" class={buttonClass} onclick={close}>{m.common_cancel()}</button>
 					<button type="submit" class={primaryButtonClass} disabled={busy} aria-busy={busy}>
-						{busy ? 'Checking…' : CONFIRM_LABELS[action]}
+						{busy ? m.settings_2fa_checking() : CONFIRM_LABELS[action]}
 					</button>
 				</div>
 			</form>
 		{:else if stage === 'scan' && qr}
 			<form id="two-factor-panel" class={panelClass} onsubmit={verifyCode} novalidate>
 				<p class="m-0 text-sm text-slate-700 dark:text-dark-muted">
-					Scan this QR code with an authenticator app, such as Google Authenticator, 1Password or
-					Authy, then enter the 6-digit code it shows.
+					{m.settings_2fa_scan()}
 				</p>
 				<svg
 					viewBox="0 0 {qr.size} {qr.size}"
 					class="self-center size-48 rounded-lg bg-white"
 					shape-rendering="crispEdges"
 					role="img"
-					aria-label="QR code for your authenticator app"
+					aria-label={m.settings_2fa_qr_label()}
 				>
 					<path d={qrPath} fill="#000" />
 				</svg>
 				{#if setupKey}
 					<p class="m-0 {hintClass}">
-						Can't scan it? Enter this key instead:
+						{m.settings_2fa_manual_key()}
 						<code class="select-all break-all font-mono text-slate-900 dark:text-dark-text"
 							>{setupKey}</code
 						>
 					</p>
 				{/if}
 				<label class={fieldClass}>
-					<span>Code from the app</span>
+					<span>{m.settings_2fa_code()}</span>
 					<input
 						type="text"
 						bind:value={code}
@@ -282,17 +282,16 @@
 					<p class={errorClass} role="alert">{error}</p>
 				{/if}
 				<div class="flex justify-end gap-2">
-					<button type="button" class={buttonClass} onclick={close}>Cancel</button>
+					<button type="button" class={buttonClass} onclick={close}>{m.common_cancel()}</button>
 					<button type="submit" class={primaryButtonClass} disabled={busy} aria-busy={busy}>
-						{busy ? 'Verifying…' : 'Verify and turn on'}
+						{busy ? m.settings_2fa_verifying() : m.settings_2fa_verify()}
 					</button>
 				</div>
 			</form>
 		{:else if stage === 'codes'}
 			<div id="two-factor-panel" class={panelClass}>
 				<p class="m-0 text-sm text-slate-700 dark:text-dark-muted" tabindex="-1" {@attach focus}>
-					Save these backup codes somewhere safe. Each one logs you in once if you lose your phone.
-					They will not be shown again.
+					{m.settings_2fa_save_codes()}
 				</p>
 				<ul class="m-0 p-0 list-none grid grid-cols-2 gap-2 font-mono text-sm select-all">
 					{#each backupCodes as backupCode (backupCode)}
@@ -302,8 +301,9 @@
 					{/each}
 				</ul>
 				<div class="flex justify-end gap-2">
-					<button type="button" class={buttonClass} onclick={copyCodes}>Copy</button>
-					<button type="button" class={primaryButtonClass} onclick={close}>Done</button>
+					<button type="button" class={buttonClass} onclick={copyCodes}>{m.common_copy()}</button>
+					<button type="button" class={primaryButtonClass} onclick={close}>{m.common_done()}</button
+					>
 				</div>
 			</div>
 		{/if}

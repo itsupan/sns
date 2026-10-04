@@ -6,6 +6,7 @@
 	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
 	import SheetAction from '$lib/components/shared/SheetAction.svelte';
 	import ThemeToggle from '$lib/components/shared/ThemeToggle.svelte';
+	import { m } from '$lib/i18n';
 	import ShareProfileModal from './ShareProfileModal.svelte';
 	import BlockButton from './BlockButton.svelte';
 	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
@@ -98,7 +99,7 @@
 
 	async function toggleFollow() {
 		if (!$session.data?.user) {
-			toast.show('Please log in to follow curators');
+			toast.show(m.follow_log_in());
 			const currentPath =
 				typeof window !== 'undefined'
 					? window.location.pathname + window.location.search
@@ -118,7 +119,7 @@
 			onFollowChange?.(status);
 			toast.show(followToast(status, profile.name));
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update follow');
+			toast.show(err instanceof Error ? err.message : m.follow_error());
 		}
 	}
 
@@ -127,7 +128,7 @@
 	/** Opens (or starts) the direct conversation with this profile. */
 	async function handleMessage() {
 		if (!$session.data?.user) {
-			toast.show('Please log in to send messages');
+			toast.show(m.chat_log_in());
 			const currentPath =
 				typeof window !== 'undefined'
 					? window.location.pathname + window.location.search
@@ -150,11 +151,11 @@
 				body: JSON.stringify({ userId: profile.id })
 			});
 			const data = await res.json().catch(() => null);
-			if (!res.ok) throw new Error(readApiError(data, 'Could not open the conversation').message);
+			if (!res.ok) throw new Error(readApiError(data, m.chat_open_error()).message);
 			const { conversation } = data as { conversation: { id: string } };
 			await goto(resolve('/messages/[id]', { id: conversation.id }));
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not open the conversation');
+			toast.show(err instanceof Error ? err.message : m.chat_open_error());
 		} finally {
 			openingChat = false;
 		}
@@ -168,9 +169,9 @@
 		const mute = !isMuted;
 		try {
 			await muteStore.set(profile.id, mute);
-			toast.show(mute ? `Muted ${profile.name}` : `Unmuted ${profile.name}`);
+			toast.show(mute ? m.mute_muted(profile.name) : m.mute_unmuted(profile.name));
 		} catch (err) {
-			toast.show(err instanceof Error ? err.message : 'Could not update mute');
+			toast.show(err instanceof Error ? err.message : m.mute_error());
 		}
 	}
 
@@ -179,7 +180,7 @@
 	/** Opens the report sheet for this profile; signed-out viewers go to log in first. */
 	async function openReport() {
 		if (!$session.data?.user) {
-			toast.show('Please log in to report accounts');
+			toast.show(m.report_log_in());
 			const currentPath =
 				typeof window !== 'undefined'
 					? window.location.pathname + window.location.search
@@ -247,7 +248,7 @@
 				<Avatar
 					src={profile.avatar}
 					name={profile.name}
-					alt={profile.name || 'Profile photo'}
+					alt={profile.name || m.profile_photo_alt()}
 					size="3xl"
 					loading="eager"
 					class="rounded-full ring-2 sm:ring-4 ring-slate-100 dark:ring-dark-border sm:dark:ring-dark-elevated shadow-xs sm:shadow-sm"
@@ -258,7 +259,7 @@
 					<button
 						type="button"
 						class="sm:hidden absolute -bottom-1 -right-1 size-7 rounded-full bg-black text-white dark:bg-dark-elevated dark:text-white flex items-center justify-center shadow-md cursor-pointer border-2 border-white dark:border-dark-card"
-						aria-label="Change avatar photo"
+						aria-label={m.profile_change_avatar()}
 						onclick={() => goto(resolve('/profile/edit'))}
 					>
 						<Icon name="camera" class="text-xs" />
@@ -278,7 +279,7 @@
 						{formatCount(profile.postsCount)}
 					</span>
 					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
-						posts
+						{m.profile_stat_posts()}
 					</span>
 				</div>
 
@@ -290,7 +291,7 @@
 						{formatCount(followersCount)}
 					</span>
 					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
-						followers
+						{m.profile_stat_followers()}
 					</span>
 				</div>
 
@@ -302,7 +303,7 @@
 						{formatCount(profile.followingCount)}
 					</span>
 					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
-						following
+						{m.profile_stat_following()}
 					</span>
 				</div>
 
@@ -314,7 +315,7 @@
 						{formatCount(profile.impressionsCount)}
 					</span>
 					<span class="text-xs text-slate-500 dark:text-dark-muted font-normal sm:font-medium">
-						impressions
+						{m.profile_stat_impressions()}
 					</span>
 				</div>
 			</div>
@@ -366,7 +367,7 @@
 						class="text-xs sm:text-sm text-slate-400 hover:text-slate-600 dark:text-dark-muted dark:hover:text-dark-text italic no-underline flex items-center gap-1.5"
 					>
 						<Icon name="pencil" class="text-xs" />
-						<span>Add a bio to your profile...</span>
+						<span>{m.profile_add_bio()}</span>
 					</a>
 				{/if}
 
@@ -415,7 +416,7 @@
 						class="flex-1 sm:flex-initial h-11 sm:h-10 px-4 sm:px-5 rounded-full bg-slate-100 dark:bg-dark-elevated hover:bg-slate-200 dark:hover:bg-dark-hover text-slate-900 dark:text-dark-text border border-slate-200 dark:border-dark-border flex items-center justify-center gap-1.5 font-semibold text-xs transition-colors duration-150 no-underline cursor-pointer shadow-xs"
 					>
 						<Icon name="pencil" class="text-xs" />
-						<span>Edit Profile</span>
+						<span>{m.profile_edit_title()}</span>
 					</a>
 
 					<!-- Settings Button & Desktop Dropdown Menu (Owner only) -->
@@ -425,7 +426,7 @@
 							type="button"
 							class="size-11 sm:size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-dark-hover active:scale-95 flex items-center justify-center transition-all duration-150 cursor-pointer border-0 shrink-0 shadow-xs"
 							onclick={toggleSettings}
-							aria-label="Settings"
+							aria-label={m.profile_settings()}
 							aria-haspopup="menu"
 							aria-expanded={desktopDropdownOpen || settingsOpen}
 						>
@@ -438,7 +439,7 @@
 								bind:this={dropdownRef}
 								class="hidden sm:flex flex-col absolute right-0 top-full mt-2 w-72 p-1.5 bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-2xl shadow-xl z-50"
 								role="menu"
-								aria-label="Settings menu"
+								aria-label={m.profile_settings_menu()}
 							>
 								<button
 									type="button"
@@ -452,7 +453,7 @@
 									}}
 								>
 									<Icon name="share" class="text-sm text-slate-500 dark:text-dark-muted shrink-0" />
-									<span>Share Profile</span>
+									<span>{m.share_profile()}</span>
 								</button>
 
 								<div
@@ -460,7 +461,7 @@
 								>
 									<span class="flex items-center gap-2.5 shrink-0">
 										<Icon name="sun" class="text-sm text-slate-500 dark:text-dark-muted shrink-0" />
-										<span>Theme</span>
+										<span>{m.profile_theme()}</span>
 									</span>
 									<ThemeToggle variant="segmented" class="shrink-0" />
 								</div>
@@ -475,7 +476,7 @@
 										name="document"
 										class="text-sm text-slate-500 dark:text-dark-muted shrink-0"
 									/>
-									<span>Drafts</span>
+									<span>{m.draft_drafts()}</span>
 								</a>
 
 								<a
@@ -485,7 +486,7 @@
 									onclick={() => (desktopDropdownOpen = false)}
 								>
 									<Icon name="clock" class="text-sm text-slate-500 dark:text-dark-muted shrink-0" />
-									<span>Archive</span>
+									<span>{m.profile_archive()}</span>
 								</a>
 
 								<a
@@ -498,7 +499,7 @@
 										name="settings"
 										class="text-sm text-slate-500 dark:text-dark-muted shrink-0"
 									/>
-									<span>Settings & privacy</span>
+									<span>{m.profile_settings_privacy()}</span>
 								</a>
 
 								<div class="h-px my-1 bg-slate-100 dark:bg-dark-border"></div>
@@ -513,7 +514,7 @@
 									}}
 								>
 									<Icon name="sign-out-alt" class="text-sm text-red-500 shrink-0" />
-									<span>Log out</span>
+									<span>{m.settings_log_out()}</span>
 								</button>
 							</div>
 						{/if}
@@ -548,8 +549,8 @@
 						aria-busy={openingChat}
 					>
 						<Icon name="envelope" class="hidden sm:inline-block text-sm" />
-						<span class="sm:hidden">Message</span>
-						<span class="hidden sm:inline">Send Message</span>
+						<span class="sm:hidden">{m.profile_message()}</span>
+						<span class="hidden sm:inline">{m.profile_send_message()}</span>
 					</button>
 
 					<!-- Share Profile Button -->
@@ -557,8 +558,8 @@
 						type="button"
 						class="size-11 sm:size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-dark-hover flex items-center justify-center transition-colors duration-150 cursor-pointer border-0 shrink-0 shadow-xs"
 						onclick={handleShare}
-						aria-label="Share profile"
-						title="Share profile"
+						aria-label={m.profile_share()}
+						title={m.profile_share()}
 					>
 						<Icon name="share" class="text-sm" />
 					</button>
@@ -569,8 +570,8 @@
 							type="button"
 							class="size-11 sm:size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-red-600 dark:hover:text-red-400 hover:bg-slate-200 dark:hover:bg-dark-hover flex items-center justify-center transition-colors duration-150 cursor-pointer border-0 shrink-0 shadow-xs"
 							onclick={openReport}
-							aria-label="Report profile"
-							title="Report profile"
+							aria-label={m.profile_report()}
+							title={m.profile_report()}
 						>
 							<Icon name="flag" class="text-sm" />
 						</button>
@@ -582,8 +583,8 @@
 							class="size-11 sm:size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-dark-hover flex items-center justify-center transition-colors duration-150 cursor-pointer border-0 shrink-0 shadow-xs disabled:opacity-60"
 							onclick={toggleMute}
 							disabled={muteStore.isPending(profile.id)}
-							aria-label={isMuted ? 'Unmute profile' : 'Mute profile'}
-							title={isMuted ? 'Unmute profile' : 'Mute profile'}
+							aria-label={isMuted ? m.profile_unmute() : m.profile_mute()}
+							title={isMuted ? m.profile_unmute() : m.profile_mute()}
 						>
 							<Icon name={isMuted ? 'volume' : 'volume-mute'} class="text-sm" />
 						</button>
@@ -601,14 +602,16 @@
 </div>
 
 {#if profile.isOwnProfile}
-	<BottomSheet bind:open={settingsOpen} title="Settings" showTitle>
+	<BottomSheet bind:open={settingsOpen} title={m.profile_settings()} showTitle>
 		<div class="flex items-center justify-between gap-4 min-h-12 px-4">
-			<span class="text-[15px] font-medium text-slate-900 dark:text-dark-text">Appearance</span>
+			<span class="text-[15px] font-medium text-slate-900 dark:text-dark-text"
+				>{m.settings_appearance()}</span
+			>
 			<ThemeToggle variant="segmented" />
 		</div>
 		<SheetAction
 			icon="share"
-			label="Share profile"
+			label={m.profile_share()}
 			onclick={() => {
 				settingsOpen = false;
 				handleShare();
@@ -616,7 +619,7 @@
 		/>
 		<SheetAction
 			icon="document"
-			label="Drafts"
+			label={m.draft_drafts()}
 			onclick={() => {
 				settingsOpen = false;
 				goto(resolve('/drafts'));
@@ -624,7 +627,7 @@
 		/>
 		<SheetAction
 			icon="clock"
-			label="Archive"
+			label={m.profile_archive()}
 			onclick={() => {
 				settingsOpen = false;
 				goto(resolve('/stories/archive'));
@@ -632,13 +635,13 @@
 		/>
 		<SheetAction
 			icon="settings"
-			label="Settings & privacy"
+			label={m.profile_settings_privacy()}
 			onclick={() => {
 				settingsOpen = false;
 				goto(resolve('/settings'));
 			}}
 		/>
-		<SheetAction icon="sign-out-alt" label="Log out" danger onclick={signOut} />
+		<SheetAction icon="sign-out-alt" label={m.settings_log_out()} danger onclick={signOut} />
 	</BottomSheet>
 {/if}
 

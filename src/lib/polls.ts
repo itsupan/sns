@@ -1,3 +1,4 @@
+import { m } from '$lib/i18n';
 import { formatCount } from '$lib/utils/format';
 
 /** A poll offers 2 to 4 choices of up to 80 characters each. */
@@ -11,12 +12,12 @@ export const MAX_POLL_DURATION_MINUTES = 7 * 24 * 60;
 
 /** The durations the composer offers. */
 export const POLL_DURATIONS: { minutes: number; label: string }[] = [
-	{ minutes: 5, label: '5 minutes' },
-	{ minutes: 60, label: '1 hour' },
-	{ minutes: 6 * 60, label: '6 hours' },
-	{ minutes: 24 * 60, label: '1 day' },
-	{ minutes: 3 * 24 * 60, label: '3 days' },
-	{ minutes: 7 * 24 * 60, label: '7 days' }
+	{ minutes: 5, label: m.duration_minutes(5) },
+	{ minutes: 60, label: m.duration_hours(1) },
+	{ minutes: 6 * 60, label: m.duration_hours(6) },
+	{ minutes: 24 * 60, label: m.duration_days(1) },
+	{ minutes: 3 * 24 * 60, label: m.duration_days(3) },
+	{ minutes: 7 * 24 * 60, label: m.duration_days(7) }
 ];
 export const DEFAULT_POLL_DURATION_MINUTES = 24 * 60;
 
@@ -38,14 +39,14 @@ export interface PollData {
 
 /** The line under a poll: "12 votes · 3h left", "1 vote · Final results". */
 export function pollSummary(poll: PollData, now = Date.now()): string {
-	const votes = `${formatCount(poll.totalVotes)} ${poll.totalVotes === 1 ? 'vote' : 'votes'}`;
+	const votes = m.poll_vote_count(poll.totalVotes, formatCount(poll.totalVotes));
 	const leftMin = Math.ceil((new Date(poll.closesAt).getTime() - now) / 60_000);
-	if (poll.closed || leftMin <= 0) return `${votes} · Final results`;
+	if (poll.closed || leftMin <= 0) return m.poll_summary_final(votes);
 	const left =
 		leftMin < 60
-			? `${leftMin}m`
+			? m.poll_left_minutes(leftMin)
 			: leftMin < 24 * 60
-				? `${Math.floor(leftMin / 60)}h`
-				: `${Math.floor(leftMin / (24 * 60))}d`;
-	return `${votes} · ${left} left`;
+				? m.poll_left_hours(Math.floor(leftMin / 60))
+				: m.poll_left_days(Math.floor(leftMin / (24 * 60)));
+	return m.poll_summary_open(votes, left);
 }

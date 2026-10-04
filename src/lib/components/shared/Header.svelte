@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { asset, resolve } from '$app/paths';
+	import { m } from '$lib/i18n';
 	import Icon from './Icon.svelte';
 	import Avatar from './Avatar.svelte';
 	import ThemeToggle from './ThemeToggle.svelte';
@@ -121,7 +122,7 @@
 			<button
 				type="button"
 				class="sm:hidden {iconButton}"
-				aria-label="Search"
+				aria-label={m.nav_search()}
 				aria-haspopup="dialog"
 				onclick={() => (mobileSearchOpen = true)}
 			>
@@ -131,8 +132,8 @@
 			<a
 				href={resolve('/messages')}
 				class="relative {iconButton}"
-				aria-label={unread > 0 ? `Direct messages, ${unread} unread` : 'Direct messages'}
-				title="Direct messages"
+				aria-label={unread > 0 ? m.nav_messages_unread(unread) : m.nav_messages()}
+				title={m.nav_messages()}
 			>
 				<Icon name="comment" class="text-xl sm:text-base" />
 				{#if unread > 0}
@@ -146,8 +147,8 @@
 			<a
 				href={resolve('/activity')}
 				class="hidden sm:flex relative {iconButton}"
-				aria-label={unreadActivity > 0 ? `Activity, ${unreadActivity} new` : 'Activity'}
-				title="Activity"
+				aria-label={unreadActivity > 0 ? m.nav_activity_new(unreadActivity) : m.nav_activity()}
+				title={m.nav_activity()}
 			>
 				<Icon name="bell" class="text-base" />
 				{#if unreadActivity > 0}
@@ -185,7 +186,7 @@
 					href={resolve('/login')}
 					class="hidden sm:inline-flex items-center h-9 px-4 rounded-full text-xs font-semibold bg-slate-950 text-white dark:bg-white dark:text-slate-950 hover:bg-slate-800 dark:hover:bg-slate-100 transition-colors duration-150 no-underline"
 				>
-					Log in
+					{m.auth_log_in_link()}
 				</a>
 			{/if}
 		</div>
@@ -194,7 +195,7 @@
 
 <Modal
 	bind:open={mobileSearchOpen}
-	label="Search"
+	label={m.nav_search()}
 	variant="fullscreen"
 	closeOnBackdrop={false}
 	class="flex-col bg-white dark:bg-dark-card pt-safe"
@@ -206,7 +207,7 @@
 		<button
 			type="button"
 			class={iconButton}
-			aria-label="Close search"
+			aria-label={m.nav_close_search()}
 			onclick={() => (mobileSearchOpen = false)}
 		>
 			<Icon name="angle-left" class="text-xl" />

@@ -4,6 +4,7 @@
 	import { readApiError } from '$lib/utils/api-error';
 	import { displayHandle } from '$lib/utils/format';
 	import { toast } from '$lib/utils/toast.svelte';
+	import { m } from '$lib/i18n';
 	import SettingsSection from './SettingsSection.svelte';
 	import { buttonClass, fieldClass, hintClass, inputClass, panelClass, rowClass } from './styles';
 
@@ -67,7 +68,9 @@
 
 	async function change(u: Listed, add: boolean) {
 		pending = u.id;
-		const fallback = add ? 'Could not add to close friends' : 'Could not remove from close friends';
+		const fallback = add
+			? m.settings_close_friend_add_error()
+			: m.settings_close_friend_remove_error();
 		try {
 			const res = await fetch('/api/account/close-friends', {
 				method: add ? 'POST' : 'DELETE',
@@ -106,7 +109,7 @@
 	</a>
 {/snippet}
 
-<SettingsSection id="settings-close-friends" title="Close friends">
+<SettingsSection id="settings-close-friends" title={m.settings_close_friends()}>
 	{#each friends as u (u.id)}
 		<div class={rowClass}>
 			{@render person(u)}
@@ -116,21 +119,21 @@
 				onclick={() => change(u, false)}
 				disabled={pending === u.id}
 				aria-busy={pending === u.id}
-				aria-label={`Remove ${u.name} from close friends`}
+				aria-label={m.settings_close_friend_remove(u.name)}
 			>
-				{pending === u.id ? 'Removing…' : 'Remove'}
+				{pending === u.id ? m.common_removing() : m.common_remove()}
 			</button>
 		</div>
 	{:else}
 		<p class="{rowClass} m-0 text-sm text-slate-500 dark:text-dark-muted">
-			You haven't added any close friends.
+			{m.settings_no_close_friends()}
 		</p>
 	{/each}
 	<div class={panelClass}>
 		<label for="close-friend-search" class={fieldClass}>
-			<span>Add close friends</span>
+			<span>{m.settings_add_close_friends()}</span>
 			<span id="close-friend-search-hint" class={hintClass}>
-				Search by handle. Your close friends stories reach the people here who follow you.
+				{m.settings_close_friends_hint()}
 			</span>
 		</label>
 		<input
@@ -145,7 +148,7 @@
 			class={inputClass}
 		/>
 		{#if candidates.length > 0}
-			<ul class="m-0 p-0 list-none flex flex-col" aria-label="People to add">
+			<ul class="m-0 p-0 list-none flex flex-col" aria-label={m.settings_people_to_add()}>
 				{#each candidates as u (u.id)}
 					<li class="flex items-center justify-between gap-4 min-h-12 text-[15px]">
 						{@render person(u)}
@@ -155,9 +158,9 @@
 							onclick={() => change(u, true)}
 							disabled={pending === u.id}
 							aria-busy={pending === u.id}
-							aria-label={`Add ${u.name} to close friends`}
+							aria-label={m.settings_close_friend_add(u.name)}
 						>
-							{pending === u.id ? 'Adding…' : 'Add'}
+							{pending === u.id ? m.common_adding() : m.common_add()}
 						</button>
 					</li>
 				{/each}

@@ -1,3 +1,5 @@
+import { m } from '$lib/i18n';
+
 /** Reactions a user can leave on a comment. Shared by the API (validation) and the UI (picker). */
 export const COMMENT_REACTIONS = ['like', 'love', 'haha', 'wow', 'sad', 'fire'] as const;
 
@@ -13,12 +15,12 @@ export const REACTION_EMOJI: Record<CommentReaction, string> = {
 };
 
 export const REACTION_LABEL: Record<CommentReaction, string> = {
-	like: 'Like',
-	love: 'Love',
-	haha: 'Haha',
-	wow: 'Wow',
-	sad: 'Sad',
-	fire: 'Fire'
+	like: m.comment_reaction_like(),
+	love: m.comment_reaction_love(),
+	haha: m.comment_reaction_haha(),
+	wow: m.comment_reaction_wow(),
+	sad: m.comment_reaction_sad(),
+	fire: m.comment_reaction_fire()
 };
 
 export function isCommentReaction(value: unknown): value is CommentReaction {
