@@ -208,7 +208,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 
 Over the limit the API returns `429` with a `Retry-After` header (seconds) and `{ "error": { "code": "rate_limited", ... } }` (the `/api/auth/*` limits answer in better-auth's `{ "code", "message" }` shape). A Durable Object handles one request at a time, so counts are exact, and each object deletes its storage when its window ends. If the limiter is unreachable, the costly writes in `FAIL_CLOSED_LIMITS` answer `503` and the rest are allowed. Without the binding (`vite dev`, unit tests) requests are allowed.
 
-To add a limit, extend `RateLimitName`, `DEFAULT_CONFIG` and `RATE_LIMIT_VARS` in `src/lib/server/config.ts`, add a row to the table above, and add its var to **both** `vars` blocks in `wrangler.jsonc`: the top level (local dev and tests) and `env.production`. Wrangler does not inherit `vars` into an environment, so a var missing from `env.production` silently falls back to its default in production. Add the name to `FAIL_CLOSED_LIMITS` (`src/lib/server/api/rate-limit.ts`) if the endpoint is abuse-sensitive.
+To add a limit, extend `RateLimitName`, `DEFAULT_CONFIG` and `RATE_LIMIT_VARS` in `src/lib/server/config.ts`, and add a row to the table above. The defaults apply everywhere; set a `RATE_LIMIT_*` var in `wrangler.jsonc` only to override one, in both the top level and `env.production` (Wrangler does not inherit `vars`). The Workers Free plan allows 64 vars and secrets per Worker, so don't list defaults. Add the name to `FAIL_CLOSED_LIMITS` (`src/lib/server/api/rate-limit.ts`) if the endpoint is abuse-sensitive.
 
 ## Moderation
 
