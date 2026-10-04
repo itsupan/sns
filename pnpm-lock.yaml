@@ -21,6 +21,9 @@ importers:
       '@lucide/svelte':
         specifier: 1.49.0
         version: 1.49.0(svelte@5.56.10(@typescript-eslint/types@8.68.0))
+      '@pushforge/builder':
+        specifier: 2.0.5
+        version: 2.0.5
       aws4fetch:
         specifier: ^1.0.20
         version: 1.0.20
@@ -1161,6 +1164,11 @@ packages:
 
   '@poppinss/exception@1.2.3':
     resolution: {integrity: sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw==}
+
+  '@pushforge/builder@2.0.5':
+    resolution: {integrity: sha512-9Q6lBFWUMKUL5vBknwAt+nlS7eWCrNuf1lCMAhC1Iypn8gtYJ0rdVHAnsGFMxPKhbtgkgpU3r6UVduDTQ8jgzw==}
+    engines: {node: '>=20.0.0'}
+    hasBin: true
 
   '@rolldown/binding-android-arm-eabi@1.2.5':
     resolution: {integrity: sha512-DLe/i+l8ynIBY7XEQ191TeZvCoowIGa18R+dIV30GW7DiOtp74i/xX8hs8GUjW5ARV7VZuie3d6AumSmCwbeRA==}
@@ -3368,6 +3376,8 @@ snapshots:
       supports-color: 10.2.2
 
   '@poppinss/exception@1.2.3': {}
+
+  '@pushforge/builder@2.0.5': {}
 
   '@rolldown/binding-android-arm-eabi@1.2.5':
     optional: true

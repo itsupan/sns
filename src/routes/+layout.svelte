@@ -10,14 +10,18 @@
 
 	let { children } = $props();
 
-	let isAuthPage = $derived(
+	// Pages without the header and nav: the auth flows, and the offline fallback. That one is
+	// prerendered, so it cannot know who is signed in, and the service worker serves it at the URL
+	// that failed to load, so it is told by its route instead.
+	let isBarePage = $derived(
 		page.url.pathname === '/login' ||
 			page.url.pathname === '/login/two-factor' ||
 			page.url.pathname === '/signup' ||
 			page.url.pathname === '/forgot-password' ||
 			page.url.pathname === '/reset-password' ||
 			page.url.pathname === '/welcome' ||
-			page.url.pathname.startsWith('/auth')
+			page.url.pathname.startsWith('/auth') ||
+			page.route.id === '/offline'
 	);
 </script>
 
@@ -31,15 +35,15 @@
 <div
 	class="min-h-dvh flex flex-col bg-slate-50 dark:bg-dark-canvas text-slate-900 dark:text-dark-text transition-colors duration-200"
 >
-	{#if !isAuthPage}
+	{#if !isBarePage}
 		<Header />
 	{/if}
 
-	<div class="flex-1 flex flex-col {isAuthPage ? '' : 'pb-nav lg:pb-0'}">
+	<div class="flex-1 flex flex-col {isBarePage ? '' : 'pb-nav lg:pb-0'}">
 		{@render children()}
 	</div>
 
-	{#if !isAuthPage}
+	{#if !isBarePage}
 		<MobileNav />
 	{/if}
 

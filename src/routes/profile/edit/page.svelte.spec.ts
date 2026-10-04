@@ -9,6 +9,7 @@ describe('Profile Edit Page', () => {
 				data: {
 					imageTransforms: false,
 					turnstileSiteKey: null,
+					pushPublicKey: null,
 					user: {
 						id: 'user-1',
 						name: 'Elena Rostova',

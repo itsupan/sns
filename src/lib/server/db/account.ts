@@ -25,6 +25,7 @@ import {
 	postSave,
 	postShare,
 	postTag,
+	pushSubscription,
 	story,
 	storyView,
 	tag,
@@ -33,12 +34,12 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 14;
+export const EXPORT_FORMAT_VERSION = 15;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
- * Secrets are left out: password hashes, OAuth tokens, session tokens and two-factor secrets and
- * backup codes never appear.
+ * Secrets are left out: password hashes, OAuth tokens, session tokens, two-factor secrets and
+ * backup codes, and push subscription endpoints and keys never appear.
  */
 export async function buildAccountExport(db: Database, userId: string, now = new Date()) {
 	const [profile] = await db.select().from(user).where(eq(user.id, userId));
@@ -66,6 +67,7 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		memberships,
 		notifications,
 		notificationOptOuts,
+		pushSubscriptions,
 		stories,
 		storyViews,
 		moderationActions
@@ -194,6 +196,15 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.select({ type: notificationOptOut.type, since: notificationOptOut.createdAt })
 			.from(notificationOptOut)
 			.where(eq(notificationOptOut.userId, userId)),
+		db
+			.select({
+				endpoint: pushSubscription.endpoint,
+				createdAt: pushSubscription.createdAt,
+				lastSuccessAt: pushSubscription.lastSuccessAt
+			})
+			.from(pushSubscription)
+			.where(eq(pushSubscription.userId, userId))
+			.orderBy(asc(pushSubscription.createdAt)),
 		db
 			.select({
 				id: story.id,
@@ -353,6 +364,12 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		notifications,
 		// Notification types the user turned off.
 		notificationOptOuts,
+		// Devices receiving push notifications, named by their push service only.
+		pushSubscriptions: pushSubscriptions.map(({ endpoint, createdAt, lastSuccessAt }) => ({
+			pushService: new URL(endpoint).origin,
+			createdAt,
+			lastSuccessAt
+		})),
 		stories,
 		storyViews,
 		// Actions this account took as a moderator or admin.

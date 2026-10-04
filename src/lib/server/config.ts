@@ -47,7 +47,8 @@ export type RateLimitName =
 	| 'profileUpdate'
 	| 'contentEdit'
 	| 'markRead'
-	| 'storyView';
+	| 'storyView'
+	| 'pushSubscribe';
 
 export interface PageSize {
 	defaultPageSize: number;
@@ -87,6 +88,11 @@ export interface AppConfig {
 	 * When set, signup and password reset requests need a solved challenge.
 	 */
 	turnstileSiteKey: string | null;
+	/**
+	 * Web Push: the VAPID public key the browser subscribes with and the contact sent to push
+	 * services. Null (push off) unless the `VAPID_PRIVATE_KEY` secret is set too.
+	 */
+	webPush: { publicKey: string; subject: string } | null;
 }
 
 const MAX_SIGV4_TTL_SEC = 7 * 24 * 3600;
@@ -126,7 +132,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 		profileUpdate: { limit: 10, windowSec: 60 },
 		contentEdit: { limit: 30, windowSec: 60 },
 		markRead: { limit: 120, windowSec: 60 },
-		storyView: { limit: 120, windowSec: 60 }
+		storyView: { limit: 120, windowSec: 60 },
+		pushSubscribe: { limit: 10, windowSec: 60 }
 	},
 	upload: {
 		maxBytes: 50 * 1024 * 1024,
@@ -157,7 +164,8 @@ export const DEFAULT_CONFIG: AppConfig = {
 	mediaUrlTtlSec: MAX_SIGV4_TTL_SEC,
 	imageTransforms: false,
 	auth: { blockedSignupEmails: new Set() },
-	turnstileSiteKey: null
+	turnstileSiteKey: null,
+	webPush: null
 };
 
 /** Env var name for each rate limit. Value format: `<limit>/<windowSeconds>`, e.g. `10/60`. */
@@ -195,7 +203,8 @@ export const RATE_LIMIT_VARS: Record<RateLimitName, string> = {
 	profileUpdate: 'RATE_LIMIT_PROFILE_UPDATE',
 	contentEdit: 'RATE_LIMIT_CONTENT_EDIT',
 	markRead: 'RATE_LIMIT_MARK_READ',
-	storyView: 'RATE_LIMIT_STORY_VIEW'
+	storyView: 'RATE_LIMIT_STORY_VIEW',
+	pushSubscribe: 'RATE_LIMIT_PUSH_SUBSCRIBE'
 };
 
 const PositiveInt = v.pipe(v.string(), v.trim(), v.regex(/^\d+$/), v.toNumber(), v.minValue(1));
@@ -208,6 +217,12 @@ const OnOff = v.pipe(
 );
 
 const NonEmpty = v.pipe(v.string(), v.trim(), v.nonEmpty());
+
+/** An uncompressed P-256 point (65 bytes) as unpadded base64url. */
+const VapidPublicKey = v.pipe(v.string(), v.trim(), v.regex(/^[A-Za-z0-9_-]{87}$/));
+
+/** Who push services contact about our traffic (RFC 8292). */
+const VapidSubject = v.pipe(v.string(), v.trim(), v.regex(/^(mailto:|https:\/\/)\S+$/));
 
 const RateLimitVar = v.pipe(
 	v.string(),
@@ -278,6 +293,12 @@ function read<T>(vars: Vars, name: string, schema: v.GenericSchema<string, T>, f
 	return fallback;
 }
 
+function readWebPush(vars: Vars): AppConfig['webPush'] {
+	const publicKey = read<string | null>(vars, 'VAPID_PUBLIC_KEY', VapidPublicKey, null);
+	const subject = read<string | null>(vars, 'VAPID_SUBJECT', VapidSubject, null);
+	return publicKey && subject ? { publicKey, subject } : null;
+}
+
 export function loadConfig(env: object | undefined): AppConfig {
 	const vars = (env ?? {}) as Vars;
 	const d = DEFAULT_CONFIG;
@@ -334,7 +355,8 @@ export function loadConfig(env: object | undefined): AppConfig {
 		// A widget whose tokens nothing verifies would only slow people down.
 		turnstileSiteKey: vars.TURNSTILE_SECRET_KEY
 			? read<string | null>(vars, 'TURNSTILE_SITE_KEY', NonEmpty, d.turnstileSiteKey)
-			: null
+			: null,
+		webPush: vars.VAPID_PRIVATE_KEY ? readWebPush(vars) : null
 	};
 }
 
