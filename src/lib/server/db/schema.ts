@@ -408,6 +408,57 @@ export const message = sqliteTable(
 	]
 );
 
+/** A story: visible to the author's followers until `expires_at`, 24 hours after it was shared. */
+export const story = sqliteTable(
+	'story',
+	{
+		// `<userId>:<createdAtMs>`, the format `message.story_ref` and `isStoryExpired` read.
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		mediaUrl: text('media_url').notNull(),
+		mediaType: text('media_type', { enum: ['image', 'video'] }).notNull(),
+		caption: text('caption'),
+		location: text('location'),
+		// Viewers other than the author; grows by one per new `story_view` row.
+		viewsCount: integer('views_count').default(0).notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull(),
+		expiresAt: integer('expires_at', { mode: 'timestamp_ms' }).notNull()
+	},
+	(table) => [
+		// Tray and author checks: WHERE user_id = ? AND expires_at > now.
+		index('story_userId_expiresAt_idx').on(table.userId, table.expiresAt),
+		// Pruning views of long-expired stories.
+		index('story_expiresAt_idx').on(table.expiresAt)
+	]
+);
+
+/** Who watched a story (once per viewer) and the reaction they sent, if any. */
+export const storyView = sqliteTable(
+	'story_view',
+	{
+		storyId: text('story_id')
+			.notNull()
+			.references(() => story.id, { onDelete: 'cascade' }),
+		viewerId: text('viewer_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		viewedAt: integer('viewed_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		// One of STORY_REACTIONS ($lib/reactions); validated at the API layer.
+		reaction: text('reaction')
+	},
+	(table) => [
+		primaryKey({ columns: [table.storyId, table.viewerId] }),
+		// Viewers list: WHERE story_id = ? ORDER BY viewed_at DESC, viewer_id DESC.
+		index('story_view_storyId_viewedAt_idx').on(table.storyId, table.viewedAt, table.viewerId),
+		// Account deletion: the stories a user watched.
+		index('story_view_viewerId_idx').on(table.viewerId)
+	]
+);
+
 export const NOTIFICATION_TYPES = [
 	'like',
 	'comment',

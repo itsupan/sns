@@ -59,6 +59,8 @@
 		"EXPLORE_MAX_PAGE_SIZE": "36",
 		"PROFILE_PAGE_SIZE": "18",
 		"PROFILE_MAX_PAGE_SIZE": "36",
+		"STORY_VIEWERS_PAGE_SIZE": "20",
+		"STORY_VIEWERS_MAX_PAGE_SIZE": "50",
 		"CHAT_PAGE_SIZE": "30",
 		"CHAT_MAX_PAGE_SIZE": "100",
 		"INBOX_PAGE_SIZE": "20",
@@ -83,12 +85,6 @@
 		{
 			"binding": "KV",
 			"id": "00000000000000000000000000000000"
-		},
-		// Stories: one key per story (`story:<userId>:<ts>`) written with a 24h expirationTtl,
-		// so KV deletes them itself. Local dev simulates it; the id is a placeholder.
-		{
-			"binding": "STORIES",
-			"id": "00000000000000000000000000000001"
 		}
 	],
 
@@ -104,6 +100,9 @@
 		{ "tag": "v1", "new_sqlite_classes": ["ChatRoom"] },
 		{ "tag": "v2", "new_sqlite_classes": ["RateLimiter"] }
 	],
+
+	// Daily at 03:00 UTC: worker.ts `scheduled` prunes the views of long-expired stories.
+	"triggers": { "crons": ["0 3 * * *"] },
 
 	"env": {
 		"production": {
@@ -156,6 +155,8 @@
 				"EXPLORE_MAX_PAGE_SIZE": "36",
 				"PROFILE_PAGE_SIZE": "18",
 				"PROFILE_MAX_PAGE_SIZE": "36",
+				"STORY_VIEWERS_PAGE_SIZE": "20",
+				"STORY_VIEWERS_MAX_PAGE_SIZE": "50",
 				"CHAT_PAGE_SIZE": "30",
 				"CHAT_MAX_PAGE_SIZE": "100",
 				"INBOX_PAGE_SIZE": "20",
@@ -186,12 +187,6 @@
 				{
 					"binding": "KV",
 					"id": "fa46fc4c9e684fbbb1f38509a177509b"
-				},
-				// No id: `wrangler deploy` auto-provisions this namespace on first deploy. To pin an
-				// existing one instead, run `wrangler kv namespace create STORIES --env production`
-				// and paste the printed id here.
-				{
-					"binding": "STORIES"
 				}
 			],
 			"durable_objects": {

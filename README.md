@@ -207,27 +207,29 @@ new tag there (never edit `v1`) if a Durable Object class is renamed or removed.
 
 Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per environment; override locally in `.dev.vars`). `src/lib/server/config.ts` parses them once per Worker with `getConfig(platform.env)`. A missing value uses the default; an invalid value logs a warning and uses the default, so a typo never takes the site down.
 
-| Var                         | Format                        | Default                                     |
-| --------------------------- | ----------------------------- | ------------------------------------------- |
-| `RATE_LIMIT_*`              | `<limit>/<windowSeconds>`     | see [Rate limits](#rate-limits)             |
-| `UPLOAD_MAX_BYTES`          | integer                       | `52428800` (50 MB)                          |
-| `UPLOAD_ALLOWED_MIME_TYPES` | comma-separated MIME types    | common image + mp4/webm/mov types           |
-| `FEED_PAGE_SIZE`            | integer (≤ max)               | `10`                                        |
-| `FEED_MAX_PAGE_SIZE`        | integer                       | `50`                                        |
-| `COMMENTS_PAGE_SIZE`        | integer (≤ max)               | `20`                                        |
-| `COMMENTS_MAX_PAGE_SIZE`    | integer                       | `50`                                        |
-| `SEARCH_PAGE_SIZE`          | integer (≤ max)               | `5` (per section)                           |
-| `SEARCH_MAX_PAGE_SIZE`      | integer                       | `20`                                        |
-| `CHAT_PAGE_SIZE`            | integer (≤ max)               | `30` (messages per history page)            |
-| `CHAT_MAX_PAGE_SIZE`        | integer                       | `100`                                       |
-| `INBOX_PAGE_SIZE`           | integer (≤ max)               | `20`                                        |
-| `INBOX_MAX_PAGE_SIZE`       | integer                       | `50`                                        |
-| `PROFILE_PAGE_SIZE`         | integer (≤ max)               | `18` (profile grid page)                    |
-| `PROFILE_MAX_PAGE_SIZE`     | integer                       | `36`                                        |
-| `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                           |
-| `IMAGE_TRANSFORMS`          | `on` or `off`                 | `off`                                       |
-| `SIGNUP_BLOCKED_EMAILS`     | comma-separated emails        | empty (nobody blocked)                      |
-| `EMAIL_FROM`                | `Name <address>`              | sender of auth emails (see [Email](#email)) |
+| Var                           | Format                        | Default                                     |
+| ----------------------------- | ----------------------------- | ------------------------------------------- |
+| `RATE_LIMIT_*`                | `<limit>/<windowSeconds>`     | see [Rate limits](#rate-limits)             |
+| `UPLOAD_MAX_BYTES`            | integer                       | `52428800` (50 MB)                          |
+| `UPLOAD_ALLOWED_MIME_TYPES`   | comma-separated MIME types    | common image + mp4/webm/mov types           |
+| `FEED_PAGE_SIZE`              | integer (≤ max)               | `10`                                        |
+| `FEED_MAX_PAGE_SIZE`          | integer                       | `50`                                        |
+| `COMMENTS_PAGE_SIZE`          | integer (≤ max)               | `20`                                        |
+| `COMMENTS_MAX_PAGE_SIZE`      | integer                       | `50`                                        |
+| `SEARCH_PAGE_SIZE`            | integer (≤ max)               | `5` (per section)                           |
+| `SEARCH_MAX_PAGE_SIZE`        | integer                       | `20`                                        |
+| `CHAT_PAGE_SIZE`              | integer (≤ max)               | `30` (messages per history page)            |
+| `CHAT_MAX_PAGE_SIZE`          | integer                       | `100`                                       |
+| `INBOX_PAGE_SIZE`             | integer (≤ max)               | `20`                                        |
+| `INBOX_MAX_PAGE_SIZE`         | integer                       | `50`                                        |
+| `PROFILE_PAGE_SIZE`           | integer (≤ max)               | `18` (profile grid page)                    |
+| `PROFILE_MAX_PAGE_SIZE`       | integer                       | `36`                                        |
+| `STORY_VIEWERS_PAGE_SIZE`     | integer (≤ max)               | `20` (story viewers list page)              |
+| `STORY_VIEWERS_MAX_PAGE_SIZE` | integer                       | `50`                                        |
+| `MEDIA_URL_TTL_SECONDS`       | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                           |
+| `IMAGE_TRANSFORMS`            | `on` or `off`                 | `off`                                       |
+| `SIGNUP_BLOCKED_EMAILS`       | comma-separated emails        | empty (nobody blocked)                      |
+| `EMAIL_FROM`                  | `Name <address>`              | sender of auth emails (see [Email](#email)) |
 
 `IMAGE_TRANSFORMS=on` gives feed, Explore and profile images a `srcset` of resized copies from [Cloudflare Image Transformations](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/width=…,quality=85,format=auto/api/media/…`), so phones download a fraction of the original. Only media served by this Worker under `/api/media/` is resized; presigned R2 and external URLs are left as they are. Turn it on only after enabling Transformations for the zone (dashboard → Images → Transformations → enable the zone): until then every `/cdn-cgi/image/` URL fails and those images break.
 
@@ -338,9 +340,8 @@ pnpm exec wrangler d1 create sns-prod
 pnpm exec wrangler kv namespace create KV --env production
 ```
 
-The `STORIES` namespace has no ID, so the first deploy creates it. The top-level IDs in
-`wrangler.jsonc` are placeholders on purpose — local D1 and KV live in `.wrangler/state` and
-never use them.
+The top-level IDs in `wrangler.jsonc` are placeholders on purpose — local D1 and KV live in
+`.wrangler/state` and never use them.
 
 **2. Configure auth for production.** The site's URL appears three times: `BETTER_AUTH_URL`
 and the custom-domain `routes` entry in `env.production`, and `PRODUCTION_URL` in the workflow

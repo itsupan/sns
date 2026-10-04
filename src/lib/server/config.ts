@@ -64,6 +64,8 @@ export interface AppConfig {
 	explore: PageSize;
 	/** A profile's posts grid. */
 	profile: PageSize;
+	/** Who watched one of your stories. */
+	storyViewers: PageSize;
 	/** Chat history pages and the conversations inbox. */
 	chat: { messages: PageSize; inbox: PageSize };
 	/** Lifetime of presigned media GET URLs; SigV4 caps this at 7 days. */
@@ -127,6 +129,7 @@ export const DEFAULT_CONFIG: AppConfig = {
 	activity: { defaultPageSize: 20, maxPageSize: 50 },
 	explore: { defaultPageSize: 18, maxPageSize: 36 },
 	profile: { defaultPageSize: 18, maxPageSize: 36 },
+	storyViewers: { defaultPageSize: 20, maxPageSize: 50 },
 	chat: {
 		messages: { defaultPageSize: 30, maxPageSize: 100 },
 		inbox: { defaultPageSize: 20, maxPageSize: 50 }
@@ -280,6 +283,7 @@ export function loadConfig(env: object | undefined): AppConfig {
 		activity: pageSize('ACTIVITY', d.activity),
 		explore: pageSize('EXPLORE', d.explore),
 		profile: pageSize('PROFILE', d.profile),
+		storyViewers: pageSize('STORY_VIEWERS', d.storyViewers),
 		chat: {
 			messages: pageSize('CHAT', d.chat.messages),
 			inbox: pageSize('INBOX', d.chat.inbox)
