@@ -4,5 +4,6 @@ export { default as NotificationsSection } from './NotificationsSection.svelte';
 export { default as PrivateAccountSection } from './PrivateAccountSection.svelte';
 export { default as PrivacyDataSection } from './PrivacyDataSection.svelte';
 export { default as BlockedUsersSection } from './BlockedUsersSection.svelte';
+export { default as MutedSection } from './MutedSection.svelte';
 export { default as LegalSection } from './LegalSection.svelte';
 export { default as LogOutButton } from './LogOutButton.svelte';

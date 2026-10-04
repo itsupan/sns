@@ -153,6 +153,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | `chatConnect`    | `RATE_LIMIT_CHAT_CONNECT`    | `GET /api/chat/ws` (WebSocket upgrade)                               | 30 / min  |
 | `like`           | `RATE_LIMIT_LIKE`            | `POST /api/posts/:id/like`                                           | 60 / min  |
 | `follow`         | `RATE_LIMIT_FOLLOW`          | follow / unfollow (#46)                                              | 30 / min  |
+| `mute`           | `RATE_LIMIT_MUTE`            | mute / unmute a user, add / remove a muted keyword                   | 30 / min  |
 | `share`          | `RATE_LIMIT_SHARE`           | `POST /api/posts/:id/share`                                          | 30 / min  |
 | `uploadPresign`  | `RATE_LIMIT_UPLOAD_PRESIGN`  | `POST /api/upload/presigned`                                         | 20 / min  |
 | `upload`         | `RATE_LIMIT_UPLOAD`          | `PUT /api/upload/mock-r2/:key` (media upload)                        | 20 / min  |
@@ -443,8 +444,8 @@ contains:
 D1 always enforces foreign keys and ignores `PRAGMA foreign_keys=OFF`, so `DROP TABLE` runs an
 implicit `DELETE` that fires every `ON DELETE CASCADE`: a rebuild of `user` or `post` deletes
 every row that references them (sessions, posts, likes, comments, messages, …) and drops
-their triggers (search in `0012`, the notification block guard in `0019`). If Drizzle
-generates a rebuild, change the schema so it doesn't.
+their triggers (search in `0012`, the notification block and mute guards in `0019` and
+`0025`). If Drizzle generates a rebuild, change the schema so it doesn't.
 
 Dropping a plain index is allowed: it holds no data, the deployed queries still return the
 same rows (at worst more slowly), and Drizzle drops and recreates an index to change it

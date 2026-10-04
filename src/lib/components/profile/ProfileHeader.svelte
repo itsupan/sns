@@ -19,6 +19,7 @@
 		followToast,
 		type FollowStatus
 	} from '$lib/utils/follow.svelte';
+	import { muteStore } from '$lib/utils/mute.svelte';
 
 	import { profileStore, resolveProfile, type ProfileData } from '$lib/utils/profile.svelte';
 
@@ -29,6 +30,8 @@
 		user?: Record<string, unknown> | null;
 		/** Block state between the viewer and this (other) user, for the Block / Unblock action. */
 		block?: { blocked: boolean; blockedBy: boolean };
+		/** Whether the viewer muted this (other) user, for the Mute / Unmute action. */
+		muted?: boolean;
 	}
 
 	let {
@@ -36,7 +39,8 @@
 		class: className = '',
 		onFollowChange,
 		user: initialUser,
-		block
+		block,
+		muted = false
 	}: Props = $props();
 
 	let settingsOpen = $state(false);
@@ -153,6 +157,20 @@
 			toast.show(err instanceof Error ? err.message : 'Could not open the conversation');
 		} finally {
 			openingChat = false;
+		}
+	}
+
+	// Shared with post cards, so muting from either shows on both.
+	let isMuted = $derived(profile.id ? muteStore.muted(profile.id, muted) : muted);
+
+	async function toggleMute() {
+		if (!profile.id || muteStore.isPending(profile.id)) return;
+		const mute = !isMuted;
+		try {
+			await muteStore.set(profile.id, mute);
+			toast.show(mute ? `Muted ${profile.name}` : `Unmuted ${profile.name}`);
+		} catch (err) {
+			toast.show(err instanceof Error ? err.message : 'Could not update mute');
 		}
 	}
 
@@ -536,6 +554,17 @@
 					{/if}
 
 					{#if $session.data?.user && profile.id}
+						<button
+							type="button"
+							class="size-11 sm:size-10 rounded-full bg-slate-100 dark:bg-dark-elevated sm:bg-white sm:dark:bg-dark-elevated sm:border sm:border-slate-200 sm:dark:border-dark-border text-slate-700 dark:text-dark-muted hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-dark-hover flex items-center justify-center transition-colors duration-150 cursor-pointer border-0 shrink-0 shadow-xs disabled:opacity-60"
+							onclick={toggleMute}
+							disabled={muteStore.isPending(profile.id)}
+							aria-label={isMuted ? 'Unmute profile' : 'Mute profile'}
+							title={isMuted ? 'Unmute profile' : 'Mute profile'}
+						>
+							<Icon name={isMuted ? 'volume' : 'volume-mute'} class="text-sm" />
+						</button>
+
 						<BlockButton
 							userId={profile.id}
 							name={profile.name}
