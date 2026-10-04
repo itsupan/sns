@@ -13,7 +13,7 @@
 		id: string;
 		snippet: string;
 		location: string | null;
-		thumbnail: { url: string; type: 'image' | 'video' } | null;
+		thumbnail: { url: string; type: 'image' | 'video'; alt?: string } | null;
 		author: { id: string; name: string; handle: string; image: string | null };
 	}
 
@@ -287,7 +287,7 @@
 						{#if p.thumbnail?.type === 'image'}
 							<img
 								src={p.thumbnail.url}
-								alt=""
+								alt={p.thumbnail.alt ?? ''}
 								class="size-10 rounded-lg object-cover shrink-0 bg-slate-100"
 								loading="lazy"
 							/>

@@ -47,7 +47,7 @@ export interface PostResult {
 	id: string;
 	snippet: string;
 	location: string | null;
-	thumbnail: { url: string; type: 'image' | 'video' } | null;
+	thumbnail: { url: string; type: 'image' | 'video'; alt?: string } | null;
 	createdAt: Date;
 	author: { id: string; name: string; handle: string; image: string | null };
 }
@@ -115,7 +115,12 @@ export async function searchPosts(
 	const thumbs = new Map<string, PostResult['thumbnail']>();
 	if (rows.length > 0) {
 		const media = await db
-			.select({ postId: postMedia.postId, url: postMedia.url, type: postMedia.type })
+			.select({
+				postId: postMedia.postId,
+				url: postMedia.url,
+				type: postMedia.type,
+				alt: postMedia.alt
+			})
 			.from(postMedia)
 			.where(
 				and(
@@ -126,7 +131,9 @@ export async function searchPosts(
 					eq(postMedia.position, 0)
 				)
 			);
-		for (const m of media) thumbs.set(m.postId, { url: m.url, type: m.type });
+		for (const m of media) {
+			thumbs.set(m.postId, { url: m.url, type: m.type, alt: m.alt ?? undefined });
+		}
 	}
 
 	return rows.map((r) => ({

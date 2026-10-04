@@ -21,7 +21,7 @@
 				{#if tile.cover?.type === 'image'}
 					<img
 						src={tile.cover.url}
-						alt=""
+						alt={tile.cover.alt ?? ''}
 						srcset={imageSrcset(tile.cover.url, GRID_IMAGE_WIDTHS)}
 						sizes="(min-width: 768px) 256px, 33vw"
 						class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"

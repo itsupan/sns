@@ -97,6 +97,8 @@ export async function loadFeedPage(
 export interface MediaItem {
 	url: string;
 	type: 'image' | 'video';
+	/** Author-written description for screen readers. */
+	alt?: string;
 }
 
 /** Media for many posts in one query, keyed by post id and ordered by position. */
@@ -108,15 +110,21 @@ export async function loadPostMedia(
 	if (postIds.length === 0) return byPost;
 
 	const rows = await db
-		.select({ postId: postMedia.postId, url: postMedia.url, type: postMedia.type })
+		.select({
+			postId: postMedia.postId,
+			url: postMedia.url,
+			type: postMedia.type,
+			alt: postMedia.alt
+		})
 		.from(postMedia)
 		.where(inArray(postMedia.postId, postIds))
 		.orderBy(asc(postMedia.postId), asc(postMedia.position));
 
-	for (const { postId, url, type } of rows) {
+	for (const { postId, url, type, alt } of rows) {
+		const item: MediaItem = { url, type, alt: alt ?? undefined };
 		const items = byPost.get(postId);
-		if (items) items.push({ url, type });
-		else byPost.set(postId, [{ url, type }]);
+		if (items) items.push(item);
+		else byPost.set(postId, [item]);
 	}
 	return byPost;
 }
@@ -124,19 +132,21 @@ export async function loadPostMedia(
 const VIDEO_URL = /\.(mp4|webm|mov)(\?.*)?$/i;
 
 /**
- * Cleans a `mediaUrls` payload (`[{ url, type? }]`) from the composer: drops blank entries and
- * infers video from the declared type or the file extension. Order is kept (first = cover).
+ * Cleans a `mediaUrls` payload (`[{ url, type?, alt? }]`) from the composer: drops blank entries,
+ * infers video from the declared type or the file extension and trims alt text, dropping it when
+ * blank. Order is kept (first = cover).
  */
 export function normalizeMedia(input: unknown): MediaItem[] {
 	if (!Array.isArray(input)) return [];
 	return input
 		.filter(
-			(m): m is { url: string; type?: string } =>
+			(m): m is { url: string; type?: string; alt?: unknown } =>
 				typeof m === 'object' && m !== null && typeof m.url === 'string' && m.url.trim().length > 0
 		)
 		.map((m) => ({
 			url: m.url.trim(),
-			type: m.type === 'video' || VIDEO_URL.test(m.url) ? 'video' : 'image'
+			type: m.type === 'video' || VIDEO_URL.test(m.url) ? 'video' : 'image',
+			alt: (typeof m.alt === 'string' && m.alt.trim()) || undefined
 		}));
 }
 

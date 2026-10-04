@@ -15,6 +15,8 @@
 		id: string;
 		title: string;
 		image: string;
+		/** Alt text of `image`, when the author wrote one. */
+		alt?: string;
 		/** Type of `image`; 'none' for text-only posts. Inferred from the URL when missing. */
 		mediaType?: 'image' | 'video' | 'none';
 		likes: number;
@@ -151,7 +153,7 @@
 	{#if kind === 'image'}
 		<img
 			src={item.image}
-			alt={item.title}
+			alt={item.alt || item.title}
 			srcset={imageSrcset(item.image, GRID_IMAGE_WIDTHS)}
 			{sizes}
 			class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"

@@ -18,7 +18,7 @@ const mockPost: PostData = {
 	tags: ['#Architecture'],
 	likes: 42,
 	commentsCount: 5,
-	repostsCount: 2
+	sharesCount: 2
 };
 
 describe('Post Page Component', () => {
