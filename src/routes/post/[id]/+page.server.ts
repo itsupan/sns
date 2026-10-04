@@ -4,7 +4,7 @@ import type { PageServerLoad } from './$types';
 import { post, user } from '$lib/server/db/schema';
 import { loadSuggestions } from '$lib/server/explore';
 import { refreshPostMediaUrls } from '$lib/server/services/storage';
-import { notDeleted } from '$lib/server/db/posts';
+import { notDeleted, notRepost } from '$lib/server/db/posts';
 import { postRowAuthor, toPostCards } from '$lib/server/db/post-cards';
 import { notBlockedWith } from '$lib/server/db/blocks';
 import { notPrivateTo } from '$lib/server/db/visibility';
@@ -18,7 +18,14 @@ export const load: PageServerLoad = async ({ params, locals, url, platform }) =>
 		})
 		.from(post)
 		.innerJoin(user, eq(post.userId, user.id))
-		.where(and(eq(post.id, params.id), notDeleted, notBlockedWith(locals.user?.id, post.userId)))
+		.where(
+			and(
+				eq(post.id, params.id),
+				notDeleted,
+				notRepost,
+				notBlockedWith(locals.user?.id, post.userId)
+			)
+		)
 		.limit(1);
 
 	if (!row) {

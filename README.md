@@ -155,6 +155,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | `follow`         | `RATE_LIMIT_FOLLOW`          | follow / unfollow (#46)                                              | 30 / min  |
 | `mute`           | `RATE_LIMIT_MUTE`            | mute / unmute a user, add / remove a muted keyword                   | 30 / min  |
 | `share`          | `RATE_LIMIT_SHARE`           | `POST /api/posts/:id/share`                                          | 30 / min  |
+| `repost`         | `RATE_LIMIT_REPOST`          | repost / undo a repost, publish a quote post                         | 30 / min  |
 | `uploadPresign`  | `RATE_LIMIT_UPLOAD_PRESIGN`  | `POST /api/upload/presigned`                                         | 20 / min  |
 | `upload`         | `RATE_LIMIT_UPLOAD`          | `PUT /api/upload/mock-r2/:key` (media upload)                        | 20 / min  |
 | `mediaRefresh`   | `RATE_LIMIT_MEDIA_REFRESH`   | `POST /api/media/refresh` (per user, or per IP)                      | 60 / min  |

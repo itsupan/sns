@@ -1,29 +1,5 @@
-<script lang="ts">
-	import FormattedText from '$lib/components/shared/FormattedText.svelte';
-	import Avatar from '$lib/components/shared/Avatar.svelte';
-	import Icon from '$lib/components/shared/Icon.svelte';
-	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
-	import SheetAction from '$lib/components/shared/SheetAction.svelte';
-	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
-	import { formatCount, likesSummary } from '$lib/utils/format';
-	import { TEXT_BACKGROUNDS, type TextBackground } from '$lib/post-backgrounds';
-	import { toast } from '$lib/utils/toast.svelte';
-	import { authClient } from '$lib/auth-client';
-	import SharePostModal from './SharePostModal.svelte';
-	import PostCommentsModal from './PostCommentsModal.svelte';
-	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
-	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
-	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
-	import { readApiError } from '$lib/utils/api-error';
-	import {
-		FOLLOW_LABELS,
-		followStore,
-		followToast,
-		type FollowStatus
-	} from '$lib/utils/follow.svelte';
-	import { muteStore } from '$lib/utils/mute.svelte';
-	import { goto } from '$app/navigation';
-	import { resolve } from '$app/paths';
+<script lang="ts" module>
+	import type { TextBackground } from '$lib/post-backgrounds';
 
 	export interface PostAuthor {
 		id?: string;
@@ -74,12 +50,55 @@
 		likedBy?: string;
 		commentsCount: number;
 		sharesCount: number;
+		repostsCount?: number;
 		commentPreview?: PostComment;
 		liked?: boolean;
 		saved?: boolean;
 		/** Pinned to the top of the author's profile. */
 		pinned?: boolean;
+		/** Whether the viewer reposted this post. */
+		reposted?: boolean;
+		/** Set when the card stands for someone's repost of this post. */
+		repostedBy?: { id: string; name: string; handle: string };
+		/** Quote posts: the quoted post, or null once it is deleted or hidden from the viewer. */
+		quoted?: QuotedPost | null;
 	}
+
+	/** What a quote post shows of the post it quotes. */
+	export type QuotedPost = Pick<
+		PostData,
+		'id' | 'author' | 'title' | 'description' | 'mediaItems' | 'postType' | 'background'
+	>;
+</script>
+
+<script lang="ts">
+	import FormattedText from '$lib/components/shared/FormattedText.svelte';
+	import Avatar from '$lib/components/shared/Avatar.svelte';
+	import Icon from '$lib/components/shared/Icon.svelte';
+	import BottomSheet from '$lib/components/shared/BottomSheet.svelte';
+	import SheetAction from '$lib/components/shared/SheetAction.svelte';
+	import ReportSheet from '$lib/components/shared/ReportSheet.svelte';
+	import { formatCount, likesSummary } from '$lib/utils/format';
+	import { TEXT_BACKGROUNDS } from '$lib/post-backgrounds';
+	import { toast } from '$lib/utils/toast.svelte';
+	import { authClient } from '$lib/auth-client';
+	import SharePostModal from './SharePostModal.svelte';
+	import PostCommentsModal from './PostCommentsModal.svelte';
+	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
+	import QuoteComposer from './QuoteComposer.svelte';
+	import QuotedPostCard from './QuotedPostCard.svelte';
+	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
+	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
+	import { readApiError } from '$lib/utils/api-error';
+	import {
+		FOLLOW_LABELS,
+		followStore,
+		followToast,
+		type FollowStatus
+	} from '$lib/utils/follow.svelte';
+	import { muteStore } from '$lib/utils/mute.svelte';
+	import { goto } from '$app/navigation';
+	import { resolve } from '$app/paths';
 
 	interface Props {
 		post: PostData;
@@ -136,16 +155,20 @@
 	);
 	let canFollow = $derived(showFollow && Boolean(post.author.id) && !isOwner);
 
+	/** Signed out: shows `message` and sends the user to log in. Resolves to whether signed in. */
+	async function requireSignIn(message: string): Promise<boolean> {
+		if ($session.data?.user) return true;
+		toast.show(message);
+		const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
+		return false;
+	}
+
 	async function toggleFollowAuthor() {
 		const authorId = post.author.id;
 		if (!authorId || followStore.isPending(authorId)) return;
-		if (!$session.data?.user) {
-			toast.show('Please log in to follow curators');
-			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
-			return;
-		}
+		if (!(await requireSignIn('Please log in to follow curators'))) return;
 		try {
 			const { status } = await followStore.set(authorId, followStatus === 'none');
 			toast.show(followToast(status, post.author.name));
@@ -168,6 +191,10 @@
 	let commentsOpen = $state(false);
 	let shareOpen = $state(false);
 	let sharesDelta = $state(0);
+	let repostOpen = $state(false);
+	let quoteOpen = $state(false);
+	let repostedOverride = $state<boolean | null>(null);
+	let repostsDelta = $state(0);
 	let commentsDelta = $state(0);
 	let latestCommentPreview = $state<PostComment | undefined>(undefined);
 
@@ -273,6 +300,8 @@
 	let isPinned = $derived(pinnedOverride ?? post.pinned ?? false);
 	let likesCount = $derived(post.likes + likesDelta);
 	let sharesCount = $derived(post.sharesCount + sharesDelta);
+	let isReposted = $derived(repostedOverride ?? post.reposted ?? false);
+	let repostsCount = $derived((post.repostsCount ?? 0) + repostsDelta);
 	let displayCommentsCount = $derived(post.commentsCount + commentsDelta);
 	let activeCommentPreview = $derived(latestCommentPreview || post.commentPreview);
 
@@ -371,13 +400,7 @@
 		optionsOpen = false;
 		const authorId = post.author.id;
 		if (!authorId || muteStore.isPending(authorId)) return;
-		if (!$session.data?.user) {
-			toast.show('Please log in to mute accounts');
-			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
-			return;
-		}
+		if (!(await requireSignIn('Please log in to mute accounts'))) return;
 		const mute = !authorMuted;
 		try {
 			await muteStore.set(authorId, mute);
@@ -391,24 +414,12 @@
 
 	async function openReport() {
 		optionsOpen = false;
-		if (!$session.data?.user) {
-			toast.show('Please log in to report posts');
-			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
-			return;
-		}
+		if (!(await requireSignIn('Please log in to report posts'))) return;
 		reportOpen = true;
 	}
 
 	async function toggleSave() {
-		if (!$session.data?.user) {
-			toast.show('Please log in to save posts');
-			const redirectTo = encodeURIComponent(window.location.pathname + window.location.search);
-			// eslint-disable-next-line svelte/no-navigation-without-resolve
-			await goto(`${resolve('/login')}?redirectTo=${redirectTo}`).catch(() => {});
-			return;
-		}
+		if (!(await requireSignIn('Please log in to save posts'))) return;
 		const next = !isSaved;
 		savedOverride = next;
 		haptic();
@@ -449,6 +460,47 @@
 		} catch {
 			// The share itself already happened; only the counter is left unchanged.
 		}
+	}
+
+	async function openRepost() {
+		if (await requireSignIn('Please log in to repost')) repostOpen = true;
+	}
+
+	let repostInFlight = false;
+
+	// Not optimistic: the sheet closes at once and the server's answer sets state and count.
+	async function toggleRepost() {
+		repostOpen = false;
+		if (repostInFlight) return;
+		repostInFlight = true;
+		try {
+			const res = await fetch(`/api/posts/${post.id}/repost`, {
+				method: isReposted ? 'DELETE' : 'POST'
+			});
+			const body = (await res.json().catch(() => null)) as {
+				reposted?: boolean;
+				repostsCount?: number;
+			} | null;
+			if (!res.ok || typeof body?.reposted !== 'boolean') {
+				toast.show(readApiError(body, 'Could not update your repost').message);
+				return;
+			}
+			repostedOverride = body.reposted;
+			if (typeof body.repostsCount === 'number') {
+				repostsDelta = body.repostsCount - (post.repostsCount ?? 0);
+			}
+			haptic();
+			toast.show(body.reposted ? 'Reposted' : 'Repost removed');
+		} catch {
+			toast.show('Could not update your repost');
+		} finally {
+			repostInFlight = false;
+		}
+	}
+
+	function openQuote() {
+		repostOpen = false;
+		quoteOpen = true;
 	}
 
 	function handleCommentAdded(comment: PostComment, newCount: number) {
@@ -550,6 +602,24 @@
 			>
 				<Icon name="pin" class="text-xs" />
 				Pinned
+			</p>
+		{/if}
+		{#if post.repostedBy}
+			<p
+				class="flex items-center gap-1.5 px-4 lg:px-0 m-0 mb-2 text-xs font-medium text-slate-500 dark:text-dark-muted"
+			>
+				<Icon name="arrows-repeat" class="text-sm" />
+				{#if post.repostedBy.id === $session.data?.user?.id}
+					<span>You reposted</span>
+				{:else}
+					<a
+						href={resolve('/profile/[id]', { id: post.repostedBy.id })}
+						class="font-semibold text-slate-700 dark:text-dark-text no-underline hover:underline truncate"
+					>
+						{post.repostedBy.name}
+					</a>
+					<span class="shrink-0">reposted</span>
+				{/if}
 			</p>
 		{/if}
 
@@ -833,12 +903,16 @@
 
 				<button
 					type="button"
-					class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
+					class="{actionButton} px-2 {isReposted
+						? 'text-emerald-600 dark:text-emerald-400 font-semibold'
+						: 'hover:text-slate-900 dark:hover:text-dark-text'}"
 					aria-label="Repost"
-					onclick={openShare}
+					aria-haspopup="dialog"
+					aria-pressed={isReposted}
+					onclick={openRepost}
 				>
 					<Icon name="arrows-repeat" class="text-xl lg:text-base" />
-					<span>{formatCount(sharesCount)}</span>
+					<span>{formatCount(repostsCount)}</span>
 				</button>
 			</div>
 
@@ -857,11 +931,12 @@
 
 				<button
 					type="button"
-					class="{actionButton} hover:text-slate-900 dark:hover:text-dark-text"
+					class="{actionButton} px-2 hover:text-slate-900 dark:hover:text-dark-text"
 					aria-label="Share post"
 					onclick={openShare}
 				>
 					<Icon name="paper-plane" class="text-xl lg:text-base" />
+					<span>{formatCount(sharesCount)}</span>
 				</button>
 			</div>
 		</div>
@@ -896,6 +971,12 @@
 							{expanded ? 'See less' : 'See more'}
 						</button>
 					{/if}
+				</div>
+			{/if}
+
+			{#if post.quoted !== undefined}
+				<div class="mb-3">
+					<QuotedPostCard quoted={post.quoted} />
 				</div>
 			{/if}
 
@@ -1021,6 +1102,21 @@
 
 {#if shareOpen}
 	<SharePostModal bind:open={shareOpen} {post} onShare={handleShared} />
+{/if}
+
+{#if repostOpen}
+	<BottomSheet bind:open={repostOpen} title="Repost">
+		<SheetAction
+			icon="arrows-repeat"
+			label={isReposted ? 'Undo repost' : 'Repost'}
+			onclick={toggleRepost}
+		/>
+		<SheetAction icon="pencil" label="Quote" onclick={openQuote} />
+	</BottomSheet>
+{/if}
+
+{#if quoteOpen}
+	<QuoteComposer bind:open={quoteOpen} {post} />
 {/if}
 
 {#if commentsOpen}

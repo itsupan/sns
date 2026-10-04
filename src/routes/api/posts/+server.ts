@@ -48,6 +48,9 @@ export const POST: RequestHandler = withApi(async ({ request, locals, platform }
 	const currentUser = requireUser(locals);
 	await enforceRateLimit(platform, 'createPost', currentUser.id);
 	const body = await parseBody(request, CreatePostBody);
+	if (typeof body.quoteOfId === 'string') {
+		await enforceRateLimit(platform, 'repost', currentUser.id);
+	}
 	const created = await createPost(locals.db, platform, currentUser.id, body);
 	return json({ post: created }, { status: 201 });
 });

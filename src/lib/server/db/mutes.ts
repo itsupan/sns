@@ -25,12 +25,17 @@ export function notMutedBy(
 }
 
 /**
- * Condition keeping only posts whose text and title contain none of the viewer's muted keywords
- * (stored lowercased, so the match is case-insensitive). `undefined` when signed out.
+ * Condition keeping only posts whose text and title (the `post` row's unless given) contain none
+ * of the viewer's muted keywords (stored lowercased, so the match is case-insensitive).
+ * `undefined` when signed out.
  */
-export function noMutedKeywordFor(viewerId: string | null | undefined): SQL | undefined {
+export function noMutedKeywordFor(
+	viewerId: string | null | undefined,
+	content: SQLiteColumn | SQL = post.content,
+	title: SQLiteColumn | SQL = post.title
+): SQL | undefined {
 	return viewerId
-		? sql`not exists (select 1 from ${mutedKeyword} where ${mutedKeyword.userId} = ${viewerId} and instr(lower(${post.content} || ' ' || coalesce(${post.title}, '')), ${mutedKeyword.keyword}) > 0)`
+		? sql`not exists (select 1 from ${mutedKeyword} where ${mutedKeyword.userId} = ${viewerId} and instr(lower(${content} || ' ' || coalesce(${title}, '')), ${mutedKeyword.keyword}) > 0)`
 		: undefined;
 }
 

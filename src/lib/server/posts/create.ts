@@ -16,13 +16,21 @@ import {
 	MAX_TEXT_POST_LENGTH
 } from '$lib/constants/post-limits';
 import { ApiError } from '$lib/server/api';
-import { attachTagsStatements, normalizeMedia, normalizeTags } from '$lib/server/db/posts';
+import {
+	attachTagsStatements,
+	normalizeMedia,
+	normalizeTags,
+	requireVisiblePost
+} from '$lib/server/db/posts';
 import { postRowAuthor, toPostCards } from '$lib/server/db/post-cards';
 import { syncMentionsStatements } from '$lib/server/db/mentions';
+import { requireNotBlocked } from '$lib/server/db/blocks';
+import { notifyStatement } from '$lib/server/db/notifications';
 
 /**
  * Validates a composer payload and stores the post with its media, tags and mentions in one
- * transaction. Returns the new post in the `PostCard` shape with fresh media URLs.
+ * transaction; with `quoteOfId` it is a quote post of a post the author may see, whose author is
+ * notified. Returns the new post in the `PostCard` shape with fresh media URLs.
  * The payload is loose on purpose: legacy and partial media and tag fields are tolerated.
  */
 export async function createPost(
@@ -108,6 +116,14 @@ export async function createPost(
 		throw new ApiError(400, 'validation_failed', message, { tags: message });
 	}
 
+	const quoted =
+		typeof input.quoteOfId === 'string'
+			? await requireVisiblePost(db, userId, input.quoteOfId)
+			: null;
+	if (quoted) {
+		await requireNotBlocked(db, userId, quoted.authorId, 'You cannot quote this post');
+	}
+
 	const postId = crypto.randomUUID();
 	const mentionStatements = await syncMentionsStatements(db, {
 		postId,
@@ -126,6 +142,7 @@ export async function createPost(
 		cameraMeta,
 		postType,
 		background,
+		quoteOfId: quoted?.id ?? null,
 		likesCount: 0,
 		commentsCount: 0,
 		sharesCount: 0
@@ -145,12 +162,23 @@ export async function createPost(
 					)
 				]
 			: [];
-	// Post, media, tags and mentions land together in one transaction.
+	const notifyQuoted = quoted
+		? [
+				notifyStatement(db, {
+					type: 'quote',
+					actorId: userId,
+					recipientId: quoted.authorId,
+					postId
+				})
+			]
+		: [];
+	// Post, media, tags, mentions and the quote notification land together in one transaction.
 	await db.batch([
 		insertPost,
 		...insertMedia,
 		...attachTagsStatements(db, postId, tags),
-		...mentionStatements
+		...mentionStatements,
+		...notifyQuoted
 	]);
 
 	// Read back what was stored: existing tags keep their original spelling.

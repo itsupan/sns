@@ -35,9 +35,10 @@ export const NOTIFICATION_RETENTION_MS = 90 * 24 * 3600 * 1000;
 export const UNREAD_CAP = 99;
 
 /**
- * One row per action: a like or reaction is per actor and target, a comment or reply is the
- * comment itself, a follow (or follow request, or its acceptance) is per pair, a mention is per post and tagged user. Repeating an
- * action hits the same key; undoing deletes it.
+ * One row per action: a like, reaction or repost is per actor and target, a comment or reply is
+ * the comment itself, a quote is the quote post, a follow (or follow request, or its acceptance)
+ * is per pair, a mention is per post and tagged user. Repeating an action hits the same key;
+ * undoing deletes it.
  */
 export function dedupeKey(t: NotificationTarget): string {
 	switch (t.type) {
@@ -59,6 +60,10 @@ export function dedupeKey(t: NotificationTarget): string {
 			return `follow_request:${t.actorId}:${t.recipientId}`;
 		case 'follow_accepted':
 			return `follow_accepted:${t.actorId}:${t.recipientId}`;
+		case 'repost':
+			return `repost:${t.actorId}:${t.postId}`;
+		case 'quote':
+			return `quote:${t.postId}`;
 	}
 }
 

@@ -1,5 +1,6 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { post } from '$lib/server/db/schema';
+import { notRepost } from '$lib/server/db/posts';
 import { ApiError } from './errors';
 import { requireUser } from './guards';
 import { enforceRateLimit } from './rate-limit';
@@ -28,7 +29,7 @@ export async function requireOwnPost(
 			pinnedAt: post.pinnedAt
 		})
 		.from(post)
-		.where(eq(post.id, postId))
+		.where(and(eq(post.id, postId), notRepost))
 		.limit(1);
 
 	if (!existingPost || existingPost.deletedAt !== null) {

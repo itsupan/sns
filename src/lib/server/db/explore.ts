@@ -2,7 +2,7 @@ import { stripFormatting } from '$lib/formatting';
 import { and, desc, eq, inArray, ne, notExists, notInArray, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, postTag, tag, user, userFollow } from './schema';
-import { encodeCursor, loadPostMedia, notDeleted, type FeedCursor } from './posts';
+import { encodeCursor, loadPostMedia, notDeleted, notRepost, type FeedCursor } from './posts';
 import type { ExploreTile } from '$lib/explore/types';
 import { notBlockedWith } from './blocks';
 import { shownInFeedsTo } from './visibility';
@@ -65,7 +65,7 @@ export async function loadExplorePage(
 	const candidates = db
 		.select({ id: post.id })
 		.from(post)
-		.where(and(notDeleted, outsideNetwork(db, viewerId)))
+		.where(and(notDeleted, notRepost, outsideNetwork(db, viewerId)))
 		.orderBy(desc(post.createdAt), desc(post.id))
 		.limit(EXPLORE_CANDIDATES);
 
