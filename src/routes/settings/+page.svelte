@@ -4,6 +4,7 @@
 		BlockedUsersSection,
 		LegalSection,
 		LogOutButton,
+		NotificationsSection,
 		PrivacyDataSection,
 		PrivateAccountSection,
 		SecuritySection
@@ -27,6 +28,7 @@
 		sessions={data.sessions}
 	/>
 	<PrivateAccountSection userId={data.userId} isPrivate={data.isPrivate} />
+	<NotificationsSection />
 	<PrivacyDataSection hasPassword={data.hasPassword} />
 	<BlockedUsersSection users={data.blockedUsers} />
 	<LegalSection />

@@ -540,6 +540,24 @@ export const notificationRead = sqliteTable('notification_read', {
 	readAt: integer('read_at', { mode: 'timestamp_ms' }).notNull()
 });
 
+/**
+ * Notification types a user turned off. The `notification_opt_out_guard` trigger skips inserts of
+ * those types, so every path that notifies respects the preference.
+ */
+export const notificationOptOut = sqliteTable(
+	'notification_opt_out',
+	{
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		type: text('type', { enum: NOTIFICATION_TYPES }).notNull(),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [primaryKey({ columns: [table.userId, table.type] })]
+);
+
 export const REPORT_TARGET_TYPES = ['post', 'comment', 'user', 'message'] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 

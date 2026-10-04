@@ -166,7 +166,7 @@ Write endpoints call `enforceRateLimit(platform, name, user.id)`, a fixed window
 | `authEmail`      | `RATE_LIMIT_AUTH_EMAIL`      | request a password reset, resend verification, change email (per IP) | 5 / hour  |
 | `passwordChange` | `RATE_LIMIT_PASSWORD_CHANGE` | reset or change the password (per IP)                                | 10 / hour |
 | `sessionRevoke`  | `RATE_LIMIT_SESSION_REVOKE`  | `DELETE /api/account/sessions/:id`                                   | 30 / min  |
-| `profileUpdate`  | `RATE_LIMIT_PROFILE_UPDATE`  | `PATCH /api/users/:id`                                               | 10 / min  |
+| `profileUpdate`  | `RATE_LIMIT_PROFILE_UPDATE`  | `PATCH /api/users/:id`, `PUT /api/account/notification-preferences`  | 10 / min  |
 | `contentEdit`    | `RATE_LIMIT_CONTENT_EDIT`    | edit / delete a post, delete a comment or story                      | 30 / min  |
 | `markRead`       | `RATE_LIMIT_MARK_READ`       | mark notifications or a conversation read                            | 120 / min |
 | `storyView`      | `RATE_LIMIT_STORY_VIEW`      | `POST /api/stories/:id/view`                                         | 120 / min |
