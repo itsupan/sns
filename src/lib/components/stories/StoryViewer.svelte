@@ -446,7 +446,7 @@
 						</span>
 						{#if story.location}
 							<span class="flex items-center gap-1 text-[11px] text-white/80 truncate">
-								<Icon name="marker" class="text-[10px]" />
+								<Icon name="map-marker" class="text-[10px]" />
 								<span class="truncate">{story.location}</span>
 							</span>
 						{/if}

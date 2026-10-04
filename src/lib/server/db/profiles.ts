@@ -2,11 +2,11 @@ import { stripFormatting } from '$lib/formatting';
 import { and, desc, eq, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, user } from './schema';
+import { notBlockedWith } from './blocks';
 import { isFollowing } from './follows';
-import { loadPostMedia, loadPostTags, loadRecentLikers, notDeleted } from './posts';
-import { backgroundOf, loadViewerPostState } from './post-cards';
-import { displayHandle, formatTimeAgo } from '$lib/utils/format';
-import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
+import { encodeCursor, notDeleted, type FeedCursor } from './posts';
+import { postRowAuthor, toPostCards } from './post-cards';
+import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 
 export interface ProfileStats {
@@ -58,69 +58,41 @@ export async function loadProfileStats(
 	};
 }
 
-export interface ProfileAuthor {
-	id: string;
-	name: string;
-	handle: string | null;
-	image: string | null;
-	location: string | null;
-}
-
-/** A profile's live posts, newest first, in the same shape the feed renders with `PostCard`. */
+/**
+ * One page of a profile's live posts in the `PostCard` shape, newest first, keyset-paginated on
+ * (created_at, id) via `post_userId_createdAt_idx`. Empty when the author and `viewerId` are
+ * blocked in either direction, which is how the profile page hides them.
+ */
 export async function loadProfilePosts(
 	db: Database,
-	author: ProfileAuthor,
-	viewerId?: string | null
-): Promise<PostData[]> {
-	const postRows = await db
-		.select()
+	userId: string,
+	viewerId: string | null | undefined,
+	{ limit, cursor }: { limit: number; cursor?: FeedCursor | null }
+): Promise<{ posts: PostData[]; nextCursor: string | null }> {
+	const rows = await db
+		.select({ post, user: postRowAuthor })
 		.from(post)
-		.where(and(eq(post.userId, author.id), notDeleted))
-		.orderBy(desc(post.createdAt));
-	if (postRows.length === 0) return [];
+		.innerJoin(user, eq(post.userId, user.id))
+		.where(
+			and(
+				eq(post.userId, userId),
+				notDeleted,
+				notBlockedWith(viewerId, post.userId),
+				cursor
+					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
+					: undefined
+			)
+		)
+		.orderBy(desc(post.createdAt), desc(post.id))
+		.limit(limit + 1);
 
-	const postIds = postRows.map((p) => p.id);
-	const [mediaByPost, tagsByPost, viewer, likers] = await Promise.all([
-		loadPostMedia(db, postIds),
-		loadPostTags(db, postIds),
-		loadViewerPostState(db, viewerId, postIds),
-		loadRecentLikers(db, viewerId, postIds)
-	]);
-	const handle = displayHandle(author.handle, author.name);
-
-	return postRows.map((p) => {
-		const media = mediaByPost.get(p.id) ?? [];
-		const location = p.location || author.location || undefined;
-		return {
-			id: p.id,
-			author: {
-				id: author.id,
-				name: author.name,
-				handle,
-				avatar: author.image || '',
-				location,
-				timeAgo: formatTimeAgo(p.createdAt)
-			},
-			title: p.title || '',
-			description: p.content,
-			image: media[0]?.url || '',
-			mediaUrl: media[0]?.url || undefined,
-			mediaType: media[0]?.type || 'none',
-			mediaItems: media,
-			aspectRatio: (p.aspectRatio as '1:1' | '4:5' | '16:9') || '1:1',
-			postType: p.postType as PostType,
-			background: backgroundOf(p),
-			location,
-			cameraMeta: p.cameraMeta || undefined,
-			tags: tagsByPost.get(p.id) ?? [],
-			likes: p.likesCount,
-			commentsCount: p.commentsCount,
-			repostsCount: p.sharesCount,
-			likedBy: likers.get(p.id),
-			liked: viewer.liked.has(p.id),
-			saved: viewer.saved.has(p.id)
-		};
-	});
+	const hasMore = rows.length > limit;
+	const page = hasMore ? rows.slice(0, limit) : rows;
+	const last = page.at(-1);
+	return {
+		posts: await toPostCards(db, page, viewerId),
+		nextCursor: hasMore && last ? encodeCursor(last.post) : null
+	};
 }
 
 /** Grid tile for a post; keeps the full post so list view can render a real `PostCard`. */

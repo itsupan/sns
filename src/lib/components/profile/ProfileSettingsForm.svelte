@@ -584,7 +584,7 @@
 					</label>
 					<div class="relative flex items-center">
 						<Icon
-							name="marker"
+							name="map-marker"
 							class="absolute left-3.5 text-slate-400 dark:text-dark-muted text-xs pointer-events-none"
 						/>
 						<input

@@ -460,7 +460,7 @@
 		<Button type="submit" variant="primary" size="lg" fullWidth {loading}>
 			<span>{mode === 'login' ? 'Sign In' : 'Create Account'}</span>
 			<Icon
-				name="arrow-small-right"
+				name="arrow-right"
 				class="arrow-icon ml-1 text-base transition-transform duration-150 group-hover:translate-x-0.5"
 			/>
 		</Button>

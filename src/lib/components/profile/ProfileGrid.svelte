@@ -2,10 +2,13 @@
 	import { goto } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import Icon from '$lib/components/shared/Icon.svelte';
+	import LoadMore from '$lib/components/shared/LoadMore.svelte';
 	import { TEXT_BACKGROUNDS } from '$lib/post-backgrounds';
 	import { stripFormatting } from '$lib/formatting';
 	import PostCard, { type PostData } from '$lib/components/feed/PostCard.svelte';
 	import { formatCount } from '$lib/utils/format';
+	import { readApiError } from '$lib/utils/api-error';
+	import { GRID_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import type { TabId, ViewMode } from './ProfileTabs.svelte';
 
 	export interface GridItem {
@@ -36,6 +39,9 @@
 		isOwnProfile?: boolean;
 		/** The viewer's most recently saved posts (own profile only); "See all" opens /saved. */
 		savedPosts?: GridItem[];
+		/** Whose posts `items` are, and the cursor of the page after them; null when there is none. */
+		userId?: string;
+		nextCursor?: string | null;
 	}
 
 	let {
@@ -45,15 +51,39 @@
 		class: className = '',
 		userName,
 		isOwnProfile = true,
-		savedPosts = []
+		savedPosts = [],
+		userId,
+		nextCursor = null
 	}: Props = $props();
 
+	/** How wide a grid cell renders: a third of the page, which stops growing at 1152px. */
+	const GRID_CELL_SIZES = '(min-width: 1152px) 360px, 33vw';
 	// Posts the author deleted or edited from list view, so grid and compact views match.
 	let removedIds = $state<Record<string, boolean>>({});
 	let updatedPosts = $state<Record<string, PostData>>({});
 
+	/** Pages loaded while scrolling, appended after the server-rendered first page. */
+	let more = $state<GridItem[]>([]);
+	let moreCursor = $state<string | null | undefined>(undefined);
+	let loadingMore = $state(false);
+	let loadError = $state<string | null>(null);
+	// SvelteKit reuses this component between profiles; drop the previous one's pages.
+	$effect.pre(() => {
+		void userId;
+		more = [];
+		moreCursor = undefined;
+		loadError = null;
+	});
+
+	let cursor = $derived(moreCursor === undefined ? nextCursor : moreCursor);
+
+	let allItems = $derived.by(() => {
+		const seen = new Set(items.map((item) => item.id));
+		return [...items, ...more.filter((item) => !seen.has(item.id))];
+	});
+
 	let visibleItems = $derived<GridItem[]>(
-		items
+		allItems
 			.filter((item) => !removedIds[item.id])
 			.map((item): GridItem => {
 				const updated = updatedPosts[item.id];
@@ -87,20 +117,46 @@
 		updatedPosts[next.id] = next;
 	}
 
+	async function loadMore() {
+		if (!userId || !cursor || loadingMore) return;
+		loadingMore = true;
+		loadError = null;
+		try {
+			const res = await fetch(
+				`/api/users/${encodeURIComponent(userId)}/posts?cursor=${encodeURIComponent(cursor)}`
+			);
+			const body = await res.json().catch(() => null);
+			if (!res.ok) {
+				loadError = readApiError(body, 'Could not load more posts').message;
+				return;
+			}
+			const page = body as { posts: GridItem[]; nextCursor: string | null };
+			more = [...more, ...page.posts];
+			moreCursor = page.nextCursor;
+		} catch {
+			loadError = 'Could not load more posts';
+		} finally {
+			loadingMore = false;
+		}
+	}
+
 	function openItem(item: GridItem) {
 		goto(resolve('/post/[id]', { id: item.id }));
 	}
 </script>
 
 <!-- Square/portrait preview for any post: photo, first video frame, or its text. -->
-{#snippet preview(item: GridItem, textSize: string)}
+{#snippet preview(item: GridItem, textSize: string, sizes: string)}
 	{@const kind = kindOf(item)}
 	{#if kind === 'image'}
 		<img
 			src={item.image}
 			alt={item.title}
+			srcset={imageSrcset(item.image, GRID_IMAGE_WIDTHS)}
+			{sizes}
 			class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
 			loading="lazy"
+			decoding="async"
 		/>
 	{:else if kind === 'video'}
 		<video
@@ -183,7 +239,7 @@
 						onclick={() => openItem(item)}
 						aria-label={`View post ${item.title}`}
 					>
-						{@render preview(item, 'text-[11px] sm:text-sm')}
+						{@render preview(item, 'text-[11px] sm:text-sm', GRID_CELL_SIZES)}
 
 						<!-- Multi-photo Carousel Indicator Icon -->
 						{#if item.isCarousel}
@@ -191,7 +247,7 @@
 								class="absolute top-2 right-2 sm:top-3 sm:right-3 p-1 rounded-md bg-black/50 backdrop-blur-xs text-white"
 								aria-hidden="true"
 							>
-								<Icon name="copy-alt" class="text-xs sm:text-sm drop-shadow-xs" />
+								<Icon name="copy" class="text-xs sm:text-sm drop-shadow-xs" />
 							</div>
 						{/if}
 
@@ -243,7 +299,7 @@
 							<div
 								class="group relative size-12 sm:size-14 rounded-lg overflow-hidden shrink-0 bg-slate-100 dark:bg-dark-elevated"
 							>
-								{@render preview(item, 'text-[8px]')}
+								{@render preview(item, 'text-[8px]', '56px')}
 							</div>
 							<div class="flex flex-col min-w-0">
 								<span class="font-semibold text-sm text-slate-900 dark:text-white truncate">
@@ -290,6 +346,10 @@
 			</div>
 		{/if}
 
+		{#if userId && cursor}
+			<LoadMore onLoad={loadMore} loading={loadingMore} error={loadError} />
+		{/if}
+
 		<!-- 2. SAVED TAB -->
 	{:else if activeTab === 'saved'}
 		{#if savedPosts.length === 0}
@@ -313,7 +373,7 @@
 						onclick={() => openItem(item)}
 						aria-label={`View saved post ${item.title}`}
 					>
-						{@render preview(item, 'text-[11px] sm:text-sm')}
+						{@render preview(item, 'text-[11px] sm:text-sm', GRID_CELL_SIZES)}
 						<div class="absolute top-2 right-2 text-white drop-shadow-md">
 							<Icon name="bookmark" class="text-sm text-blue-500" />
 						</div>

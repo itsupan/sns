@@ -219,8 +219,13 @@ Operational settings live in wrangler `vars` (`wrangler.jsonc`, one block per en
 | `CHAT_MAX_PAGE_SIZE`        | integer                       | `100`                             |
 | `INBOX_PAGE_SIZE`           | integer (≤ max)               | `20`                              |
 | `INBOX_MAX_PAGE_SIZE`       | integer                       | `50`                              |
+| `PROFILE_PAGE_SIZE`         | integer (≤ max)               | `18` (profile grid page)          |
+| `PROFILE_MAX_PAGE_SIZE`     | integer                       | `36`                              |
 | `MEDIA_URL_TTL_SECONDS`     | integer (≤ 604800, SigV4 cap) | `604800` (7 days)                 |
+| `IMAGE_TRANSFORMS`          | `on` or `off`                 | `off`                             |
 | `SIGNUP_BLOCKED_EMAILS`     | comma-separated emails        | empty (nobody blocked)            |
+
+`IMAGE_TRANSFORMS=on` gives feed, Explore and profile images a `srcset` of resized copies from [Cloudflare Image Transformations](https://developers.cloudflare.com/images/transform-images/transform-via-url/) (`/cdn-cgi/image/width=…,quality=85,format=auto/api/media/…`), so phones download a fraction of the original. Only media served by this Worker under `/api/media/` is resized; presigned R2 and external URLs are left as they are. Turn it on only after enabling Transformations for the zone (dashboard → Images → Transformations → enable the zone): until then every `/cdn-cgi/image/` URL fails and those images break.
 
 `SIGNUP_BLOCKED_EMAILS` is checked in Better Auth's `user.create.before` hook, so it blocks email/password and Google signups alike (`403 SIGNUP_NOT_ALLOWED`). Matching ignores case, and for Gmail also dots and `+suffix`. It only prevents new accounts; an existing account is not affected.
 

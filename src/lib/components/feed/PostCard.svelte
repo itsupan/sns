@@ -13,6 +13,7 @@
 	import PostCommentsModal from './PostCommentsModal.svelte';
 	import EditPostModal, { type PostEdits } from './EditPostModal.svelte';
 	import { refreshExpiredMediaUrl } from '$lib/utils/media-refresh';
+	import { FEED_IMAGE_WIDTHS, imageSrcset } from '$lib/utils/image';
 	import { readApiError } from '$lib/utils/api-error';
 	import { followStore } from '$lib/utils/follow.svelte';
 	import { goto } from '$app/navigation';
@@ -680,6 +681,7 @@
 					<img
 						src={activeMediaUrl}
 						alt={post.title || `Photo by ${post.author.name} (Slide ${activeSlide + 1})`}
+						srcset={imageSrcset(activeMediaUrl, FEED_IMAGE_WIDTHS)}
 						sizes="(min-width: 672px) 672px, 100vw"
 						class="w-full h-full object-cover transition-transform duration-300 sm:group-hover:scale-[1.01] pointer-events-none"
 						loading={priority && activeSlide === 0 ? 'eager' : 'lazy'}

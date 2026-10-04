@@ -1,7 +1,8 @@
 import { render } from 'vitest-browser-svelte';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import ProfileGrid, { type GridItem } from './ProfileGrid.svelte';
+import { stubIntersectionObserver } from '../../../test/intersection-observer';
 
 const goto = vi.hoisted(() => vi.fn());
 vi.mock('$app/navigation', () => ({ goto }));
@@ -66,5 +67,64 @@ describe('ProfileGrid posts', () => {
 		});
 		await expect.element(screen.getByText('Post p-2')).toBeVisible();
 		expect(screen.getByRole('article').elements()).toHaveLength(2);
+	});
+});
+
+describe('ProfileGrid paging', () => {
+	const tile = (id: string) => gridItem(id, { title: id });
+	let urls: string[];
+
+	function stubPosts(respond: () => Response) {
+		urls = [];
+		stubIntersectionObserver();
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async (url: string) => {
+				urls.push(url);
+				return respond();
+			})
+		);
+	}
+
+	afterEach(() => vi.unstubAllGlobals());
+
+	it('loads the next page of the profile when scrolled to the end, skipping repeats', async () => {
+		stubPosts(() => Response.json({ posts: [tile('first'), tile('second')], nextCursor: null }));
+		const screen = render(ProfileGrid, {
+			props: { items: [tile('first')], userId: 'u 1', nextCursor: '1700_first' }
+		});
+
+		await expect.element(screen.getByRole('button', { name: 'View post second' })).toBeVisible();
+		expect(urls).toEqual(['/api/users/u%201/posts?cursor=1700_first']);
+		expect(screen.getByRole('button', { name: /^View post/ }).elements()).toHaveLength(2);
+	});
+
+	it('shows a failed page with a retry', async () => {
+		let fail = true;
+		stubPosts(() =>
+			fail
+				? Response.json({ error: { code: 'internal', message: 'Server hiccup' } }, { status: 500 })
+				: Response.json({ posts: [tile('second')], nextCursor: null })
+		);
+		const screen = render(ProfileGrid, {
+			props: { items: [tile('first')], userId: 'u1', nextCursor: '1700_first' }
+		});
+		await expect.element(screen.getByRole('alert')).toHaveTextContent('Server hiccup');
+
+		fail = false;
+		await screen.getByRole('button', { name: 'Try again' }).click();
+		await expect.element(screen.getByRole('button', { name: 'View post second' })).toBeVisible();
+	});
+
+	it('drops the pages it loaded when it switches to another profile', async () => {
+		stubPosts(() => Response.json({ posts: [tile('second')], nextCursor: null }));
+		const screen = render(ProfileGrid, {
+			props: { items: [tile('first')], userId: 'u1', nextCursor: '1700_first' }
+		});
+		await expect.element(screen.getByRole('button', { name: 'View post second' })).toBeVisible();
+
+		await screen.rerender({ items: [tile('other')], userId: 'u2', nextCursor: null });
+		await expect.element(screen.getByRole('button', { name: 'View post other' })).toBeVisible();
+		expect(screen.getByRole('button', { name: /^View post/ }).elements()).toHaveLength(1);
 	});
 });

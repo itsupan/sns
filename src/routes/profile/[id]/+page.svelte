@@ -128,6 +128,8 @@
 				{viewMode}
 				items={userPosts}
 				userName={currentProfile.name}
+				userId={data.targetUser.id}
+				nextCursor={data.nextCursor}
 				isOwnProfile={data.isOwnProfile}
 			/>
 		{/if}
