@@ -47,7 +47,7 @@ const renderPage = (items: ActivityItem[], nextCursor: string | null = null) =>
 
 describe('/activity', () => {
 	it('groups likes on the same post and shows comment text', async () => {
-		const screen = renderPage([
+		const screen = await renderPage([
 			item('n1', 'like', 'Bob', { post, createdAt: 9000 }),
 			item('n2', 'like', 'Carol', { post }),
 			item('n3', 'like', 'Dan', { post }),
@@ -59,7 +59,7 @@ describe('/activity', () => {
 	});
 
 	it('marks what it shows as read, up to the newest item, then refreshes the badge', async () => {
-		renderPage([item('n1', 'follow', 'Bob', { unread: true, createdAt: 9000 })]);
+		await renderPage([item('n1', 'follow', 'Bob', { unread: true, createdAt: 9000 })]);
 		await vi.waitFor(() =>
 			expect(calls.map((c) => c.url)).toEqual(['/api/notifications/read', '/api/badges'])
 		);
@@ -67,13 +67,13 @@ describe('/activity', () => {
 	});
 
 	it('does not mark read when nothing is new', async () => {
-		renderPage([item('n1', 'follow', 'Bob')]);
+		await renderPage([item('n1', 'follow', 'Bob')]);
 		await new Promise((r) => setTimeout(r, 50));
 		expect(calls).toEqual([]);
 	});
 
 	it('loads more with the cursor', async () => {
-		const screen = renderPage([item('n1', 'like', 'Bob', { post })], 'next');
+		const screen = await renderPage([item('n1', 'like', 'Bob', { post })], 'next');
 		await screen.getByRole('button', { name: 'Load more' }).click();
 		await expect.element(screen.getByText('Zed')).toBeVisible();
 		expect(calls[0].url).toBe('/api/notifications?cursor=next');
@@ -81,7 +81,7 @@ describe('/activity', () => {
 	});
 
 	it('shows an empty state', async () => {
-		const screen = renderPage([]);
+		const screen = await renderPage([]);
 		await expect.element(screen.getByText('No activity yet')).toBeVisible();
 	});
 });

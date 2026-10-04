@@ -4,7 +4,7 @@ import AuthCard from './AuthCard.svelte';
 
 describe('AuthCard signup consent', () => {
 	it('asks the user to confirm they are 13+ and agree to the Terms and Privacy Policy', async () => {
-		const screen = render(AuthCard, { mode: 'signup' });
+		const screen = await render(AuthCard, { mode: 'signup' });
 
 		const label = screen.container.querySelector('.checkbox-label');
 		expect(label?.textContent?.replace(/\s+/g, ' ').trim()).toBe(

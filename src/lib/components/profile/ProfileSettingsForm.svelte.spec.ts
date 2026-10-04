@@ -25,7 +25,7 @@ describe('ProfileSettingsForm', () => {
 			cameraGear: 'Leica M11'
 		};
 
-		const screen = render(ProfileSettingsForm, {
+		const screen = await render(ProfileSettingsForm, {
 			props: {
 				initialData,
 				userId: 'user-123'
@@ -68,7 +68,7 @@ describe('ProfileSettingsForm', () => {
 		globalThis.fetch = mockFetch;
 
 		const onSuccess = vi.fn();
-		const screen = render(ProfileSettingsForm, {
+		const screen = await render(ProfileSettingsForm, {
 			props: {
 				initialData,
 				userId: 'user-123',
@@ -109,7 +109,7 @@ describe('ProfileSettingsForm', () => {
 			json: async () => ({ error: 'This handle is already taken', field: 'handle' })
 		} as Response);
 
-		const screen = render(ProfileSettingsForm, {
+		const screen = await render(ProfileSettingsForm, {
 			props: {
 				initialData,
 				userId: 'user-123'

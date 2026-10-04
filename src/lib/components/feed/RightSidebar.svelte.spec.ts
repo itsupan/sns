@@ -27,7 +27,7 @@ describe('RightSidebar', () => {
 	it('follows a real suggested creator through the API and links to their profile', async () => {
 		const fetchMock = vi.fn(async () => Response.json({ following: true, followersCount: 4 }));
 		vi.stubGlobal('fetch', fetchMock);
-		const screen = render(RightSidebar, { props: { suggestions } });
+		const screen = await render(RightSidebar, { props: { suggestions } });
 
 		await expect
 			.element(screen.getByRole('link', { name: /Sophia Vane/ }))
@@ -41,7 +41,7 @@ describe('RightSidebar', () => {
 	});
 
 	it('hides the card when there is nobody to suggest', async () => {
-		const screen = render(RightSidebar);
+		const screen = await render(RightSidebar);
 
 		await expect.element(screen.getByText('Curated Topics')).toBeInTheDocument();
 		expect(document.body.textContent).not.toContain('Curators to Follow');

@@ -4,7 +4,7 @@ import CreatePostBox from './CreatePostBox.svelte';
 
 describe('CreatePostBox', () => {
 	it('renders composer with input, post types, and publish button', async () => {
-		const screen = render(CreatePostBox);
+		const screen = await render(CreatePostBox);
 
 		await expect
 			.element(screen.getByPlaceholder('Share an architectural observation, exhibition note...'))
@@ -16,7 +16,7 @@ describe('CreatePostBox', () => {
 	});
 
 	it('switches to article mode and shows article title input', async () => {
-		const screen = render(CreatePostBox);
+		const screen = await render(CreatePostBox);
 
 		const articleRadio = screen.getByRole('radio', { name: /Article/i });
 		await articleRadio.click();

@@ -24,7 +24,7 @@ const testProfile = {
 
 describe('ShareProfileModal', () => {
 	it('renders share dialog with platform links and copy link', async () => {
-		const screen = render(ShareProfileModal, {
+		const screen = await render(ShareProfileModal, {
 			props: {
 				open: true,
 				profile: testProfile

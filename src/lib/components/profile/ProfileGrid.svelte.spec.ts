@@ -14,7 +14,7 @@ const saved = (id: string, extra: Partial<GridItem>): GridItem => ({
 
 describe('ProfileGrid Saved tab', () => {
 	it('renders text-only and video saves without broken images, and links to all saves', async () => {
-		const screen = render(ProfileGrid, {
+		const screen = await render(ProfileGrid, {
 			props: {
 				activeTab: 'saved',
 				savedPosts: [
@@ -34,12 +34,12 @@ describe('ProfileGrid Saved tab', () => {
 	});
 
 	it('shows the empty state when nothing is saved', async () => {
-		const screen = render(ProfileGrid, { props: { activeTab: 'saved', savedPosts: [] } });
+		const screen = await render(ProfileGrid, { props: { activeTab: 'saved', savedPosts: [] } });
 		await expect.element(screen.getByText('No saved posts')).toBeVisible();
 	});
 
 	it('shows demo items read-only in list view, with no buttons that do nothing', async () => {
-		const screen = render(ProfileGrid, { props: { viewMode: 'feed' } });
+		const screen = await render(ProfileGrid, { props: { viewMode: 'feed' } });
 
 		await expect.element(screen.getByText('Brutalist Spiral Staircase Atrium')).toBeInTheDocument();
 		expect(document.querySelector('[aria-label="Post options"]')).toBeNull();
@@ -47,7 +47,7 @@ describe('ProfileGrid Saved tab', () => {
 	});
 
 	it('opens a demo item in a modal dialog that closes on Escape and returns focus', async () => {
-		const screen = render(ProfileGrid, {
+		const screen = await render(ProfileGrid, {
 			props: { items: [{ id: 'g9', title: 'Bare study', image: '', likes: 1, comments: 0 }] }
 		});
 		const tile = screen.getByRole('button', { name: 'View post Bare study' });

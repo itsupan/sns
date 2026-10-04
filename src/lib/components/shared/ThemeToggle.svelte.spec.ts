@@ -5,7 +5,7 @@ import { themeManager } from '$lib/utils/theme.svelte';
 
 describe('ThemeToggle component', () => {
 	it('renders icon button with accessible label', async () => {
-		const screen = render(ThemeToggle);
+		const screen = await render(ThemeToggle);
 		const btn = screen.getByRole('button');
 
 		await expect.element(btn).toBeInTheDocument();
@@ -13,7 +13,7 @@ describe('ThemeToggle component', () => {
 	});
 
 	it('renders segmented mode when requested', async () => {
-		const screen = render(ThemeToggle, { variant: 'segmented' });
+		const screen = await render(ThemeToggle, { variant: 'segmented' });
 		const group = screen.getByRole('radiogroup', { name: 'Theme mode' });
 
 		await expect.element(group).toBeInTheDocument();
@@ -23,7 +23,7 @@ describe('ThemeToggle component', () => {
 	});
 
 	it('changes theme on click', async () => {
-		const screen = render(ThemeToggle, { variant: 'segmented' });
+		const screen = await render(ThemeToggle, { variant: 'segmented' });
 		const darkOption = screen.getByRole('radio', { name: 'Dark' });
 
 		await darkOption.click();

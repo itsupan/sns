@@ -23,7 +23,7 @@ const mockPost: PostData = {
 
 describe('Post Page Component', () => {
 	it('renders post title, author, and back button', async () => {
-		const screen = render(Page, {
+		const screen = await render(Page, {
 			props: {
 				data: {
 					post: mockPost,

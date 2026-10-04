@@ -10,7 +10,7 @@ afterEach(() => {
 
 describe('ReportSheet', () => {
 	it('lists the reasons and keeps Submit disabled until one is chosen', async () => {
-		const screen = render(ReportSheet, {
+		const screen = await render(ReportSheet, {
 			props: { open: true, targetType: 'user', targetId: 'u-1' }
 		});
 
@@ -28,7 +28,7 @@ describe('ReportSheet', () => {
 		const fetchMock = vi.fn(async () => Response.json({ reported: true }, { status: 201 }));
 		vi.stubGlobal('fetch', fetchMock);
 		const onreported = vi.fn();
-		const screen = render(ReportSheet, {
+		const screen = await render(ReportSheet, {
 			props: { open: true, targetType: 'post', targetId: 'p-1', onreported }
 		});
 
@@ -61,7 +61,7 @@ describe('ReportSheet', () => {
 				)
 			)
 		);
-		const screen = render(ReportSheet, {
+		const screen = await render(ReportSheet, {
 			props: { open: true, targetType: 'user', targetId: 'me' }
 		});
 

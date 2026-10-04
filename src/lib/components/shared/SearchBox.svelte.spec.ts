@@ -46,7 +46,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('SearchBox', () => {
 	it('waits for the debounce and sends one request for a burst of typing', async () => {
-		const screen = render(SearchBox);
+		const screen = await render(SearchBox);
 		const input = screen.getByRole('combobox', { name: 'Search creators and posts' });
 		await userEvent.type(input, 'kai');
 
@@ -76,7 +76,7 @@ describe('SearchBox', () => {
 				return slowFetch(input, init);
 			})
 		);
-		const screen = render(SearchBox);
+		const screen = await render(SearchBox);
 		const input = screen.getByRole('combobox');
 
 		await input.fill('kai');
@@ -92,7 +92,7 @@ describe('SearchBox', () => {
 	});
 
 	it('explains the minimum length and does not search short input', async () => {
-		const screen = render(SearchBox);
+		const screen = await render(SearchBox);
 		await screen.getByRole('combobox').fill('ka');
 		await expect.element(screen.getByText('Type at least 3 characters to search.')).toBeVisible();
 		await new Promise((r) => setTimeout(r, SEARCH_DEBOUNCE_MS + 50));
@@ -100,7 +100,7 @@ describe('SearchBox', () => {
 	});
 
 	it('navigates results with the keyboard and opens the active one', async () => {
-		const screen = render(SearchBox);
+		const screen = await render(SearchBox);
 		const input = screen.getByRole('combobox');
 		await input.fill('kai');
 		await expect.element(screen.getByRole('option').first()).toBeVisible();
@@ -121,7 +121,7 @@ describe('SearchBox', () => {
 	});
 
 	it('closes on Escape and highlights the matched text', async () => {
-		const screen = render(SearchBox);
+		const screen = await render(SearchBox);
 		const input = screen.getByRole('combobox');
 		await input.fill('ceramic');
 		await expect.element(screen.getByText('ceramic', { exact: true })).toBeVisible();
@@ -133,7 +133,7 @@ describe('SearchBox', () => {
 
 	it('shows empty and error states', async () => {
 		respond = () => ({ body: { users: [], posts: [] } });
-		const screen = render(SearchBox);
+		const screen = await render(SearchBox);
 		const input = screen.getByRole('combobox');
 		await input.fill('zzzz');
 		await expect.element(screen.getByText('No results for “zzzz”.')).toBeVisible();

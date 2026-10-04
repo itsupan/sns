@@ -38,7 +38,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('StoryViewer', () => {
 	it('shows the person, caption, location and one progress segment per story', async () => {
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+		const screen = await render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
 
 		await expect.element(screen.getByRole('dialog', { name: 'Stories from Aoi' })).toBeVisible();
 		await expect.element(screen.getByText('Aoi one')).toBeVisible();
@@ -50,7 +50,9 @@ describe('StoryViewer', () => {
 
 	it('fills the current progress bar while a photo is shown and marks it seen', async () => {
 		const onSeen = vi.fn();
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1, onSeen } });
+		const screen = await render(StoryViewer, {
+			props: { open: true, groups, startIndex: 1, onSeen }
+		});
 		expect(onSeen).toHaveBeenCalledWith(expect.objectContaining({ caption: 'Aoi one' }));
 
 		const bar = screen.getByTestId('story-progress').first();
@@ -60,7 +62,7 @@ describe('StoryViewer', () => {
 	});
 
 	it('pauses the timer', async () => {
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+		const screen = await render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
 		await screen.getByRole('button', { name: 'Pause' }).click();
 		const bar = screen.getByTestId('story-progress').first().element() as HTMLElement;
 		const width = bar.style.width;
@@ -70,7 +72,7 @@ describe('StoryViewer', () => {
 	});
 
 	it('moves through stories, then to the next person, then closes', async () => {
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 0 } });
+		const screen = await render(StoryViewer, { props: { open: true, groups, startIndex: 0 } });
 		await expect.element(screen.getByText('My first')).toBeVisible();
 
 		await screen.getByRole('button', { name: 'Next story' }).click();
@@ -86,7 +88,7 @@ describe('StoryViewer', () => {
 	});
 
 	it('closes with Escape and the close button', async () => {
-		const screen = render(StoryViewer, { props: { open: true, groups } });
+		const screen = await render(StoryViewer, { props: { open: true, groups } });
 		await userEvent.keyboard('{Escape}');
 		await expect.element(screen.getByRole('dialog')).not.toBeInTheDocument();
 	});
@@ -97,11 +99,13 @@ describe('StoryViewer', () => {
 			vi.fn(async () => new Response(null, { status: 204 }))
 		);
 		const onDeleted = vi.fn();
-		const other = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+		const other = await render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
 		expect(other.getByRole('button', { name: 'Delete story' }).query()).toBeNull();
 		other.unmount();
 
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 0, onDeleted } });
+		const screen = await render(StoryViewer, {
+			props: { open: true, groups, startIndex: 0, onDeleted }
+		});
 		await screen.getByRole('button', { name: 'Delete story' }).click();
 		await screen.getByRole('button', { name: 'Delete', exact: true }).click();
 		await vi.waitFor(() =>
@@ -139,7 +143,7 @@ describe('StoryViewer', () => {
 		const own: StoryGroup[] = [
 			{ ...groups[0], stories: [{ ...groups[0].stories[0], viewCount: 1 }] }
 		];
-		const screen = render(StoryViewer, { props: { open: true, groups: own } });
+		const screen = await render(StoryViewer, { props: { open: true, groups: own } });
 
 		await screen.getByRole('button', { name: '1 view, see who viewed' }).click();
 		const panel = screen.getByRole('dialog', { name: 'Story viewers' });
@@ -164,7 +168,7 @@ describe('StoryViewer', () => {
 	it('sends a reaction and toggles it off with a second tap', async () => {
 		const fetchMock = vi.fn<typeof fetch>(async () => Response.json({}));
 		vi.stubGlobal('fetch', fetchMock);
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+		const screen = await render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
 		const url = `/api/stories/${encodeURIComponent(groups[1].stories[0].id)}/react`;
 		const sent = () => JSON.parse(String(fetchMock.mock.lastCall?.[1]?.body));
 
@@ -186,7 +190,9 @@ describe('StoryViewer', () => {
 			groups[0],
 			{ ...groups[1], stories: [{ ...groups[1].stories[0], reaction: '😂' }, groups[1].stories[1]] }
 		];
-		const screen = render(StoryViewer, { props: { open: true, groups: reacted, startIndex: 1 } });
+		const screen = await render(StoryViewer, {
+			props: { open: true, groups: reacted, startIndex: 1 }
+		});
 
 		const laugh = screen.getByRole('button', { name: 'React 😂' });
 		await expect.element(laugh).toHaveAttribute('aria-pressed', 'true');
@@ -198,7 +204,7 @@ describe('StoryViewer', () => {
 	it('replies to a story without moving on while typing', async () => {
 		const fetchMock = vi.fn(async () => Response.json({}, { status: 201 }));
 		vi.stubGlobal('fetch', fetchMock);
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+		const screen = await render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
 
 		const input = screen.getByRole('textbox', { name: 'Reply to Aoi' });
 		await input.fill('So good');
@@ -214,14 +220,14 @@ describe('StoryViewer', () => {
 	});
 
 	it("doesn't show reactions or a reply box on your own story", async () => {
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 0 } });
+		const screen = await render(StoryViewer, { props: { open: true, groups, startIndex: 0 } });
 		await expect.element(screen.getByText('My first')).toBeVisible();
 		expect(screen.getByRole('button', { name: 'React 🔥' }).query()).toBeNull();
 		expect(screen.getByRole('textbox', { name: /Reply to/ }).query()).toBeNull();
 	});
 
 	it("doesn't show a views button on other people's stories", async () => {
-		const screen = render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
+		const screen = await render(StoryViewer, { props: { open: true, groups, startIndex: 1 } });
 		await expect.element(screen.getByText('Aoi one')).toBeVisible();
 		expect(screen.getByRole('button', { name: /views, see who viewed/ }).query()).toBeNull();
 	});

@@ -21,7 +21,7 @@ const testPost: PostData = {
 
 describe('SharePostModal', () => {
 	it('renders share post dialog with social platforms and copy link', async () => {
-		const screen = render(SharePostModal, {
+		const screen = await render(SharePostModal, {
 			props: {
 				open: true,
 				post: testPost

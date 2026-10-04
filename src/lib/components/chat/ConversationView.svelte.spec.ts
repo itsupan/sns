@@ -82,7 +82,7 @@ function renderView(initialMessages: ChatMessage[] = [], initialCursor: string |
 
 describe('ConversationView', () => {
 	it('renders history oldest first and appends live messages once', async () => {
-		const screen = renderView([
+		const screen = await renderView([
 			msg('m2', 'bob', 'second', 2000),
 			msg('m1', 'alice', 'first', 1000)
 		]);
@@ -126,7 +126,7 @@ describe('ConversationView', () => {
 				return res;
 			})
 		);
-		const screen = renderView();
+		const screen = await renderView();
 		sockets[0].open();
 
 		const box = screen.getByRole('textbox', { name: 'Message Bob' });
@@ -161,7 +161,7 @@ describe('ConversationView', () => {
 				return fetchMock(input, init);
 			})
 		);
-		const screen = renderView();
+		const screen = await renderView();
 		sockets[0].open();
 		await screen.getByRole('textbox').fill('made it');
 		await screen.getByRole('button', { name: 'Send' }).click();
@@ -180,7 +180,7 @@ describe('ConversationView', () => {
 					? { status: 429, body: { error: { code: 'rate_limited', message: 'Slow down' } } }
 					: { status: 201, body: { message: echo(postedMessage(), 6000) } }
 				: { body: { ok: true } };
-		const screen = renderView();
+		const screen = await renderView();
 		await screen.getByRole('textbox').fill('retry me');
 		await screen.getByRole('button', { name: 'Send' }).click();
 		await expect.element(screen.getByText('Not sent')).toBeVisible();
@@ -195,14 +195,14 @@ describe('ConversationView', () => {
 	});
 
 	it('says Connecting… before the first open and nothing once live', async () => {
-		const screen = renderView();
+		const screen = await renderView();
 		await expect.element(screen.getByText('Connecting…')).toBeVisible();
 		sockets[0].open();
 		await expect.element(screen.getByRole('status')).not.toBeInTheDocument();
 	});
 
 	it('shows the typing indicator from the other member only', async () => {
-		const screen = renderView();
+		const screen = await renderView();
 		sockets[0].open();
 		sockets[0].push({ type: 'typing', userId: 'alice' });
 		await expect.element(screen.getByText('@bob')).toBeVisible();
@@ -211,7 +211,7 @@ describe('ConversationView', () => {
 	});
 
 	it('signals typing while composing, throttled', async () => {
-		const screen = renderView();
+		const screen = await renderView();
 		sockets[0].open();
 		await screen.getByRole('textbox').click();
 		await userEvent.keyboard('abc');
@@ -232,7 +232,7 @@ describe('ConversationView', () => {
 						}
 					}
 				: { body: { ok: true } };
-		const screen = renderView([msg('m1', 'bob', 'one', 1000)]);
+		const screen = await renderView([msg('m1', 'bob', 'one', 1000)]);
 		sockets[0].open();
 		sockets[0].drop();
 		await expect.element(screen.getByText('Reconnecting…')).toBeVisible();
@@ -248,7 +248,7 @@ describe('ConversationView', () => {
 			url.includes('cursor=older')
 				? { body: { messages: [msg('m0', 'bob', 'ancient', 500)], nextCursor: null } }
 				: { body: { ok: true } };
-		const screen = renderView([msg('m1', 'bob', 'recent', 1000)], 'older');
+		const screen = await renderView([msg('m1', 'bob', 'recent', 1000)], 'older');
 		await screen.getByRole('button', { name: 'Load earlier messages' }).click();
 		await expect.element(screen.getByText('ancient')).toBeVisible();
 		await expect

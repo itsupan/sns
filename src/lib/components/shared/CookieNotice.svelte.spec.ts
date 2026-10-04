@@ -6,7 +6,7 @@ describe('CookieNotice', () => {
 	afterEach(() => localStorage.removeItem(COOKIE_NOTICE_KEY));
 
 	it('shows the notice until it is dismissed, and remembers the choice', async () => {
-		const screen = render(CookieNotice);
+		const screen = await render(CookieNotice);
 		const notice = screen.getByRole('region', { name: 'Cookie notice' });
 		await expect.element(notice).toBeInTheDocument();
 		await expect
@@ -20,7 +20,7 @@ describe('CookieNotice', () => {
 
 	it('stays hidden once dismissed', async () => {
 		localStorage.setItem(COOKIE_NOTICE_KEY, 'dismissed');
-		const screen = render(CookieNotice);
+		const screen = await render(CookieNotice);
 		await expect
 			.element(screen.getByRole('region', { name: 'Cookie notice' }))
 			.not.toBeInTheDocument();

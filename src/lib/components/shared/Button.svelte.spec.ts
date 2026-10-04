@@ -6,7 +6,7 @@ import Button from './Button.svelte';
 
 describe('Button component', () => {
 	it('renders with default primary styling', async () => {
-		const screen = render(Button, {
+		const screen = await render(Button, {
 			children: createRawSnippet(() => ({
 				render: () => '<span>Click Me</span>'
 			}))
@@ -19,7 +19,7 @@ describe('Button component', () => {
 	});
 
 	it('renders as anchor when href is provided', async () => {
-		const screen = render(Button, {
+		const screen = await render(Button, {
 			href: resolve('/login'),
 			children: createRawSnippet(() => ({
 				render: () => '<span>Go to Login</span>'
@@ -32,7 +32,7 @@ describe('Button component', () => {
 	});
 
 	it('renders disabled state', async () => {
-		const screen = render(Button, {
+		const screen = await render(Button, {
 			disabled: true,
 			children: createRawSnippet(() => ({
 				render: () => '<span>Disabled</span>'

@@ -44,7 +44,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe('StoriesBar', () => {
 	it('loads followed users’ stories from the API instead of mock data', async () => {
-		const screen = render(StoriesBar);
+		const screen = await render(StoriesBar);
 		await expect
 			.element(screen.getByRole('button', { name: 'View story from Aoi Tanaka, new' }))
 			.toBeVisible();
@@ -54,7 +54,7 @@ describe('StoriesBar', () => {
 	});
 
 	it('opens the viewer and marks the story as watched', async () => {
-		const screen = render(StoriesBar);
+		const screen = await render(StoriesBar);
 		await screen.getByRole('button', { name: 'View story from Aoi Tanaka, new' }).click();
 		await expect
 			.element(screen.getByRole('dialog', { name: 'Stories from Aoi Tanaka' }))
@@ -74,7 +74,7 @@ describe('StoriesBar', () => {
 	});
 
 	it('opens the story composer from "Your story"', async () => {
-		const screen = render(StoriesBar);
+		const screen = await render(StoriesBar);
 		await screen.getByRole('button', { name: 'Add your story' }).click();
 		await expect.element(screen.getByRole('dialog', { name: 'New story' })).toBeVisible();
 		// Nothing to share until media is uploaded.

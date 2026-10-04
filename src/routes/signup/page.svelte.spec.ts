@@ -4,7 +4,7 @@ import SignupPage from './+page.svelte';
 
 describe('Signup Page', () => {
 	it('renders signup form according to design requirements', async () => {
-		const screen = render(SignupPage);
+		const screen = await render(SignupPage);
 
 		// Kizuna branding
 		await expect.element(screen.getByText('Kizuna', { exact: true })).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe('Signup Page', () => {
 	});
 
 	it('validates password mismatch on signup', async () => {
-		const screen = render(SignupPage);
+		const screen = await render(SignupPage);
 
 		const nameInput = screen.getByLabelText('Full name');
 		const emailInput = screen.getByLabelText('Email address');

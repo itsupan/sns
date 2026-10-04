@@ -4,7 +4,7 @@ import ProfileEditPage from './+page.svelte';
 
 describe('Profile Edit Page', () => {
 	it('renders back link and profile settings form', async () => {
-		const screen = render(ProfileEditPage, {
+		const screen = await render(ProfileEditPage, {
 			props: {
 				data: {
 					user: {

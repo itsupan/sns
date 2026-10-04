@@ -73,7 +73,7 @@ const page =
 describe('PostCommentsModal', () => {
 	it('renders the dialog with the post total and the composer', async () => {
 		routes['GET /api/posts/post-1/comments'] = page([]);
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await expect.element(screen.getByText('Comments (3)')).toBeInTheDocument();
 		await expect.element(screen.getByText('No comments yet')).toBeInTheDocument();
@@ -87,7 +87,7 @@ describe('PostCommentsModal', () => {
 				author: { id: 'impostor', name: 'Elena Rostova', handle: '@y', avatar: '' }
 			})
 		]);
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await expect.element(screen.getByText('comment c2')).toBeInTheDocument();
 		expect(screen.getByText('Author').elements()).toHaveLength(1);
@@ -113,7 +113,7 @@ describe('PostCommentsModal', () => {
 							nextCursor: null
 						}
 					};
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await screen.getByRole('button', { name: 'View 3 replies' }).click();
 		await expect.element(screen.getByText('comment r1')).toBeInTheDocument();
@@ -142,7 +142,7 @@ describe('PostCommentsModal', () => {
 				repliesCount: 2
 			}
 		});
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await screen.getByRole('button', { name: 'View 1 reply' }).click();
 		await expect.element(screen.getByText('comment r1')).toBeInTheDocument();
@@ -165,7 +165,7 @@ describe('PostCommentsModal', () => {
 		routes['POST /api/comments/c1/reactions'] = () => ({
 			body: { reacted: true, reactions: { counts: { love: 2 }, mine: ['love'] } }
 		});
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await screen.getByRole('button', { name: 'Add reaction' }).click();
 		await screen.getByRole('button', { name: 'Love', exact: true }).click();
@@ -186,7 +186,7 @@ describe('PostCommentsModal', () => {
 			status: 429,
 			body: { error: { code: 'rate_limited', message: 'Slow down' } }
 		});
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await screen.getByRole('button', { name: 'Fire: 1' }).click();
 		await expect.element(screen.getByRole('button', { name: 'Fire: 1' })).toBeInTheDocument();
@@ -202,7 +202,7 @@ describe('PostCommentsModal', () => {
 			body: { commentsCount: 1, parentCommentId: null, repliesCount: null }
 		});
 		const onCommentDeleted = vi.fn();
-		const screen = render(PostCommentsModal, {
+		const screen = await render(PostCommentsModal, {
 			props: { open: true, post: testPost, onCommentDeleted }
 		});
 
@@ -225,7 +225,7 @@ describe('PostCommentsModal', () => {
 			n++ === 0
 				? { body: { comments: [makeComment('c1')], nextCursor: 'cur' } }
 				: { body: { comments: [makeComment('c2')], nextCursor: null } };
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await screen.getByRole('button', { name: 'Load more comments' }).click();
 		await expect.element(screen.getByText('comment c2')).toBeInTheDocument();
@@ -239,7 +239,7 @@ describe('PostCommentsModal', () => {
 			status: 500,
 			body: { error: { code: 'internal', message: 'Server is down' } }
 		});
-		const screen = render(PostCommentsModal, { props: { open: true, post: testPost } });
+		const screen = await render(PostCommentsModal, { props: { open: true, post: testPost } });
 
 		await expect.element(screen.getByText('Server is down')).toBeInTheDocument();
 		routes['GET /api/posts/post-1/comments'] = page([makeComment('c1')]);
@@ -252,7 +252,7 @@ describe('PostCommentsModal', () => {
 			status: 500,
 			body: { error: { code: 'internal', message: 'Server is down' } }
 		});
-		const screen = render(PostCommentsModal, {
+		const screen = await render(PostCommentsModal, {
 			props: {
 				open: true,
 				post: { ...testPost, commentPreview: { author: 'marcus_k', content: 'An old remark' } }
