@@ -4,7 +4,7 @@ import ProfileHeader from './ProfileHeader.svelte';
 
 describe('ProfileHeader', () => {
 	it('renders owner actions when viewing current user profile', async () => {
-		const screen = render(ProfileHeader, {
+		const screen = await render(ProfileHeader, {
 			props: {
 				profile: {
 					name: 'Current User',
@@ -37,7 +37,7 @@ describe('ProfileHeader', () => {
 	});
 
 	it("renders visitor actions and hides owner actions when viewing another user's profile", async () => {
-		const screen = render(ProfileHeader, {
+		const screen = await render(ProfileHeader, {
 			props: {
 				profile: {
 					name: 'Elena Rostova',
@@ -58,7 +58,7 @@ describe('ProfileHeader', () => {
 	});
 
 	it('redirects unauthenticated visitor when clicking Follow or Message', async () => {
-		const screen = render(ProfileHeader, {
+		const screen = await render(ProfileHeader, {
 			props: {
 				profile: {
 					name: 'Elena Rostova',
@@ -78,7 +78,7 @@ describe('ProfileHeader', () => {
 	});
 
 	it('opens ShareProfileModal when clicking Share profile button', async () => {
-		const screen = render(ProfileHeader, {
+		const screen = await render(ProfileHeader, {
 			props: {
 				profile: {
 					name: 'Elena Rostova',

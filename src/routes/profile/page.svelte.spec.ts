@@ -48,7 +48,7 @@ const emptyStats = {
 
 describe('Profile Page', () => {
 	it('renders authenticated user profile info, badge, and stats', async () => {
-		const screen = render(ProfilePage, {
+		const screen = await render(ProfilePage, {
 			props: {
 				data: {
 					user: testUser,
@@ -89,7 +89,7 @@ describe('Profile Page', () => {
 	});
 
 	it('displays only the user data without dummy data for newly registered users', async () => {
-		const screen = render(ProfilePage, {
+		const screen = await render(ProfilePage, {
 			props: {
 				data: {
 					user: newRegisteredUser,
@@ -118,7 +118,7 @@ describe('Profile Page', () => {
 	});
 
 	it('sets document title and metadata dynamically for the user', async () => {
-		render(ProfilePage, {
+		await render(ProfilePage, {
 			props: {
 				data: {
 					user: testUser,
@@ -135,7 +135,7 @@ describe('Profile Page', () => {
 	});
 
 	it('opens settings menu containing share, theme, and logout without duplicate edit profile', async () => {
-		const screen = render(ProfilePage, {
+		const screen = await render(ProfilePage, {
 			props: {
 				data: {
 					user: testUser,

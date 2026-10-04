@@ -4,7 +4,7 @@ import Page from './+page.svelte';
 
 describe('home page', () => {
 	it('shows the app name and feed layout components', async () => {
-		const screen = render(Page);
+		const screen = await render(Page);
 
 		await expect
 			.element(screen.getByRole('heading', { level: 1 }))
@@ -14,7 +14,7 @@ describe('home page', () => {
 	});
 
 	it('shows an empty state instead of demo posts when the feed is empty', async () => {
-		const screen = render(Page, {
+		const screen = await render(Page, {
 			props: {
 				data: {
 					posts: [],
@@ -35,7 +35,7 @@ describe('home page', () => {
 	});
 
 	it('shows an error with a retry when the feed failed to load', async () => {
-		const screen = render(Page, {
+		const screen = await render(Page, {
 			props: {
 				data: {
 					posts: [],
@@ -53,7 +53,7 @@ describe('home page', () => {
 	});
 
 	it('shows "You\'re all caught up" indicator when no more posts exist', async () => {
-		const screen = render(Page, {
+		const screen = await render(Page, {
 			props: {
 				data: {
 					posts: [
@@ -114,7 +114,7 @@ describe('home page', () => {
 			const fetchMock = mockFeedApi(() =>
 				Response.json({ posts: [makePost('page-2')], hasMore: false, nextCursor: null })
 			);
-			const screen = render(Page, {
+			const screen = await render(Page, {
 				props: {
 					data: {
 						posts: [makePost('page-1')],
@@ -138,7 +138,7 @@ describe('home page', () => {
 					{ status: 400 }
 				)
 			);
-			const screen = render(Page, {
+			const screen = await render(Page, {
 				props: {
 					data: {
 						posts: [makePost('page-1')],

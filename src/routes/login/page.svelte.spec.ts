@@ -4,7 +4,7 @@ import LoginPage from './+page.svelte';
 
 describe('Login Page', () => {
 	it('renders login form according to design requirements', async () => {
-		const screen = render(LoginPage);
+		const screen = await render(LoginPage);
 
 		// Kizuna branding
 		await expect.element(screen.getByText('Kizuna', { exact: true })).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('Login Page', () => {
 	});
 
 	it('validates empty fields on login submission', async () => {
-		const screen = render(LoginPage);
+		const screen = await render(LoginPage);
 
 		const submitBtn = screen.getByRole('button', { name: /Sign In/i });
 		await submitBtn.click();

@@ -56,7 +56,7 @@ function renderPage(overrides: Record<string, unknown> = {}) {
 
 describe('/explore', () => {
 	it('shows trending tags, creators and post tiles linking to their pages', async () => {
-		const screen = renderPage();
+		const screen = await renderPage();
 		await expect
 			.element(screen.getByRole('link', { name: /#Film/ }))
 			.toHaveAttribute('href', '/explore/tags/film');
@@ -67,21 +67,21 @@ describe('/explore', () => {
 	});
 
 	it('follows a suggested creator', async () => {
-		const screen = renderPage();
+		const screen = await renderPage();
 		await screen.getByRole('button', { name: 'Follow Dan' }).click();
 		await expect.element(screen.getByRole('button', { name: 'Unfollow Dan' })).toBeVisible();
 		expect(calls).toContainEqual({ url: '/api/users/dan/follow', method: 'POST' });
 	});
 
 	it('loads the next page when scrolled to the end', async () => {
-		const screen = renderPage({ hasMore: true });
+		const screen = await renderPage({ hasMore: true });
 		await expect.element(screen.getByRole('link', { name: 'Post t3' })).toBeVisible();
 		expect(calls[0].url).toBe('/api/explore?page=1');
 		expect(screen.getByTestId('tile').elements()).toHaveLength(3);
 	});
 
 	it('explains an empty Explore', async () => {
-		const screen = renderPage({ tiles: [], trending: [], suggestions: [] });
+		const screen = await renderPage({ tiles: [], trending: [], suggestions: [] });
 		await expect.element(screen.getByText('Nothing new to explore yet')).toBeVisible();
 	});
 });

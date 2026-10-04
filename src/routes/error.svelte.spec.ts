@@ -4,7 +4,7 @@ import ErrorPage from './+error.svelte';
 
 describe('Error Page', () => {
 	it('renders 404 page with recovery links', async () => {
-		const screen = render(ErrorPage);
+		const screen = await render(ErrorPage);
 
 		await expect.element(screen.getByText('404')).toBeInTheDocument();
 		await expect

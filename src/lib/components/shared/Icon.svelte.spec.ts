@@ -4,7 +4,7 @@ import Icon from './Icon.svelte';
 
 describe('Icon Component', () => {
 	it('renders with default regular rounded class', async () => {
-		const screen = render(Icon, { name: 'user', 'data-testid': 'user-icon' });
+		const screen = await render(Icon, { name: 'user', 'data-testid': 'user-icon' });
 		const el = screen.getByTestId('user-icon');
 		await expect.element(el).toBeInTheDocument();
 		await expect.element(el).toHaveClass('fi');
@@ -12,7 +12,7 @@ describe('Icon Component', () => {
 	});
 
 	it('supports custom size and regular straight type', async () => {
-		const screen = render(Icon, {
+		const screen = await render(Icon, {
 			name: 'camera',
 			type: 'rs',
 			size: 'lg',
