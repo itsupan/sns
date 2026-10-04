@@ -481,6 +481,13 @@
 								· {formatTimeAgo(story.createdAt)}
 							</span>
 						</span>
+						{#if story.audience === 'close_friends'}
+							<span
+								class="self-start mt-0.5 px-1.5 py-px rounded-full bg-green-500 text-white text-[10px] font-semibold"
+							>
+								Close friends
+							</span>
+						{/if}
 						{#if story.location}
 							<span class="flex items-center gap-1 text-[11px] text-white/80 truncate">
 								<Icon name="map-marker" class="text-[10px]" />

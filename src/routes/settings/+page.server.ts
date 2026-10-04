@@ -4,6 +4,7 @@ import { account, session } from '$lib/server/db/auth-schema';
 import { resolve } from '$app/paths';
 import type { PageServerLoad } from './$types';
 import { listBlockedUsers, type BlockedUser } from '$lib/server/db/blocks';
+import { listCloseFriends, type CloseFriend } from '$lib/server/db/close-friends';
 import { listMutedKeywords, listMutedUsers, type MutedUser } from '$lib/server/db/mutes';
 import { refreshMediaUrl } from '$lib/server/services/storage';
 import { displayHandle } from '$lib/utils/format';
@@ -38,7 +39,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 	]);
 	const providers = accounts.map((a) => a.providerId);
 	// These lists are secondary: a failure here must not take the settings page down.
-	const [blocked, muted, mutedKeywords] = await Promise.all([
+	const [blocked, muted, mutedKeywords, friends] = await Promise.all([
 		listBlockedUsers(locals.db, me.id).catch((err) => {
 			console.error('Failed to load blocked users:', err);
 			return [];
@@ -50,17 +51,22 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 		listMutedKeywords(locals.db, me.id).catch((err) => {
 			console.error('Failed to load muted keywords:', err);
 			return [];
+		}),
+		listCloseFriends(locals.db, me.id).catch((err) => {
+			console.error('Failed to load close friends:', err);
+			return [];
 		})
 	]);
-	const toListed = async ({ id, name, handle, image }: BlockedUser | MutedUser) => ({
+	const toListed = async ({ id, name, handle, image }: BlockedUser | MutedUser | CloseFriend) => ({
 		id,
 		name,
 		handle: displayHandle(handle, name),
 		image: image ? await refreshMediaUrl(image, platform?.env) : null
 	});
-	const [blockedUsers, mutedUsers] = await Promise.all([
+	const [blockedUsers, mutedUsers, closeFriends] = await Promise.all([
 		Promise.all(blocked.map(toListed)),
-		Promise.all(muted.map(toListed))
+		Promise.all(muted.map(toListed)),
+		Promise.all(friends.map(toListed))
 	]);
 	return {
 		userId: me.id,
@@ -81,6 +87,7 @@ export const load: PageServerLoad = async ({ locals, url, platform }) => {
 		blockedUsers,
 		mutedUsers,
 		mutedKeywords,
+		closeFriends,
 		isModerator: isModerator(me)
 	};
 };

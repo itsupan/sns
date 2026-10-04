@@ -2,6 +2,7 @@
 	import {
 		AccountSection,
 		BlockedUsersSection,
+		CloseFriendsSection,
 		LegalSection,
 		LogOutButton,
 		NotificationsSection,
@@ -35,6 +36,7 @@
 	<PrivacyDataSection hasPassword={data.hasPassword} />
 	<BlockedUsersSection users={data.blockedUsers} />
 	<MutedSection users={data.mutedUsers} keywords={data.mutedKeywords} />
+	<CloseFriendsSection users={data.closeFriends} />
 	<LegalSection />
 	<LogOutButton />
 </main>
