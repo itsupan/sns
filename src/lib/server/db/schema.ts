@@ -90,7 +90,11 @@ export const postMedia = sqliteTable(
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull()
 	},
-	(table) => [uniqueIndex('post_media_postId_position_unique').on(table.postId, table.position)]
+	(table) => [
+		uniqueIndex('post_media_postId_position_unique').on(table.postId, table.position),
+		// Whether a deleted draft's uploads are still used by a post: WHERE url IN (...).
+		index('post_media_url_idx').on(table.url)
+	]
 );
 
 export const tag = sqliteTable('tag', {
@@ -385,6 +389,36 @@ export const mutedKeyword = sqliteTable(
 			.notNull()
 	},
 	(table) => [primaryKey({ columns: [table.userId, table.keyword] })]
+);
+
+/**
+ * A post being written: a composer payload (the body `POST /api/posts` takes, as JSON) saved
+ * for later. With `publish_at` set, the publish-drafts cron posts it then and deletes the draft;
+ * when that fails it keeps the draft, clears `publish_at` and records why in `last_error`.
+ */
+export const postDraft = sqliteTable(
+	'post_draft',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		payload: text('payload').notNull(),
+		publishAt: integer('publish_at', { mode: 'timestamp_ms' }),
+		lastError: text('last_error'),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// Drafts page: WHERE user_id = ? ORDER BY updated_at DESC.
+		index('post_draft_userId_updatedAt_idx').on(table.userId, table.updatedAt),
+		// Cron: WHERE publish_at <= now ORDER BY publish_at.
+		index('post_draft_publishAt_idx').on(table.publishAt)
+	]
 );
 
 /** Users tagged (@mentioned) in a post. */

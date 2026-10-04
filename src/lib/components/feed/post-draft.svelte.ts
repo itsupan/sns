@@ -1,5 +1,7 @@
 import { uploadToR2 } from '$lib/utils/upload';
 import { toast } from '$lib/utils/toast.svelte';
+import { readApiError } from '$lib/utils/api-error';
+import type { DraftData } from '$lib/drafts';
 import {
 	MAX_MEDIA_PER_POST,
 	MAX_TAGS_PER_POST,
@@ -7,7 +9,7 @@ import {
 	MAX_TEXT_POST_LENGTH
 } from '$lib/constants/post-limits';
 import { DEFAULT_TEXT_BACKGROUND, type TextBackground } from '$lib/post-backgrounds';
-import type { PostData, PostType } from './PostCard.svelte';
+import type { MediaItem, PostData, PostType } from './PostCard.svelte';
 import type { IconName } from '$lib/components/shared/icons';
 
 export type { PostType };
@@ -40,11 +42,25 @@ export const ASPECT_RATIOS: { id: AspectRatio; label: string; sub: string }[] = 
 
 export const MAX_CONTENT_LENGTH = 2200;
 
+function platesFrom(media: MediaItem[]): MediaPlate[] {
+	return media.map((m) => ({
+		id: crypto.randomUUID(),
+		url: m.url,
+		previewUrl: m.url,
+		type: m.type,
+		alt: m.alt ?? ''
+	}));
+}
+
 /**
  * Everything the post composer edits: text, media plates (uploaded as they are added), tags.
  * Shared by the create composer and the edit form so both behave and submit the same way.
  */
 export class PostDraft {
+	/** The saved draft (`/api/drafts`) this was opened from or last saved to. */
+	draftId = $state<string | null>(null);
+	/** When that draft is scheduled to publish (ISO), or null. */
+	scheduledAt = $state<string | null>(null);
 	content = $state('');
 	title = $state('');
 	selectedType = $state<PostType>('photo');
@@ -84,13 +100,44 @@ export class PostDraft {
 							}
 						]
 					: [];
-		draft.mediaPlates = media.map((m) => ({
-			id: crypto.randomUUID(),
-			url: m.url,
-			previewUrl: m.url,
-			type: m.type,
-			alt: m.alt ?? ''
-		}));
+		draft.mediaPlates = platesFrom(media);
+		return draft;
+	}
+
+	/** Replaces what is being composed with a saved draft, to keep editing it. */
+	loadDraft(saved: DraftData) {
+		const { payload } = saved;
+		this.reset();
+		this.draftId = saved.id;
+		this.scheduledAt = saved.publishAt;
+		this.content = payload.content;
+		this.title = payload.title ?? '';
+		this.selectedType = payload.postType;
+		this.background = payload.background ?? DEFAULT_TEXT_BACKGROUND;
+		this.canvasRatio = payload.aspectRatio;
+		this.location = payload.location ?? '';
+		this.tags = payload.tags.map((t) => `#${t}`);
+		this.mediaPlates = platesFrom(payload.mediaUrls);
+	}
+
+	/**
+	 * Saves to `/api/drafts`: a new draft, or the one being edited. With `publishAt` the draft is
+	 * scheduled; without, it is kept unscheduled.
+	 */
+	async saveDraft(publishAt: Date | null = null): Promise<DraftData> {
+		const res = await fetch(this.draftId ? `/api/drafts/${this.draftId}` : '/api/drafts', {
+			method: this.draftId ? 'PATCH' : 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({
+				payload: this.toPayload(),
+				publishAt: publishAt?.toISOString() ?? null
+			})
+		});
+		const data = await res.json().catch(() => null);
+		if (!res.ok) throw new Error(readApiError(data, 'Could not save the draft').message);
+		const { draft } = data as { draft: DraftData };
+		this.draftId = draft.id;
+		this.scheduledAt = draft.publishAt;
 		return draft;
 	}
 
@@ -226,6 +273,8 @@ export class PostDraft {
 	}
 
 	reset() {
+		this.draftId = null;
+		this.scheduledAt = null;
 		this.content = '';
 		this.title = '';
 		this.location = '';
