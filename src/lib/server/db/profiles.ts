@@ -1,11 +1,12 @@
 import { stripFormatting } from '$lib/formatting';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, sql } from 'drizzle-orm';
 import type { Database } from '.';
 import { post, user } from './schema';
 import { followStatus } from './follows';
 import { visibleTo } from './visibility';
 import { encodeCursor, notDeleted, type FeedCursor } from './posts';
 import { postRowAuthor, toPostCards } from './post-cards';
+import { MAX_PINNED_POSTS } from '$lib/constants/post-limits';
 import type { PostData } from '$lib/components/feed/PostCard.svelte';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 import type { FollowStatus } from '$lib/utils/follow.svelte';
@@ -63,9 +64,10 @@ export async function loadProfileStats(
 
 /**
  * One page of a profile's live posts in the `PostCard` shape, newest first, keyset-paginated on
- * (created_at, id) via `post_userId_createdAt_idx`. Empty when the author and `viewerId` are
- * blocked in either direction, or the author is private and not followed by `viewerId`: that is
- * how the profile page hides them.
+ * (created_at, id) via `post_userId_createdAt_idx`. The first page (no cursor) leads with the
+ * pinned posts, most recently pinned first; the pages never repeat them. Empty when the author
+ * and `viewerId` are blocked in either direction, or the author is private and not followed by
+ * `viewerId`: that is how the profile page hides them.
  */
 export async function loadProfilePosts(
 	db: Database,
@@ -73,28 +75,39 @@ export async function loadProfilePosts(
 	viewerId: string | null | undefined,
 	{ limit, cursor }: { limit: number; cursor?: FeedCursor | null }
 ): Promise<{ posts: PostData[]; nextCursor: string | null }> {
-	const rows = await db
-		.select({ post, user: postRowAuthor })
-		.from(post)
-		.innerJoin(user, eq(post.userId, user.id))
-		.where(
-			and(
-				eq(post.userId, userId),
-				notDeleted,
-				visibleTo(viewerId, post.userId),
-				cursor
-					? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
-					: undefined
+	const shown = and(eq(post.userId, userId), notDeleted, visibleTo(viewerId, post.userId));
+	const [pinned, rows] = await Promise.all([
+		cursor
+			? []
+			: db
+					.select({ post, user: postRowAuthor })
+					.from(post)
+					.innerJoin(user, eq(post.userId, user.id))
+					.where(and(shown, isNotNull(post.pinnedAt)))
+					.orderBy(desc(post.pinnedAt))
+					.limit(MAX_PINNED_POSTS),
+		db
+			.select({ post, user: postRowAuthor })
+			.from(post)
+			.innerJoin(user, eq(post.userId, user.id))
+			.where(
+				and(
+					shown,
+					isNull(post.pinnedAt),
+					cursor
+						? sql`(${post.createdAt}, ${post.id}) < (${cursor.createdAt}, ${cursor.id})`
+						: undefined
+				)
 			)
-		)
-		.orderBy(desc(post.createdAt), desc(post.id))
-		.limit(limit + 1);
+			.orderBy(desc(post.createdAt), desc(post.id))
+			.limit(limit + 1)
+	]);
 
 	const hasMore = rows.length > limit;
 	const page = hasMore ? rows.slice(0, limit) : rows;
 	const last = page.at(-1);
 	return {
-		posts: await toPostCards(db, page, viewerId),
+		posts: await toPostCards(db, [...pinned, ...page], viewerId),
 		nextCursor: hasMore && last ? encodeCursor(last.post) : null
 	};
 }

@@ -39,13 +39,17 @@ export const post = sqliteTable(
 			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
 			.notNull(),
 		// Soft delete: set instead of removing the row; feed and profile queries filter it out.
-		deletedAt: integer('deleted_at', { mode: 'timestamp_ms' })
+		deletedAt: integer('deleted_at', { mode: 'timestamp_ms' }),
+		// Set while the post is pinned to the top of its author's profile (see MAX_PINNED_POSTS).
+		pinnedAt: integer('pinned_at', { mode: 'timestamp_ms' })
 	},
 	(table) => [
 		// Feed keyset pagination: ORDER BY created_at DESC, id DESC.
 		index('post_createdAt_id_idx').on(table.createdAt, table.id),
 		// Profile grid: WHERE user_id = ? ORDER BY created_at DESC (also serves user_id lookups).
-		index('post_userId_createdAt_idx').on(table.userId, table.createdAt)
+		index('post_userId_createdAt_idx').on(table.userId, table.createdAt),
+		// Pinned posts: WHERE user_id = ? AND pinned_at IS NOT NULL ORDER BY pinned_at DESC.
+		index('post_userId_pinnedAt_idx').on(table.userId, table.pinnedAt)
 	]
 );
 

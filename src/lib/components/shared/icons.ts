@@ -40,6 +40,8 @@ import MessageCircle from '@lucide/svelte/icons/message-circle';
 import MessageSquareText from '@lucide/svelte/icons/message-square-text';
 import Pause from '@lucide/svelte/icons/pause';
 import Pencil from '@lucide/svelte/icons/pencil';
+import Pin from '@lucide/svelte/icons/pin';
+import PinOff from '@lucide/svelte/icons/pin-off';
 import Play from '@lucide/svelte/icons/play';
 import Plus from '@lucide/svelte/icons/plus';
 import Repeat from '@lucide/svelte/icons/repeat';
@@ -110,6 +112,8 @@ export const ICONS = {
 	pause: Pause,
 	pencil: Pencil,
 	picture: Image,
+	pin: Pin,
+	'pin-off': PinOff,
 	play: Play,
 	'play-alt': SquarePlay,
 	plus: Plus,
