@@ -9,6 +9,10 @@ import type { RequestEvent } from './$types';
 const media = vi.hoisted<Record<string, Array<{ url: string; type: 'image' | 'video' }>>>(() => ({
 	'post-1': [{ url: 'https://example.com/photo.jpg', type: 'image' }]
 }));
+vi.mock('$lib/server/db/polls', async (importOriginal) => ({
+	...(await importOriginal<typeof import('$lib/server/db/polls')>()),
+	loadPolls: vi.fn(async () => new Map())
+}));
 vi.mock('$lib/server/db/posts', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('$lib/server/db/posts')>();
 	const tags: Record<string, string[]> = { 'post-1': ['#MinimalArchitecture'] };

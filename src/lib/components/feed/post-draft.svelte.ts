@@ -9,6 +9,7 @@ import {
 	MAX_TEXT_POST_LENGTH
 } from '$lib/constants/post-limits';
 import { DEFAULT_TEXT_BACKGROUND, type TextBackground } from '$lib/post-backgrounds';
+import { DEFAULT_POLL_DURATION_MINUTES, MIN_POLL_OPTIONS } from '$lib/polls';
 import type { MediaItem, PostData, PostType } from './PostCard.svelte';
 import type { IconName } from '$lib/components/shared/icons';
 
@@ -42,6 +43,16 @@ export const ASPECT_RATIOS: { id: AspectRatio; label: string; sub: string }[] = 
 
 export const MAX_CONTENT_LENGTH = 2200;
 
+/** A poll option as the composer edits it; the id keys its input. */
+export interface PollOptionField {
+	id: string;
+	label: string;
+}
+
+function pollOptionField(label: string): PollOptionField {
+	return { id: crypto.randomUUID(), label };
+}
+
 function platesFrom(media: MediaItem[]): MediaPlate[] {
 	return media.map((m) => ({
 		id: crypto.randomUUID(),
@@ -71,6 +82,9 @@ export class PostDraft {
 	activePlateIndex = $state(0);
 	tagInput = $state('');
 	tags = $state<string[]>([]);
+	/** Text posts: the options of the poll being added, or null without one. */
+	pollOptions = $state<PollOptionField[] | null>(null);
+	pollDuration = $state(DEFAULT_POLL_DURATION_MINUTES);
 
 	isUploadingAny = $derived(this.mediaPlates.some((p) => p.uploading));
 	/** Text posts are words on a background: no media, and a shorter limit. */
@@ -118,6 +132,10 @@ export class PostDraft {
 		this.location = payload.location ?? '';
 		this.tags = payload.tags.map((t) => `#${t}`);
 		this.mediaPlates = platesFrom(payload.mediaUrls);
+		if (payload.poll) {
+			this.pollOptions = payload.poll.options.map(pollOptionField);
+			this.pollDuration = payload.poll.durationMinutes;
+		}
 	}
 
 	/**
@@ -231,6 +249,23 @@ export class PostDraft {
 		}
 	}
 
+	addPoll() {
+		this.pollOptions = Array.from({ length: MIN_POLL_OPTIONS }, () => pollOptionField(''));
+		this.pollDuration = DEFAULT_POLL_DURATION_MINUTES;
+	}
+
+	addPollOption() {
+		this.pollOptions?.push(pollOptionField(''));
+	}
+
+	removePollOption(id: string) {
+		this.pollOptions = this.pollOptions?.filter((o) => o.id !== id) ?? null;
+	}
+
+	removePoll() {
+		this.pollOptions = null;
+	}
+
 	removeTag(tag: string) {
 		this.tags = this.tags.filter((t) => t !== tag);
 	}
@@ -253,6 +288,10 @@ export class PostDraft {
 				location: this.location.trim() || null,
 				postType: this.selectedType,
 				background: this.background,
+				poll: this.pollOptions && {
+					options: this.pollOptions.map((o) => o.label),
+					durationMinutes: this.pollDuration
+				},
 				tags: this.tags
 			};
 		}
@@ -280,6 +319,7 @@ export class PostDraft {
 		this.location = '';
 		this.tags = [];
 		this.tagInput = '';
+		this.pollOptions = null;
 		this.removeAllMedia();
 	}
 }
