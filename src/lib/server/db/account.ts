@@ -27,6 +27,8 @@ import {
 	postTag,
 	pushSubscription,
 	story,
+	storyHighlight,
+	storyHighlightItem,
 	storyView,
 	tag,
 	userFollow,
@@ -34,7 +36,7 @@ import {
 } from './schema';
 
 /** Version of the export layout, bumped when fields are added or renamed. */
-export const EXPORT_FORMAT_VERSION = 15;
+export const EXPORT_FORMAT_VERSION = 16;
 
 /**
  * Everything Kizuna stores about one user, for the "Download my data" request (GDPR art. 15/20).
@@ -70,6 +72,8 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		pushSubscriptions,
 		stories,
 		storyViews,
+		highlights,
+		highlightItems,
 		moderationActions
 	] = await Promise.all([
 		db
@@ -231,6 +235,23 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 			.orderBy(asc(storyView.viewedAt)),
 		db
 			.select({
+				id: storyHighlight.id,
+				title: storyHighlight.title,
+				coverStoryId: storyHighlight.coverStoryId,
+				createdAt: storyHighlight.createdAt,
+				updatedAt: storyHighlight.updatedAt
+			})
+			.from(storyHighlight)
+			.where(eq(storyHighlight.userId, userId))
+			.orderBy(asc(storyHighlight.createdAt)),
+		db
+			.select({ highlightId: storyHighlightItem.highlightId, storyId: storyHighlightItem.storyId })
+			.from(storyHighlightItem)
+			.innerJoin(storyHighlight, eq(storyHighlight.id, storyHighlightItem.highlightId))
+			.where(eq(storyHighlight.userId, userId))
+			.orderBy(asc(storyHighlightItem.position)),
+		db
+			.select({
 				action: moderationAction.action,
 				targetType: moderationAction.targetType,
 				targetId: moderationAction.targetId,
@@ -372,6 +393,11 @@ export async function buildAccountExport(db: Database, userId: string, now = new
 		})),
 		stories,
 		storyViews,
+		highlights: highlights.map((h) => ({
+			...h,
+			// In playing order.
+			storyIds: highlightItems.filter((i) => i.highlightId === h.id).map((i) => i.storyId)
+		})),
 		// Actions this account took as a moderator or admin.
 		moderationActions
 	};

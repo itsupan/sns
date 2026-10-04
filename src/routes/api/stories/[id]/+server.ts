@@ -4,8 +4,9 @@ import { deleteMediaObjects, ownedMediaKeys } from '$lib/server/services/storage
 import { deleteStory, parseStoryId } from '$lib/server/stories';
 
 /**
- * Deletes one of your own stories (its views, reaction notifications and media too) before it
- * expires. `:id` is `<userId>:<ms>`. Idempotent: a story already gone is a 204 as well.
+ * Deletes one of your own stories, live or archived (its views, highlight items, reaction
+ * notifications and media too). `:id` is `<userId>:<ms>`. Idempotent: a story already gone is a
+ * 204 as well.
  */
 export const DELETE: RequestHandler = withApi(async ({ params, locals, platform }) => {
 	const currentUser = requireUser(locals);

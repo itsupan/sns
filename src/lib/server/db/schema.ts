@@ -636,6 +636,8 @@ export const story = sqliteTable(
 	(table) => [
 		// Tray and author checks: WHERE user_id = ? AND expires_at > now.
 		index('story_userId_expiresAt_idx').on(table.userId, table.expiresAt),
+		// Archive: WHERE user_id = ? ORDER BY created_at DESC, id DESC.
+		index('story_userId_createdAt_idx').on(table.userId, table.createdAt, table.id),
 		// Pruning views of long-expired stories.
 		index('story_expiresAt_idx').on(table.expiresAt)
 	]
@@ -663,6 +665,57 @@ export const storyView = sqliteTable(
 		index('story_view_storyId_viewedAt_idx').on(table.storyId, table.viewedAt, table.viewerId),
 		// Account deletion: the stories a user watched.
 		index('story_view_viewerId_idx').on(table.viewerId)
+	]
+);
+
+/**
+ * A named collection of its owner's stories kept on their profile past the 24 hours. The cover is
+ * one of its items; while unset (or that story is gone) the first item is the cover.
+ */
+export const storyHighlight = sqliteTable(
+	'story_highlight',
+	{
+		id: text('id').primaryKey(),
+		userId: text('user_id')
+			.notNull()
+			.references(() => user.id, { onDelete: 'cascade' }),
+		// 1 to MAX_HIGHLIGHT_TITLE ($lib/highlights) characters; validated at the API layer.
+		title: text('title').notNull(),
+		coverStoryId: text('cover_story_id').references(() => story.id, { onDelete: 'set null' }),
+		createdAt: integer('created_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull(),
+		updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+			.default(sql`(cast(unixepoch('subsecond') * 1000 as integer))`)
+			.notNull()
+	},
+	(table) => [
+		// Profile row: WHERE user_id = ? ORDER BY created_at DESC, id DESC.
+		index('story_highlight_userId_createdAt_idx').on(table.userId, table.createdAt, table.id),
+		// Clearing the cover when its story is deleted.
+		index('story_highlight_coverStoryId_idx').on(table.coverStoryId)
+	]
+);
+
+/** A story in a highlight, played in `position` order. */
+export const storyHighlightItem = sqliteTable(
+	'story_highlight_item',
+	{
+		highlightId: text('highlight_id')
+			.notNull()
+			.references(() => storyHighlight.id, { onDelete: 'cascade' }),
+		storyId: text('story_id')
+			.notNull()
+			.references(() => story.id, { onDelete: 'cascade' }),
+		position: integer('position').notNull()
+	},
+	(table) => [
+		// One row per story: makes adding idempotent (INSERT … ON CONFLICT DO NOTHING).
+		primaryKey({ columns: [table.highlightId, table.storyId] }),
+		// Playing order: WHERE highlight_id = ? ORDER BY position.
+		index('story_highlight_item_highlightId_position_idx').on(table.highlightId, table.position),
+		// Cascading a story's deletion.
+		index('story_highlight_item_storyId_idx').on(table.storyId)
 	]
 );
 
