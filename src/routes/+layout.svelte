@@ -16,6 +16,7 @@
 			page.url.pathname === '/signup' ||
 			page.url.pathname === '/forgot-password' ||
 			page.url.pathname === '/reset-password' ||
+			page.url.pathname === '/welcome' ||
 			page.url.pathname.startsWith('/auth')
 	);
 </script>

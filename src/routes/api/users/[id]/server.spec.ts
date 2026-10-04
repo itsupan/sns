@@ -165,7 +165,7 @@ describe('PATCH /api/users/:id', () => {
 		db.select = vi.fn(() => ({
 			from: vi.fn(() => ({
 				where: vi.fn(() => ({
-					limit: vi.fn(async () => [{ id: 'other-user' }])
+					limit: vi.fn(async () => [{ handle: 'taken_handle' }])
 				}))
 			}))
 		}));
