@@ -30,7 +30,7 @@
 	import { MIN_TERM_LENGTH, highlightSegments, searchTermsOf } from '$lib/search';
 
 	interface Props {
-		/** Focus the input on mount (mobile search screen). */
+		/** Focus the input when its dialog opens (mobile search screen). */
 		autofocus?: boolean;
 		/** Called after navigating to a result, e.g. to close the mobile screen. */
 		onNavigate?: () => void;
@@ -64,9 +64,8 @@
 	]);
 	let showDropdown = $derived(expanded && query.trim().length > 0);
 
+	// Typing before hydration fires no handlers; open for whatever is already focused and typed.
 	$effect(() => {
-		if (autofocus) input?.focus();
-		// Typing before hydration fires no handlers; open for whatever is already focused and typed.
 		if (input && document.activeElement === input) expanded = true;
 	});
 
@@ -175,9 +174,11 @@
 			name="search"
 			class="absolute left-3.5 text-slate-500 dark:text-dark-subtle text-sm pointer-events-none"
 		/>
+		<!-- svelte-ignore a11y_autofocus (set only inside the mobile search dialog, which focuses it) -->
 		<input
 			bind:this={input}
 			bind:value={query}
+			{autofocus}
 			oninput={onInput}
 			onfocus={() => (expanded = true)}
 			onkeydown={onKeydown}

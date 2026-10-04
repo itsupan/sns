@@ -5,7 +5,7 @@ import { post, user } from './schema';
 import { isFollowing } from './follows';
 import { loadPostMedia, loadPostTags, loadRecentLikers, notDeleted } from './posts';
 import { backgroundOf, loadViewerPostState } from './post-cards';
-import { formatTimeAgo } from '$lib/utils/format';
+import { displayHandle, formatTimeAgo } from '$lib/utils/format';
 import type { PostData, PostType } from '$lib/components/feed/PostCard.svelte';
 import type { GridItem } from '$lib/components/profile/ProfileGrid.svelte';
 
@@ -86,9 +86,7 @@ export async function loadProfilePosts(
 		loadViewerPostState(db, viewerId, postIds),
 		loadRecentLikers(db, viewerId, postIds)
 	]);
-	const handle = author.handle
-		? `@${author.handle.replace(/^@/, '')}`
-		: `@${author.name.toLowerCase().replace(/\s+/g, '')}`;
+	const handle = displayHandle(author.handle, author.name);
 
 	return postRows.map((p) => {
 		const media = mediaByPost.get(p.id) ?? [];
