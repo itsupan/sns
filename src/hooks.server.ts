@@ -73,9 +73,17 @@ export const handle: Handle = async ({ event, resolve }) => {
 	if (building) return withSecurityHeaders(await resolve(event));
 
 	const db = getDb(event.platform);
-	const auth = createAuth(event.platform!.env, db, event.platform!.ctx);
-
 	event.locals.db = db;
+
+	// Cron routes (called by worker.ts `scheduled`, guarded by their token) need no session, and
+	// setting up better-auth would spend much of the Free plan's 10 ms CPU limit.
+	if (event.url.pathname.startsWith('/api/cron/')) {
+		event.locals.session = null;
+		event.locals.user = null;
+		return withSecurityHeaders(await resolve(event));
+	}
+
+	const auth = createAuth(event.platform!.env, db, event.platform!.ctx);
 	event.locals.auth = auth;
 
 	const authLimit =
